@@ -1,10 +1,3 @@
-# La base de datos NO se levanta aquí: el sistema se conecta al servidor MySQL
-# propio del área. Los datos de conexión se capturan en backend/.env.
-#
-# Si el servidor MySQL corre en esta misma máquina (fuera de Docker), en el .env
-# usa DB_HOST=host.docker.internal, no localhost: dentro del contenedor
-# localhost es el contenedor mismo. Si es un servidor de red, pon su IP o nombre.
-
 services:
   frontend:
     build:
