@@ -1,0 +1,258 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Tablero</h1>
+    <p class="sub mb-0">Rezago del día, desempeño por técnico e insumo para justificar compras.</p>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" (click)="alternarTraza()">
+    <i class="bi bi-terminal"></i> Traza del motor de reglas
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+@if (verTraza()) {
+  <div class="tarjeta p-3 mb-3" style="background: #121c2b; color: #cfe0f2; max-height: 320px; overflow: auto">
+    @for (l of traza(); track l.t) {
+      <div class="mono" style="font-size: 0.75rem; padding: 2px 0">
+        <span style="color: #5d7a9e">{{ l.t.slice(11, 19) }}</span>
+        <span style="color: #7fe3c6" class="mx-2">{{ l.regla }}</span>
+        <span>{{ l.texto }}</span>
+      </div>
+    } @empty {
+      <div class="sub">Sin decisiones registradas todavía.</div>
+    }
+  </div>
+}
+
+@if (datos(); as d) {
+  <!-- Bloque 1 · rezago -->
+  <div class="text-uppercase sub fw-semibold mb-2" style="letter-spacing: 0.06em; font-size: 0.7rem">
+    Bloque 1 · Rezago
+  </div>
+
+  <div class="row g-2 mb-4">
+    <div class="col-6 col-lg">
+      <div class="tarjeta p-3">
+        <div class="sub">Abiertos</div>
+        <div class="h4 mb-0">{{ d.rezago.abiertos }}</div>
+        <div class="sub" style="font-size: 0.72rem">de {{ d.rezago.total }} en total</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="tarjeta p-3">
+        <div class="sub">Fuera de tiempo</div>
+        <div class="h4 mb-0" style="color: var(--p1)">{{ d.rezago.fuera_de_tiempo }}</div>
+        <div class="sub" style="font-size: 0.72rem">rebasaron el objetivo</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="tarjeta p-3">
+        <div class="sub">Sin asignar</div>
+        <div class="h4 mb-0" [style.color]="d.rezago.sin_asignar ? 'var(--p1)' : null">
+          {{ d.rezago.sin_asignar }}
+        </div>
+        <div class="sub" style="font-size: 0.72rem">en cola por falta de técnico</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="tarjeta p-3">
+        <div class="sub">En espera</div>
+        <div class="h4 mb-0">{{ d.rezago.en_espera }}</div>
+        <div class="sub" style="font-size: 0.72rem">reloj pausado</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="tarjeta p-3">
+        <div class="sub">Cierre por omisión</div>
+        <div class="h4 mb-0">{{ d.rezago.cierre_por_omision }}</div>
+        <div class="sub" style="font-size: 0.72rem">el usuario no validó</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="tarjeta p-3 h-100">
+        <h2 class="h6 mb-3">Tickets abiertos por prioridad</h2>
+        @for (p of d.rezago.por_prioridad; track p.prioridad) {
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>
+                <span class="chip" [class]="'chip-' + p.prioridad">{{ p.prioridad }}</span>
+                {{ nombrePrioridad[p.prioridad] }} · objetivo {{ dur(p.minutos_objetivo) }}
+              </span>
+              <b>{{ p.n }}</b>
+            </div>
+            <div class="barra">
+              <i [style.width.%]="(p.n / maxPrioridad()) * 100"
+                 [style.background]="'var(--' + p.prioridad.toLowerCase() + ')'"></i>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="tarjeta p-3 h-100">
+        <h2 class="h6 mb-3">Cobertura de hoy</h2>
+        @for (s of d.disponibilidad; track s.servicio_id) {
+          <div class="d-flex justify-content-between border-bottom py-2 small">
+            <span>{{ s.servicio }}</span>
+            <b [style.color]="colorCobertura(s.disponibles)">
+              {{ s.disponibles }} de {{ s.tecnicos }}
+            </b>
+          </div>
+        }
+        <div class="form-text mt-2">
+          Un servicio en rojo significa que los tickets nuevos caerán en cola.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bloque 2 · desempeño -->
+  <div class="text-uppercase sub fw-semibold mb-2" style="letter-spacing: 0.06em; font-size: 0.7rem">
+    Bloque 2 · Desempeño por técnico
+  </div>
+
+  <div class="tarjeta overflow-hidden mb-3">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr class="sub">
+            <th>Técnico</th>
+            <th style="width: 80px">Hoy</th>
+            <th style="width: 80px">Abiertos</th>
+            <th style="width: 85px">Atendidos</th>
+            <th style="width: 120px">Tiempo prom.</th>
+            <th style="width: 110px">En sitio</th>
+            <th style="width: 130px">En tiempo</th>
+            <th style="width: 95px">Reab./rech.</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (x of conCarga(); track x.tecnico_id) {
+            <tr>
+              <td>
+                <div class="fw-semibold" style="font-size: 0.85rem">{{ x.tecnico }}</div>
+                <div class="sub">{{ x.especialidad }}</div>
+              </td>
+              <td>
+                @if (x.disponible) {
+                  <span class="chip chip-P3">libre</span>
+                } @else {
+                  <span class="chip chip-P1">bloqueado</span>
+                }
+              </td>
+              <td>{{ x.abiertos }}</td>
+              <td>{{ x.atendidos }}</td>
+              <td class="sub">
+                {{ x.min_activo_prom !== null ? dur(x.min_activo_prom) : '—' }}
+                @if (x.min_campo) {
+                  <div class="sub" style="font-size: 0.7rem">sitio {{ dur(x.min_campo) }}</div>
+                }
+              </td>
+              <td>
+                @if (x.pct_en_sitio === null) {
+                  <span class="sub">sin dato</span>
+                } @else {
+                  <span class="geo" [class]="x.pct_en_sitio >= 80 ? 'geo-ok' : 'geo-no'">
+                    {{ x.pct_en_sitio }}%
+                  </span>
+                  <div class="sub" style="font-size: 0.7rem">
+                    {{ x.con_ubicacion }} de {{ x.sesiones }} sesiones
+                  </div>
+                }
+              </td>
+              <td>
+                @if (x.pct_en_tiempo === null) {
+                  <span class="sub">—</span>
+                } @else {
+                  <div class="barra mb-1">
+                    <i [style.width.%]="x.pct_en_tiempo"
+                       [style.background]="x.pct_en_tiempo >= 80 ? '#2f9e75' : 'var(--p2)'"></i>
+                  </div>
+                  <span class="sub">{{ x.pct_en_tiempo }}%</span>
+                }
+              </td>
+              <td>
+                @if (x.reaperturas) {
+                  <span class="chip chip-bandera">{{ x.reaperturas }}</span>
+                } @else {
+                  <span class="sub">0</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="8" class="text-center sub py-4">Todavía no hay carga registrada.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="alert alert-light border small">
+    Los tiempos descuentan el periodo <b>en espera</b>, para no castigar al técnico por esperas
+    ajenas. Comparar técnicos de servicios distintos no es válido: un ticket de tóner y uno de nómina
+    no son equivalentes.
+  </div>
+
+  <div class="alert alert-warning small mb-4">
+    La columna <b>En sitio</b> es un indicador de calidad del dato, no de conducta. Un porcentaje
+    bajo casi siempre significa permiso de ubicación no otorgado o mala señal dentro del edificio, no
+    que el técnico no haya asistido. El GPS no distingue pisos y en interiores puede errar decenas de
+    metros.
+  </div>
+
+  <!-- Bloque 3 · compras -->
+  <div class="text-uppercase sub fw-semibold mb-2" style="letter-spacing: 0.06em; font-size: 0.7rem">
+    Bloque 3 · Justificación de compras
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="tarjeta p-3 h-100">
+        <h2 class="h6 mb-3">Problemas más frecuentes</h2>
+        @for (p of datos()!.compras.problemas; track p.clave) {
+          <div class="d-flex justify-content-between border-bottom py-2 small gap-2">
+            <span>
+              {{ p.descripcion }}
+              <div class="sub" style="font-size: 0.72rem">{{ p.servicio }}</div>
+            </span>
+            <b>{{ p.tickets }}</b>
+          </div>
+        } @empty {
+          <div class="sub">Sin datos todavía.</div>
+        }
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="tarjeta p-3 h-100">
+        <h2 class="h6 mb-3">Tickets por dependencia</h2>
+        @for (x of datos()!.compras.dependencias; track x.dependencia) {
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small mb-1">
+              <span>{{ x.dependencia }}</span>
+              <b>{{ x.tickets }}</b>
+            </div>
+            <div class="barra">
+              <i [style.width.%]="(x.tickets / maxDependencia()) * 100" style="background: #5c6a7e"></i>
+            </div>
+          </div>
+        } @empty {
+          <div class="sub">Sin datos todavía.</div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-warning small mt-3 mb-0">
+    La recurrencia de fallas <b>por equipo</b> aún no se puede calcular: requiere el número de
+    inventario, que hoy solo trae una fracción de los tickets.
+  </div>
+}

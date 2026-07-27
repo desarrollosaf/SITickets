@@ -1,0 +1,111 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Tickets internos del área</h1>
+    <p class="sub mb-0">
+      Trabajo que nadie solicita pero debe hacerse. Admiten varios técnicos; el jefe de departamento
+      es el responsable.
+    </p>
+  </div>
+  @if (esAdmin()) {
+    <button class="btn btn-sm btn-primary" (click)="abrirFormulario()">
+      <i class="bi bi-plus-lg"></i> Generar ticket interno
+    </button>
+  }
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<app-tabla-tickets
+  [tickets]="tickets()"
+  vacio="Sin tickets internos"
+  ayudaVacio="Cuando el área programe trabajo propio aparecerá aquí."
+  (abrir)="abierto.set($event)" />
+
+<div class="alert alert-light border small mt-3 mb-0">
+  Estos tickets llevan serie de folio propia y se contabilizan aparte, para no distorsionar el conteo
+  de incidencias reportadas por usuarios.
+</div>
+
+<!-- Alta de ticket interno -->
+@if (formulario()) {
+  <div class="cajon-fondo" (click)="formulario.set(false)"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(560px, 94vw); max-height: 92vh; overflow: auto">
+    <h2 class="h6 mb-3">Generar ticket interno</h2>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold" for="i-srv">Tipo de trabajo</label>
+      <select id="i-srv" class="form-select form-select-sm" (change)="cambiaServicio($any($event.target).value)">
+        <option value="">Selecciona…</option>
+        @for (s of serviciosInternos(); track s.id) {
+          <option [value]="s.id">{{ s.nombre }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold" for="i-act">Actividad</label>
+      <select id="i-act" class="form-select form-select-sm" [(ngModel)]="claveProblema" name="claveProblema"
+              [disabled]="!servicioId()">
+        <option value="">
+          {{ servicioId() ? 'Selecciona…' : 'Elige primero el tipo de trabajo' }}
+        </option>
+        @for (a of actividades(); track a.id) {
+          <option [value]="a.clave">{{ a.descripcion }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-7">
+        <label class="form-label small fw-semibold" for="i-alc">Alcance o ubicación</label>
+        <input id="i-alc" class="form-control form-control-sm" [(ngModel)]="alcance" name="alcance"
+               placeholder="Ej. Contraloría, planta baja (32 equipos)" />
+      </div>
+      <div class="col-md-5">
+        <label class="form-label small fw-semibold" for="i-fec">Fecha planeada</label>
+        <input id="i-fec" type="date" class="form-control form-control-sm" [(ngModel)]="fechaPlan"
+               name="fechaPlan" />
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <div class="form-label small fw-semibold">Técnicos que participan</div>
+      <div class="border rounded p-2" style="max-height: 180px; overflow: auto">
+        @for (t of candidatos(); track t.id) {
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" [id]="'tec-' + t.id"
+                   [checked]="seleccionados().has(t.id)" (change)="alternarTecnico(t.id)" />
+            <label class="form-check-label small" [for]="'tec-' + t.id">
+              {{ t.nombre }}
+              <span class="sub">· {{ t.servicios.length ? t.servicios[0].nombre : 'sin especialidad' }}</span>
+            </label>
+          </div>
+        }
+      </div>
+      <div class="form-text">
+        El responsable es el jefe de departamento; los demás participan como apoyo.
+      </div>
+    </div>
+
+    @if (errorForm()) {
+      <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(false)">Cancelar</button>
+      <button class="btn btn-sm btn-primary" [disabled]="guardando()" (click)="generar()">
+        Generar ticket
+      </button>
+    </div>
+  </div>
+}
+
+<app-detalle-ticket
+  [ticketId]="abierto()"
+  [catalogos]="catalogos()"
+  [tecnicos]="tecnicos()"
+  (cerrar)="abierto.set(null)"
+  (cambio)="cargar()" />

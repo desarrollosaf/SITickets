@@ -1,0 +1,139 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Monitor de turnos</h1>
+    <p class="sub mb-0">Pantalla para proyectar en el área. Se actualiza sola cada 8 segundos.</p>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" (click)="pantallaCompleta()">
+    <i class="bi bi-arrows-fullscreen"></i> Pantalla completa
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<div class="monitor p-4" id="tablero-monitor">
+  @if (datos(); as d) {
+    <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+      <div>
+        <h2 class="h4 mb-1">Atención de servicios de informática</h2>
+        <div style="color: #7f92ae">Monitor en tiempo real</div>
+      </div>
+      <div class="mono h3 mb-0">
+        {{ hora() | date: 'HH:mm:ss' }}
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Atendiendo ahora -->
+      <div class="col-lg-6">
+        <h3 class="h6 text-uppercase mb-3" style="color: #7f92ae; letter-spacing: 0.06em">
+          Atendiendo ahora · {{ d.atencion.length }}
+        </h3>
+
+        @if (!d.atencion.length) {
+          <div class="p-3 rounded" style="background: #16263d; color: #7f92ae">
+            Ningún servicio en curso.
+          </div>
+        }
+
+        @for (a of d.atencion; track a.id) {
+          <div class="atendiendo mb-2" [class.pausa]="!a.reloj_desde">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="mono fw-semibold">{{ a.folio }}</div>
+                <div class="small" style="color: #7f92ae">{{ a.servicio }} · {{ a.prioridad }}</div>
+              </div>
+              <div class="mono h5 mb-0">
+                {{ a.seg_campo ? crono(a.seg_campo) : '—' }}
+              </div>
+            </div>
+            <div class="small mt-2" style="color: #b8c9dd">
+              @if (a.reloj_desde) {
+                <span class="pulso me-1"></span>
+              }
+              {{ a.tecnico }} <span style="color: #7f92ae">· {{ a.problema }}</span>
+            </div>
+          </div>
+        }
+
+        @if (d.rezago.sin_asignar) {
+          <div class="p-3 rounded mt-3" style="background: #3a1f21; color: #ffb3a8">
+            <b>{{ d.rezago.sin_asignar }} ticket(s) sin técnico.</b> La especialidad no tiene personal
+            disponible hoy; requieren asignación manual.
+          </div>
+        }
+      </div>
+
+      <!-- En turno -->
+      <div class="col-lg-6">
+        <h3 class="h6 text-uppercase mb-3" style="color: #7f92ae; letter-spacing: 0.06em">
+          En turno · {{ d.cola.length }}
+        </h3>
+
+        @if (!d.cola.length) {
+          <div class="p-3 rounded" style="background: #16263d; color: #7f92ae">
+            No hay tickets esperando.
+          </div>
+        }
+
+        @for (c of d.cola.slice(0, 10); track c.id) {
+          <div class="turno" [class.p1]="c.prioridad === 'P1'" [class.p2]="c.prioridad === 'P2'">
+            <span class="no">{{ c.turno }}</span>
+            <div style="min-width: 0">
+              <div class="mono">{{ c.folio }}</div>
+              <div class="small text-truncate" style="color: #7f92ae">
+                {{ c.servicio }} · {{ c.dependencia }}
+              </div>
+            </div>
+            <div class="small text-end" style="color: #b8c9dd">
+              @if (c.en_cola) {
+                <span style="color: #ff8c7f">sin técnico</span>
+              } @else {
+                {{ c.tecnico }}
+              }
+              <div style="color: #7f92ae">espera {{ dur(c.min_espera) }}</div>
+            </div>
+          </div>
+        }
+
+        @if (d.cola.length > 10) {
+          <div class="small" style="color: #7f92ae">y {{ d.cola.length - 10 }} más…</div>
+        }
+      </div>
+    </div>
+
+    <!-- Franja de indicadores -->
+    <div class="row g-3 mt-3 pt-3 border-top" style="border-color: #24384f !important">
+      <div class="col-6 col-lg">
+        <div class="small" style="color: #7f92ae">Recibidos hoy</div>
+        <div class="h4 mb-0">{{ d.rezago.recibidos_hoy }}</div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="small" style="color: #7f92ae">En curso</div>
+        <div class="h4 mb-0" style="color: #7fe3c6">{{ d.atencion.length }}</div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="small" style="color: #7f92ae">Esperando turno</div>
+        <div class="h4 mb-0" [style.color]="d.cola.length > 4 ? '#f0b45c' : '#e9f0fa'">
+          {{ d.cola.length }}
+        </div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="small" style="color: #7f92ae">Cerrados hoy</div>
+        <div class="h4 mb-0">{{ d.rezago.cerrados_hoy }}</div>
+      </div>
+      <div class="col-6 col-lg">
+        <div class="small" style="color: #7f92ae">Fuera de tiempo</div>
+        <div class="h4 mb-0" [style.color]="d.rezago.fuera_de_tiempo ? '#ff8c7f' : '#e9f0fa'">
+          {{ d.rezago.fuera_de_tiempo }}
+        </div>
+      </div>
+    </div>
+  }
+</div>
+
+<div class="alert alert-light border small mt-3 mb-0">
+  El turno se ordena por prioridad y, dentro de cada prioridad, por hora de llegada. Un ticket P1 se
+  coloca al frente aunque haya llegado después.
+</div>

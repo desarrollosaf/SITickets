@@ -1,0 +1,92 @@
+<div style="max-width: 760px">
+  <h1 class="h5 mb-1">Registrar ticket</h1>
+  <p class="sub mb-3">
+    Cuatro campos. En lugar de escribir el problema, se elige del catálogo: así el sistema sabe a qué
+    técnico turnarlo y con qué urgencia.
+  </p>
+
+  <div class="tarjeta p-4">
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold" for="n-usuario">Servidor público</label>
+        <input id="n-usuario" class="form-control" [value]="auth.usuario()?.nombre" disabled />
+        <div class="form-text">Tomado de tu sesión. No editable.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold" for="n-ext">Extensión</label>
+        <input id="n-ext" class="form-control" [(ngModel)]="extension" name="extension" />
+        <div class="form-text">Precargada de tu perfil.</div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="n-srv">Tipo de servicio</label>
+        <select id="n-srv" class="form-select" (change)="cambiaServicio($any($event.target).value)">
+          <option value="">Selecciona…</option>
+          @for (s of servicios(); track s.id) {
+            <option [value]="s.id">{{ s.nombre }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="n-prb">Problema</label>
+        <select id="n-prb" class="form-select" [disabled]="!servicioId()"
+                (change)="claveProblema.set($any($event.target).value)">
+          <option value="">
+            {{ servicioId() ? 'Selecciona…' : 'Elige primero el servicio' }}
+          </option>
+          @for (p of problemas(); track p.id) {
+            <option [value]="p.clave">{{ p.descripcion }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    @if (problema(); as p) {
+      @if (p.campo_adicional) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
+          <input id="n-ctx" class="form-control" [(ngModel)]="contexto" name="contexto"
+                 [placeholder]="p.campo_adicional" />
+        </div>
+      }
+
+      @if (p.requiere_texto) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="n-txt">Describe el problema</label>
+          <textarea id="n-txt" rows="3" class="form-control" [(ngModel)]="texto" name="texto"
+                    placeholder="Solo esta opción habilita texto libre"></textarea>
+        </div>
+      }
+
+      <div class="alert alert-info py-2 small">
+        Prioridad asignada automáticamente:
+        <span class="chip" [class]="'chip-' + p.prioridad">
+          {{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}
+        </span>
+        &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
+      </div>
+    }
+
+    @if (error()) {
+      <div class="alert alert-danger py-2 small">{{ error() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="contexto = ''; texto = ''">Limpiar</button>
+      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar ticket
+      </button>
+    </div>
+  </div>
+
+  <div class="alert alert-light border small mt-3 mb-0">
+    La prioridad no la eliges tú: la determina la opción del catálogo, para que el mismo problema
+    tenga siempre la misma urgencia. Si el tuyo no está en la lista usa <b>Otro</b> y el sistema
+    habilita un campo de texto.
+  </div>
+</div>

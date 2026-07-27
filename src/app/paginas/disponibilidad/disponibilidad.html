@@ -1,0 +1,77 @@
+<h1 class="h5 mb-1">Disponibilidad de técnicos</h1>
+<p class="sub mb-3">
+  Da clic en un día para bloquearlo o liberarlo. Los días bloqueados no reciben asignación automática.
+</p>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<div class="tarjeta p-3">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="min-width: 200px"></th>
+          @for (d of dias(); track d.getTime()) {
+            <th class="text-center sub" style="width: 46px; font-weight: 500">
+              {{ etiquetaDia(d) }}<br />{{ d.getDate() }}
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of agenda().tecnicos; track t.id) {
+          <tr>
+            <td>
+              <div style="font-size: 0.84rem">{{ t.nombre }}</div>
+              <div class="sub" style="font-size: 0.72rem">{{ t.especialidad }}</div>
+            </td>
+            @for (d of dias(); track d.getTime()) {
+              <td class="p-1">
+                @if (finde(d)) {
+                  <div class="cal-dia finde" title="Fin de semana"></div>
+                } @else {
+                  <button
+                    class="cal-dia"
+                    [class.bloqueado]="bloqueado(t.id, d)"
+                    [attr.aria-label]="
+                      (bloqueado(t.id, d) ? 'Liberar' : 'Bloquear') + ' ' + iso(d) + ' de ' + t.nombre
+                    "
+                    [title]="bloqueado(t.id, d) ? 'Bloqueado · clic para liberar' : 'Disponible · clic para bloquear'"
+                    (click)="alternar(t.id, d)"></button>
+                }
+              </td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td [attr.colspan]="dias().length + 1" class="text-center sub py-4">
+              No hay técnicos registrados.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="d-flex flex-wrap gap-3 mt-3 small sub">
+    <span class="d-flex align-items-center gap-2">
+      <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #e4f0eb; border: 1px solid #cbe3da"></i>
+      Disponible
+    </span>
+    <span class="d-flex align-items-center gap-2">
+      <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #fbe9e7; border: 1px solid #f0c9c5"></i>
+      Vacaciones, descanso, incapacidad o comisión
+    </span>
+    <span class="d-flex align-items-center gap-2">
+      <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #edf0f3; border: 1px solid #dfe4ea"></i>
+      Fin de semana
+    </span>
+  </div>
+</div>
+
+<div class="alert alert-warning small mt-3 mb-0">
+  Sistemas e Impresoras dependen hoy de un solo técnico. Si bloqueas su día, los tickets de esa
+  especialidad caerán en cola y requerirán asignación manual.
+</div>

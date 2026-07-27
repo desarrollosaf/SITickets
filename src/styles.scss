@@ -1,0 +1,228 @@
+/* =====================================================================
+   SITickets · tema sobre Bootstrap 5
+   Bootstrap se carga desde angular.json; aqui solo va lo propio del sistema.
+   ===================================================================== */
+
+:root {
+  /* Prioridades (§4). El color es apoyo, nunca el unico indicador:
+     cada chip lleva tambien la clave escrita. */
+  --p1: #c0392b;
+  --p2: #d17b1f;
+  --p3: #2b6cb0;
+  --p4: #5b6b7c;
+
+  --tinta: #1b2434;
+  --tinta-2: #5c6a7e;
+  --linea: #dfe4ea;
+  --fondo: #f4f6f9;
+
+  --bs-body-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--tinta);
+  font-size: 0.925rem;
+}
+
+/* --------------------------------------------------------------------
+   Chips de prioridad y estatus
+   -------------------------------------------------------------------- */
+.chip {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip-P1 { background: #fbe9e7; color: var(--p1); }
+.chip-P2 { background: #fdf1e3; color: var(--p2); }
+.chip-P3 { background: #e8f0fa; color: var(--p3); }
+.chip-P4 { background: #eef1f4; color: var(--p4); }
+.chip-bandera { background: #fff4e5; color: #a05a00; border: 1px solid #f0d9b5; }
+
+.estatus {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.estatus-REGISTRADO  { background: #eef1f4; color: #45566b; border-color: #dde3ea; }
+.estatus-EN_COLA     { background: #fbe9e7; color: var(--p1); border-color: #f0c9c5; }
+.estatus-ASIGNADO    { background: #e8f0fa; color: var(--p3); border-color: #cfe0f2; }
+.estatus-EN_ATENCION { background: #e4f0eb; color: #1c7a5a; border-color: #cbe3da; }
+.estatus-EN_ESPERA   { background: #fdf1e3; color: var(--p2); border-color: #f2ddbd; }
+.estatus-RESUELTO    { background: #e9f2ff; color: #1f5fa8; border-color: #cfe0f6; }
+.estatus-CERRADO     { background: #eaf3ee; color: #37694f; border-color: #d3e6da; }
+.estatus-CANCELADO   { background: #f2f3f5; color: #77808c; border-color: #e2e5e9; }
+
+/* --------------------------------------------------------------------
+   Estructura
+   -------------------------------------------------------------------- */
+.tarjeta {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 0.6rem;
+}
+
+.rail {
+  background: #fff;
+  border-right: 1px solid var(--linea);
+}
+
+.rail .nav-link {
+  color: var(--tinta-2);
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rail .nav-link:hover { background: #f1f4f8; color: var(--tinta); }
+.rail .nav-link.activo { background: #e8f0fa; color: var(--p3); font-weight: 600; }
+
+.folio {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--tinta-2);
+}
+
+.sub { color: var(--tinta-2); font-size: 0.8rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+table.tickets tbody tr { cursor: pointer; }
+table.tickets tbody tr:hover { background: #f7f9fc; }
+
+.vencido { color: var(--p1); font-weight: 600; }
+
+/* Barra de avance contra el objetivo de resolucion */
+.barra {
+  height: 6px;
+  background: #eef1f4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.barra > i { display: block; height: 100%; border-radius: 999px; }
+
+/* --------------------------------------------------------------------
+   Reloj checador (§16)
+   -------------------------------------------------------------------- */
+.crono {
+  background: linear-gradient(135deg, #16263d, #1d3552);
+  color: #dce7f5;
+  border-radius: 0.7rem;
+}
+.crono .tiempo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 2.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #5d7a9e;
+}
+.crono.activo .tiempo { color: #7fe3c6; }
+
+.pulso {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7fe3c6;
+  animation: pulso 1.6s ease-in-out infinite;
+}
+@keyframes pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Resultado de la verificacion de ubicacion */
+.geo { font-size: 0.75rem; padding: 0.1rem 0.45rem; border-radius: 0.35rem; }
+.geo-ok { background: #e4f0eb; color: #1c7a5a; }
+.geo-no { background: #fdf1e3; color: var(--p2); }
+.geo-sd { background: #eef1f4; color: var(--tinta-2); }
+
+/* --------------------------------------------------------------------
+   Monitor de turnos (§17) · pantalla para proyectar en el area
+   -------------------------------------------------------------------- */
+.monitor {
+  background: #0f1c2e;
+  color: #e9f0fa;
+  border-radius: 0.7rem;
+  min-height: 70vh;
+}
+.monitor .turno {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  background: #16263d;
+  margin-bottom: 0.5rem;
+}
+.monitor .turno.p1 { border-left: 4px solid #ff8c7f; }
+.monitor .turno.p2 { border-left: 4px solid #f0b45c; }
+.monitor .turno .no {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #7f92ae;
+  text-align: center;
+}
+.monitor .atendiendo {
+  background: #16263d;
+  border-radius: 0.5rem;
+  padding: 0.8rem;
+  border-left: 4px solid #7fe3c6;
+}
+.monitor .atendiendo.pausa { border-left-color: #f0b45c; }
+
+/* --------------------------------------------------------------------
+   Calendario de disponibilidad (§8)
+   -------------------------------------------------------------------- */
+.cal-dia {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.3rem;
+  border: 1px solid #cbe3da;
+  background: #e4f0eb;
+  cursor: pointer;
+  padding: 0;
+}
+.cal-dia.bloqueado { background: #fbe9e7; border-color: #f0c9c5; }
+.cal-dia.finde { background: #edf0f3; border-color: #dfe4ea; cursor: not-allowed; }
+
+/* --------------------------------------------------------------------
+   Cajon de detalle
+   -------------------------------------------------------------------- */
+.cajon-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 26, 38, 0.45);
+  z-index: 1040;
+}
+.cajon {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(620px, 100vw);
+  background: #fff;
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 28px rgba(18, 26, 38, 0.16);
+}
+
+@media print {
+  .rail, .cajon-fondo, .no-imprimir { display: none !important; }
+  .cajon { position: static; width: 100%; box-shadow: none; }
+  body { background: #fff; }
+}

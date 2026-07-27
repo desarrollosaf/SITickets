@@ -1,0 +1,489 @@
+@if (ticketId() !== null) {
+  <div class="cajon-fondo" (click)="cerrar.emit()"></div>
+
+  <aside class="cajon">
+    @if (cargando() && !ticket()) {
+      <div class="p-5 text-center sub">
+        <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+      </div>
+    }
+
+    @if (ticket(); as t) {
+      <!-- Encabezado y acciones -->
+      <header class="p-3 border-bottom">
+        <div class="d-flex align-items-start gap-2">
+          <div class="flex-grow-1" style="min-width: 0">
+            <div class="folio">{{ t.folio }}</div>
+            <h2 class="h6 mb-2 mt-1">{{ t.problema }}</h2>
+            <div class="d-flex flex-wrap gap-1">
+              <span class="estatus" [class]="estatus(t).clase">{{ estatus(t).texto }}</span>
+              <span class="chip" [class]="'chip-' + t.prioridad">
+                {{ t.prioridad }} · {{ nombrePrioridad[t.prioridad] }}
+              </span>
+              @for (b of marcas(t); track b.texto) {
+                <span class="chip" [class]="b.clase">{{ b.texto }}</span>
+              }
+            </div>
+          </div>
+          <button class="btn-close no-imprimir" aria-label="Cerrar" (click)="cerrar.emit()"></button>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3 no-imprimir">
+          <!-- Técnico asignado -->
+          @if ((atiende() && esMio()) || esAdmin()) {
+            @if (relojCorriendo()) {
+              <button class="btn btn-sm btn-primary" [disabled]="ocupado()"
+                      (click)="abrirFormulario('reloj-fin')">
+                <i class="bi bi-stop-circle"></i> Detener reloj
+              </button>
+            } @else if (t.estatus === 'ASIGNADO' || t.estatus === 'EN_ATENCION' || t.estatus === 'EN_ESPERA') {
+              <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="iniciarReloj()">
+                <i class="bi bi-play-circle"></i> Iniciar reloj
+              </button>
+            }
+            @if (t.estatus === 'ASIGNADO') {
+              <button class="btn btn-sm btn-outline-secondary" [disabled]="ocupado()" (click)="iniciar()">
+                Iniciar atención
+              </button>
+            }
+            @if (t.estatus === 'EN_ATENCION') {
+              <button class="btn btn-sm btn-success" (click)="abrirFormulario('resolver')">
+                Marcar resuelto
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('espera')">
+                Poner en espera
+              </button>
+            }
+            @if (t.estatus === 'EN_ESPERA') {
+              <button class="btn btn-sm btn-outline-secondary" [disabled]="ocupado()" (click)="reanudar()">
+                Reanudar
+              </button>
+            }
+            @if (abierto() && atiende()) {
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reclasificar')">
+                Reclasificar
+              </button>
+            }
+          }
+
+          <!-- Administrador -->
+          @if (esAdmin()) {
+            @if (abierto()) {
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reasignar')">
+                Reasignar
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reclasificar')">
+                Reclasificar
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('prioridad')">
+                Cambiar prioridad
+              </button>
+              <button class="btn btn-sm btn-outline-danger" (click)="abrirFormulario('cancelar')">
+                Cancelar ticket
+              </button>
+            }
+            @if (t.estatus === 'RESUELTO') {
+              <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="validar()">
+                Cerrar ticket
+              </button>
+            }
+            <button class="btn btn-sm btn-outline-secondary" (click)="imprimir()">
+              <i class="bi bi-printer"></i> Imprimir
+            </button>
+          }
+
+          <!-- Solicitante -->
+          @if (rol() === 'solicitante' && esMiSolicitud()) {
+            @if (t.estatus === 'RESUELTO') {
+              <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="validar()">
+                Sí quedó resuelto
+              </button>
+              <button class="btn btn-sm btn-outline-danger" (click)="abrirFormulario('rechazar')">
+                No quedó resuelto
+              </button>
+            }
+            @if (t.estatus === 'CERRADO') {
+              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reabrir')">
+                Reabrir
+              </button>
+            }
+            @if (t.estatus === 'REGISTRADO' || t.estatus === 'ASIGNADO') {
+              <button class="btn btn-sm btn-outline-danger" (click)="abrirFormulario('cancelar')">
+                Cancelar
+              </button>
+            }
+          }
+        </div>
+
+        @if (error()) {
+          <div class="alert alert-danger py-2 small mt-3 mb-0">{{ error() }}</div>
+        }
+      </header>
+
+      <!-- Formularios -->
+      @if (formulario(); as f) {
+        <div class="p-3 border-bottom bg-light no-imprimir">
+          @switch (f) {
+            @case ('espera') {
+              <div class="alert alert-info py-2 small">
+                Mientras el ticket esté en espera el reloj de resolución se detiene. Ese tiempo no
+                cuenta contra tu desempeño.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-espera">Motivo</label>
+              <select id="fm-espera" class="form-select form-select-sm mb-2" [(ngModel)]="motivo" name="motivo">
+                <option value="">Selecciona…</option>
+                @for (m of motivosEspera; track m) {
+                  <option [value]="m">{{ m }}</option>
+                }
+              </select>
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarEspera()">
+                  Poner en espera
+                </button>
+              </div>
+            }
+
+            @case ('reloj-fin') {
+              <div class="alert alert-info py-2 small">
+                Llevas <b>{{ crono(segundosEnSitio()) }}</b> en sitio. Elige qué pasa con el ticket
+                al detener el reloj.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-nota">Nota de la visita</label>
+              <input id="fm-nota" class="form-control form-control-sm mb-2" [(ngModel)]="nota" name="nota"
+                     placeholder="Qué se avanzó o qué falta" />
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="fm-esp" [(ngModel)]="dejarEnEspera"
+                       name="dejarEnEspera" />
+                <label class="form-check-label small" for="fm-esp">
+                  Dejar el ticket en espera (falta refacción, autorización o el usuario)
+                </label>
+              </div>
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="detenerReloj()">
+                  Detener reloj
+                </button>
+              </div>
+            }
+
+            @case ('resolver') {
+              <div class="alert alert-info py-2 small">
+                Diagnóstico y solución son obligatorios: es lo que después alimenta el tablero de compras.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-dx">Diagnóstico (causa)</label>
+              <input id="fm-dx" class="form-control form-control-sm mb-2" [(ngModel)]="diagnostico"
+                     name="diagnostico" placeholder="Qué estaba fallando" />
+              <label class="form-label small fw-semibold" for="fm-sol">Solución aplicada</label>
+              <input id="fm-sol" class="form-control form-control-sm mb-2" [(ngModel)]="solucion"
+                     name="solucion" placeholder="Qué se hizo" />
+              <label class="form-label small fw-semibold" for="fm-ref">Refacciones o insumos</label>
+              <input id="fm-ref" class="form-control form-control-sm mb-2" [(ngModel)]="refacciones"
+                     name="refacciones" placeholder="Ninguna, o descripción y cantidad" />
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="enviarResolver()">
+                  Marcar resuelto
+                </button>
+              </div>
+            }
+
+            @case ('cancelar') {
+              <label class="form-label small fw-semibold" for="fm-cancel">Motivo de la cancelación</label>
+              <textarea id="fm-cancel" rows="2" class="form-control form-control-sm mb-2"
+                        [(ngModel)]="motivo" name="motivo" placeholder="Por qué se cancela"></textarea>
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Volver</button>
+                <button class="btn btn-sm btn-danger" [disabled]="ocupado()" (click)="enviarCancelar()">
+                  Cancelar ticket
+                </button>
+              </div>
+            }
+
+            @case ('rechazar') {
+              <div class="alert alert-warning py-2 small">
+                El ticket regresa al mismo técnico y conserva el folio. Se registra como rechazo en su
+                indicador de calidad.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-rech">Qué sigue fallando</label>
+              <textarea id="fm-rech" rows="2" class="form-control form-control-sm mb-2"
+                        [(ngModel)]="motivo" name="motivo"></textarea>
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarRechazar()">
+                  Enviar
+                </button>
+              </div>
+            }
+
+            @case ('reabrir') {
+              <label class="form-label small fw-semibold" for="fm-reab">Motivo de la reapertura</label>
+              <textarea id="fm-reab" rows="2" class="form-control form-control-sm mb-2"
+                        [(ngModel)]="motivo" name="motivo"></textarea>
+              <div class="form-text mb-2">El folio no cambia.</div>
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarReabrir()">
+                  Reabrir
+                </button>
+              </div>
+            }
+
+            @case ('reasignar') {
+              <div class="alert alert-warning py-2 small">
+                La reasignación manual siempre queda en bitácora con motivo, usuario y fecha.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-tec">Nuevo técnico</label>
+              <select id="fm-tec" class="form-select form-select-sm mb-2" [(ngModel)]="tecnicoDestino"
+                      name="tecnicoDestino">
+                <option [ngValue]="null">Selecciona…</option>
+                @for (x of tecnicos(); track x.id) {
+                  @if (x.id !== t.tecnico_id) {
+                    <option [ngValue]="x.id">
+                      {{ x.nombre }} · {{ x.servicios.length ? x.servicios[0].nombre : 'sin especialidad' }}
+                    </option>
+                  }
+                }
+              </select>
+              <div class="form-text mb-2">
+                Si eliges a alguien de otra especialidad el sistema lo permite, pero lo deja marcado.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-mot">Motivo</label>
+              <select id="fm-mot" class="form-select form-select-sm mb-2" [(ngModel)]="motivo" name="motivo">
+                <option value="">Selecciona…</option>
+                @for (m of catalogos()?.motivos ?? []; track m.id) {
+                  <option [value]="m.nombre">{{ m.nombre }}</option>
+                }
+              </select>
+              <label class="form-label small fw-semibold" for="fm-nota2">Nota (opcional)</label>
+              <input id="fm-nota2" class="form-control form-control-sm mb-2" [(ngModel)]="nota" name="nota" />
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarReasignar()">
+                  Reasignar
+                </button>
+              </div>
+            }
+
+            @case ('reclasificar') {
+              <div class="alert alert-warning py-2 small">
+                El folio <b>{{ t.folio }}</b> no cambia. Solo se modifica el tipo de servicio y, en
+                consecuencia, el técnico.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-prob">Nuevo problema</label>
+              <select id="fm-prob" class="form-select form-select-sm mb-2" [(ngModel)]="problemaDestino"
+                      name="problemaDestino">
+                <option value="">Selecciona…</option>
+                @for (p of problemasReclasificacion(); track p.id) {
+                  <option [value]="p.clave">{{ p.servicio }} · {{ p.descripcion }}</option>
+                }
+              </select>
+              <label class="form-label small fw-semibold" for="fm-mot3">Motivo</label>
+              <input id="fm-mot3" class="form-control form-control-sm mb-2" [(ngModel)]="motivo" name="motivo"
+                     placeholder="Por qué no corresponde al servicio original" />
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarReclasificar()">
+                  Reclasificar
+                </button>
+              </div>
+            }
+
+            @case ('prioridad') {
+              <div class="alert alert-info py-2 small">
+                La prioridad la fija el catálogo. Un cambio manual requiere motivo y queda en bitácora.
+              </div>
+              <label class="form-label small fw-semibold" for="fm-pri">Prioridad</label>
+              <select id="fm-pri" class="form-select form-select-sm mb-2" [(ngModel)]="prioridadDestino"
+                      name="prioridadDestino">
+                @for (p of catalogos()?.prioridades ?? []; track p.clave) {
+                  <option [value]="p.clave">
+                    {{ p.clave }} · {{ p.nombre }} · objetivo {{ dur(p.minutos_resolucion) }}
+                  </option>
+                }
+              </select>
+              <label class="form-label small fw-semibold" for="fm-mot4">Motivo</label>
+              <input id="fm-mot4" class="form-control form-control-sm mb-2" [(ngModel)]="motivo" name="motivo" />
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarPrioridad()">
+                  Guardar
+                </button>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Cuerpo -->
+      <div class="flex-grow-1 overflow-auto p-3">
+        @if (t.en_cola) {
+          <div class="alert alert-danger py-2 small">
+            Sin técnico asignado. La especialidad «{{ t.servicio }}» no tiene personal disponible hoy.
+            Requiere asignación manual.
+          </div>
+        }
+        @if (t.reclasificado) {
+          <div class="alert alert-warning py-2 small">
+            Reclasificado de <b>{{ t.servicio_original }}</b> a <b>{{ t.servicio }}</b>. El folio conserva
+            el prefijo original: los reportes leen el campo servicio, no el prefijo.
+          </div>
+        }
+        @if (t.escalado) {
+          <div class="alert alert-warning py-2 small">
+            Escalado a P1 por el motor de reglas: se detectaron 3 o más tickets del mismo servicio y
+            dependencia en menos de 60 minutos.
+          </div>
+        }
+
+        <!-- Reloj de resolución -->
+        <div class="tarjeta p-3 mb-3">
+          <div class="d-flex justify-content-between sub mb-2" style="font-size: 0.78rem">
+            <span>
+              Tiempo activo {{ dur(t.min_activo) }}
+              @if (t.min_espera) { · {{ dur(t.min_espera) }} descontados por espera }
+            </span>
+            <span>Objetivo {{ dur(t.minutos_objetivo) }}</span>
+          </div>
+          <div class="barra">
+            <i [style.width.%]="avance()"
+               [style.background]="avance() >= 100 ? 'var(--p1)' : avance() > 70 ? 'var(--p2)' : '#2f9e75'"></i>
+          </div>
+          @if (t.estatus === 'EN_ESPERA') {
+            <div class="sub mt-2" style="color: var(--p2)">
+              Reloj pausado desde {{ fmt(t.f_espera_desde) }} · {{ t.motivo_espera }}
+            </div>
+          }
+        </div>
+
+        <!-- Datos del reporte -->
+        <div class="tarjeta p-3 mb-3">
+          <h3 class="h6 mb-3">Datos del reporte</h3>
+          <dl class="row mb-0 small">
+            <dt class="col-5 sub fw-normal">Tipo de servicio</dt>
+            <dd class="col-7">{{ t.servicio }}</dd>
+
+            <dt class="col-5 sub fw-normal">Problema</dt>
+            <dd class="col-7">{{ t.problema }} <span class="mono sub">({{ t.problema_clave }})</span></dd>
+
+            @if (t.contexto) {
+              <dt class="col-5 sub fw-normal">{{ t.campo_adicional || 'Contexto' }}</dt>
+              <dd class="col-7">{{ t.contexto }}</dd>
+            }
+            @if (t.texto_libre) {
+              <dt class="col-5 sub fw-normal">Descripción</dt>
+              <dd class="col-7">{{ t.texto_libre }}</dd>
+            }
+
+            <dt class="col-5 sub fw-normal">{{ t.interno ? 'Generado por' : 'Solicitante' }}</dt>
+            <dd class="col-7">{{ t.solicitante }}</dd>
+
+            @if (!t.interno) {
+              <dt class="col-5 sub fw-normal">Dependencia</dt>
+              <dd class="col-7">{{ t.dependencia }}</dd>
+              <dt class="col-5 sub fw-normal">Área</dt>
+              <dd class="col-7">{{ t.area }}</dd>
+              <dt class="col-5 sub fw-normal">Extensión</dt>
+              <dd class="col-7">{{ t.extension || '—' }}</dd>
+              <dt class="col-5 sub fw-normal">Sede esperada</dt>
+              <dd class="col-7">{{ t.sede || 'Sin sede registrada' }}</dd>
+            }
+
+            <dt class="col-5 sub fw-normal">Registrado</dt>
+            <dd class="col-7">{{ fmt(t.f_registro) }}</dd>
+
+            <dt class="col-5 sub fw-normal">Técnico{{ t.interno ? ' responsable' : '' }}</dt>
+            <dd class="col-7">{{ t.tecnico || 'Sin asignar' }}</dd>
+
+            @if (t.equipo.length > 1) {
+              <dt class="col-5 sub fw-normal">Apoyo</dt>
+              <dd class="col-7">
+                @for (e of t.equipo; track e.usuario_id) {
+                  @if (e.papel === 'apoyo') {
+                    <div>{{ e.nombre }}</div>
+                  }
+                }
+              </dd>
+            }
+            @if (t.fecha_plan) {
+              <dt class="col-5 sub fw-normal">Fecha planeada</dt>
+              <dd class="col-7">{{ t.fecha_plan }}</dd>
+            }
+          </dl>
+        </div>
+
+        <!-- Cierre técnico -->
+        @if (t.diagnostico) {
+          <div class="tarjeta p-3 mb-3">
+            <h3 class="h6 mb-3">Cierre técnico</h3>
+            <dl class="row mb-0 small">
+              <dt class="col-5 sub fw-normal">Diagnóstico</dt>
+              <dd class="col-7">{{ t.diagnostico }}</dd>
+              <dt class="col-5 sub fw-normal">Solución aplicada</dt>
+              <dd class="col-7">{{ t.solucion }}</dd>
+              <dt class="col-5 sub fw-normal">Refacciones</dt>
+              <dd class="col-7">{{ t.refacciones || 'Ninguna' }}</dd>
+              <dt class="col-5 sub fw-normal">Resuelto</dt>
+              <dd class="col-7">{{ fmt(t.f_resolucion) }}</dd>
+              @if (t.f_validacion) {
+                <dt class="col-5 sub fw-normal">Cierre</dt>
+                <dd class="col-7">
+                  {{ fmt(t.f_validacion) }} ·
+                  {{ t.cierre_por_omision ? 'por omisión del usuario' : 'validado por el usuario' }}
+                </dd>
+              }
+            </dl>
+          </div>
+        }
+
+        <!-- §16 reloj de atención en sitio -->
+        @if (t.sesiones.length) {
+          <div class="tarjeta p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-baseline mb-2">
+              <h3 class="h6 mb-0">Reloj de atención en sitio</h3>
+              <b class="mono">{{ crono(segundosEnSitio()) }}</b>
+            </div>
+            @for (s of t.sesiones; track s.id; let i = $index) {
+              <div class="d-flex justify-content-between align-items-start py-2 border-top small">
+                <div>
+                  Sesión {{ i + 1 }} · {{ fmt(s.inicio) }}
+                  @if (s.motivo) {
+                    <span class="sub">· {{ s.motivo }}</span>
+                  }
+                  <div class="mt-1">
+                    <span class="geo" [class]="geo(s).clase">{{ geo(s).texto }}</span>
+                  </div>
+                </div>
+                <b class="mono">{{ s.fin ? crono(s.segundos) : 'en curso' }}</b>
+              </div>
+            }
+            <div class="form-text mt-2">
+              Tiempo de ciclo {{ dur(t.min_ciclo) }} · efectivo en sitio {{ dur(t.min_campo) }}.
+              La diferencia es traslado, espera y coordinación.
+            </div>
+          </div>
+        }
+
+        <!-- §9 bitácora -->
+        <div class="tarjeta p-3">
+          <h3 class="h6 mb-3">Bitácora</h3>
+          @for (b of t.bitacora; track b.id) {
+            <div class="border-start ps-3 pb-3 position-relative" style="border-color: var(--linea) !important">
+              <div class="fw-semibold" style="font-size: 0.84rem">{{ b.accion }}</div>
+              <div class="sub">{{ fmt(b.fecha) }} · {{ b.usuario }}</div>
+              @if (b.detalle) {
+                <div style="font-size: 0.82rem">{{ b.detalle }}</div>
+              }
+              @if (b.valor_antes || b.valor_nuevo) {
+                <div class="sub">{{ b.valor_antes }} → {{ b.valor_nuevo }}</div>
+              }
+              @if (b.motivo) {
+                <div class="sub">Motivo: {{ b.motivo }}</div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </aside>
+}

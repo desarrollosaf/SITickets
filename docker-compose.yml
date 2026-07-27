@@ -1,0 +1,85 @@
+# La base de datos NO se levanta aquí: el sistema se conecta al servidor MySQL
+# propio del área. Los datos de conexión se capturan en backend/.env.
+#
+# Si el servidor MySQL corre en esta misma máquina (fuera de Docker), en el .env
+# usa DB_HOST=host.docker.internal, no localhost: dentro del contenedor
+# localhost es el contenedor mismo. Si es un servidor de red, pon su IP o nombre.
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: DockerFile
+
+    container_name: sitickets-frontend
+
+    working_dir: /app
+
+    ports:
+      - "4200:4200"
+
+    volumes:
+      - .:/app
+      - frontend_node_modules:/app/node_modules
+
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+
+    command:
+      - npm
+      - run
+      - start
+      - --
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4200"
+      - --poll=1000
+
+    depends_on:
+      - backend
+
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: DockerFile
+
+    container_name: sitickets-backend
+
+    working_dir: /app
+
+    ports:
+      - "3050:3050"
+
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+
+    # Toda la configuración de base de datos sale de aquí. A propósito no se
+    # repite DB_HOST en `environment`: lo que se declara ahí gana sobre el
+    # env_file y volvería a dejar el host fijo en el compose.
+    env_file:
+      - ./backend/.env
+
+    environment:
+      NODE_ENV: development
+      PORT: 3050
+      CHOKIDAR_USEPOLLING: "true"
+
+    # Permite que DB_HOST=host.docker.internal resuelva también en Linux;
+    # en Docker Desktop (Mac y Windows) ya funciona sin esto.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    command:
+      - npm
+      - run
+      - start:dev
+
+    restart: unless-stopped
+
+volumes:
+  frontend_node_modules:
+  backend_node_modules:

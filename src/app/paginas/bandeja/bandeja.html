@@ -1,0 +1,106 @@
+<h1 class="h5 mb-1">
+  {{ auth.rol() === 'proveedor' ? 'Tickets turnados por el área' : 'Mis tickets turnados' }}
+</h1>
+<p class="sub mb-3">Solo ves los tickets asignados a ti.</p>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<!-- §16 · reloj checador -->
+<div class="crono p-3 mb-3 d-flex flex-wrap justify-content-between align-items-center gap-3"
+     [class.activo]="enCurso()">
+  <div>
+    @if (enCurso(); as t) {
+      <div class="small mb-1 d-flex align-items-center gap-2" style="color: #9db4d0">
+        <span class="pulso"></span> Atendiendo en sitio
+      </div>
+      <div class="tiempo">{{ crono(segundos()) }}</div>
+      <div class="small mt-1" style="color: #b8c9dd">
+        <b>{{ t.folio }}</b> · {{ t.problema }}<br />
+        {{ t.dependencia }}@if (t.contexto) { · {{ t.contexto }} }
+      </div>
+    } @else {
+      <div class="small mb-1" style="color: #9db4d0">Reloj de atención</div>
+      <div class="tiempo">00:00:00</div>
+      <div class="small mt-1" style="color: #b8c9dd">
+        Sin reloj activo. Presiona <b>Iniciar reloj</b> al salir a atender un ticket.
+      </div>
+    }
+  </div>
+
+  <div class="d-flex gap-2">
+    @if (enCurso(); as t) {
+      <button class="btn btn-sm btn-light" (click)="abierto.set(t.id)">Detener o resolver</button>
+    } @else if (siguiente(); as s) {
+      <button class="btn btn-sm btn-light" (click)="iniciarReloj(s.id)">
+        Iniciar con {{ s.folio }}
+      </button>
+    }
+  </div>
+</div>
+
+<!-- Aviso de ubicación -->
+@if (permisoGeo() === 'denied') {
+  <div class="alert alert-warning py-2 small">
+    <b>La ubicación está bloqueada en este navegador.</b> El reloj funciona igual, pero tus registros
+    quedarán marcados como «sin ubicación». Para habilitarla, abre los permisos del sitio en tu
+    navegador y permite el acceso a la ubicación.
+  </div>
+} @else if (permisoGeo() !== 'granted') {
+  <div class="alert alert-info py-2 small d-flex flex-wrap align-items-center gap-2">
+    <span class="flex-grow-1">
+      <b>Habilita la ubicación al entrar.</b> Cuando inicias el reloj el sistema registra desde dónde
+      lo hiciste y lo compara con el edificio del reporte. No se te sigue durante el día: solo se
+      guarda el punto del momento en que inicias y terminas.
+    </span>
+    <button class="btn btn-sm btn-primary" (click)="pedirPermisoGeo()">Permitir ubicación</button>
+  </div>
+}
+
+<!-- Indicadores -->
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="tarjeta p-3">
+      <div class="sub">Abiertos</div>
+      <div class="h4 mb-0">{{ abiertos().length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="tarjeta p-3">
+      <div class="sub">Fuera de tiempo</div>
+      <div class="h4 mb-0" [style.color]="vencidos() ? 'var(--p1)' : null">{{ vencidos() }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="tarjeta p-3">
+      <div class="sub">En espera</div>
+      <div class="h4 mb-0">{{ enEspera() }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="tarjeta p-3">
+      <div class="sub">Cerrados</div>
+      <div class="h4 mb-0">{{ cerrados().length }}</div>
+    </div>
+  </div>
+</div>
+
+<h2 class="h6 mb-2">Pendientes</h2>
+<app-tabla-tickets
+  [tickets]="abiertos()"
+  [sinTecnico]="true"
+  vacio="Sin pendientes"
+  ayudaVacio="No tienes tickets turnados en este momento."
+  (abrir)="abierto.set($event)" />
+
+@if (cerrados().length) {
+  <h2 class="h6 mb-2 mt-4">Historial</h2>
+  <app-tabla-tickets [tickets]="cerrados()" [sinTecnico]="true" (abrir)="abierto.set($event)" />
+}
+
+<app-detalle-ticket
+  [ticketId]="abierto()"
+  [catalogos]="catalogos()"
+  (cerrar)="abierto.set(null)"
+  (cambio)="cargar()" />

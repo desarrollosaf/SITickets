@@ -1,0 +1,74 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Todos los tickets</h1>
+    <p class="sub mb-0">Da clic en cualquier renglón para abrir el detalle, reasignar o reclasificar.</p>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" (click)="limpiar()">Limpiar filtros</button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<div class="tarjeta p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
+      <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio"
+              name="fsrv" (change)="cargar()">
+        <option value="">Todos</option>
+        @for (s of catalogos()?.servicios ?? []; track s.id) {
+          <option [value]="s.id">{{ s.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-est">Estatus</label>
+      <select id="f-est" class="form-select form-select-sm" [(ngModel)]="filtros.estatus"
+              name="fest" (change)="cargar()">
+        <option value="">Todos</option>
+        <option value="EN_COLA">En cola (sin técnico)</option>
+        @for (e of catalogos()?.estatus ?? []; track e.clave) {
+          <option [value]="e.clave">{{ e.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-pri">Prioridad</label>
+      <select id="f-pri" class="form-select form-select-sm" [(ngModel)]="filtros.prioridad"
+              name="fpri" (change)="cargar()">
+        <option value="">Todas</option>
+        @for (p of catalogos()?.prioridades ?? []; track p.clave) {
+          <option [value]="p.clave">{{ p.clave }} · {{ p.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
+      <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico"
+              name="ftec" (change)="cargar()">
+        <option value="">Todos</option>
+        @for (t of tecnicos(); track t.id) {
+          <option [value]="t.id">{{ t.nombre }}</option>
+        }
+      </select>
+    </div>
+  </div>
+</div>
+
+<p class="sub mb-2">
+  @if (cargando()) {
+    Cargando…
+  } @else {
+    {{ tickets().length }} ticket(s)
+  }
+</p>
+
+<app-tabla-tickets [tickets]="tickets()" (abrir)="abierto.set($event)" />
+
+<app-detalle-ticket
+  [ticketId]="abierto()"
+  [catalogos]="catalogos()"
+  [tecnicos]="tecnicos()"
+  (cerrar)="abierto.set(null)"
+  (cambio)="cargar()" />

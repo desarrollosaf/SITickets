@@ -1,0 +1,97 @@
+<div class="d-flex min-vh-100">
+  <!-- Navegacion lateral -->
+  <aside class="rail flex-shrink-0 p-3 d-none d-lg-flex flex-column no-imprimir" style="width: 260px">
+    <div class="d-flex align-items-center gap-2 mb-4 px-1">
+      <div class="d-inline-flex align-items-center justify-content-center rounded-2"
+           style="width: 34px; height: 34px; background: #1d3552">
+        <i class="bi bi-headset text-white"></i>
+      </div>
+      <div>
+        <div class="fw-semibold" style="font-size: 0.9rem">Mesa de ayuda</div>
+        <div class="sub" style="font-size: 0.72rem">Servicios de informática</div>
+      </div>
+    </div>
+
+    <nav class="nav flex-column gap-1 mb-auto">
+      @for (o of menu(); track o.ruta) {
+        <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo">
+          <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+        </a>
+      }
+    </nav>
+
+    <div class="border-top pt-3 mt-3">
+      <div class="fw-semibold text-truncate" style="font-size: 0.82rem">{{ usuario()?.nombre }}</div>
+      <div class="sub mb-1">{{ nombreRol() }}</div>
+      @if (usuario()?.dependencia) {
+        <div class="sub text-truncate" style="font-size: 0.72rem">{{ usuario()?.dependencia }}</div>
+        <div class="sub text-truncate" style="font-size: 0.72rem">
+          {{ usuario()?.area }}@if (usuario()?.extension) { · ext. {{ usuario()?.extension }} }
+        </div>
+      }
+      <div class="d-flex gap-2 mt-2">
+        <button class="btn btn-sm btn-outline-secondary flex-fill" (click)="abrirPassword()">
+          <i class="bi bi-key"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-secondary flex-fill" (click)="auth.salir()">
+          <i class="bi bi-box-arrow-right"></i> Salir
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Barra superior en pantallas chicas -->
+  <div class="flex-grow-1 d-flex flex-column" style="min-width: 0">
+    <header class="d-lg-none bg-white border-bottom px-3 py-2 d-flex align-items-center gap-2 no-imprimir">
+      <button class="btn btn-sm btn-outline-secondary" (click)="railAbierto.set(!railAbierto())">
+        <i class="bi bi-list"></i>
+      </button>
+      <span class="fw-semibold">Mesa de ayuda</span>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" (click)="auth.salir()">
+        <i class="bi bi-box-arrow-right"></i>
+      </button>
+    </header>
+
+    @if (railAbierto()) {
+      <nav class="d-lg-none bg-white border-bottom p-2 no-imprimir">
+        @for (o of menu(); track o.ruta) {
+          <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo"
+             (click)="railAbierto.set(false)">
+            <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+          </a>
+        }
+      </nav>
+    }
+
+    <main class="flex-grow-1 p-3 p-lg-4" style="min-width: 0">
+      <router-outlet />
+    </main>
+  </div>
+</div>
+
+@if (modalPassword()) {
+  <div class="cajon-fondo" (click)="modalPassword.set(false)"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(420px, 92vw)">
+    <h2 class="h6 mb-3">Cambiar contraseña</h2>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold" for="pw-actual">Contraseña actual</label>
+      <input id="pw-actual" type="password" class="form-control" [(ngModel)]="actual" name="actual" />
+    </div>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold" for="pw-nueva">Contraseña nueva</label>
+      <input id="pw-nueva" type="password" class="form-control" [(ngModel)]="nueva" name="nueva" />
+      <div class="form-text">Mínimo 8 caracteres, con al menos una letra y un número.</div>
+    </div>
+    @if (errorPassword()) {
+      <div class="alert alert-danger py-2 small">{{ errorPassword() }}</div>
+    }
+    @if (avisoPassword()) {
+      <div class="alert alert-success py-2 small">{{ avisoPassword() }}</div>
+    }
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary btn-sm" (click)="modalPassword.set(false)">Cerrar</button>
+      <button class="btn btn-primary btn-sm" (click)="guardarPassword()">Guardar</button>
+    </div>
+  </div>
+}

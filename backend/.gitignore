@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+
+# Trae las credenciales del servidor MySQL del area. Nunca se versiona:
+# la plantilla que sí se comparte es .env.example.
+.env
+.env.*
+!.env.example
