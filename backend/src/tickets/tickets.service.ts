@@ -328,6 +328,18 @@ export class TicketsService {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
 
+    /* El campo adicional del catalogo. Si pide cuenta de correo se valida aqui
+       con la misma regla que la correccion de datos generales. */
+    let contexto = dto.contexto?.trim() || null;
+    if (esCampoCuentaCorreo(problema.campo_adicional)) {
+      const revision = revisaCuentaCorreo(
+        contexto,
+        dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+      );
+      if ('error' in revision) throw new BadRequestException(revision.error);
+      contexto = revision.correo;
+    }
+
     const quien = await this.resolverQuien(usuario);
 
     const ticket = await this.db.transaction(async (tx) => {
