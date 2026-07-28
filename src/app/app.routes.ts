@@ -8,11 +8,6 @@ export const routes: Routes = [
     loadComponent: () => import('./paginas/login/login').then((m) => m.Login),
   },
   {
-    path: 'registro',
-    canActivate: [guardAnonimo],
-    loadComponent: () => import('./paginas/login/registro').then((m) => m.Registro),
-  },
-  {
     path: '',
     canActivate: [guardSesion],
     loadComponent: () => import('./paginas/shell/shell').then((m) => m.Shell),

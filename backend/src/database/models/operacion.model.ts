@@ -88,10 +88,20 @@ export class Ticket extends Model {
   @Column(DataType.STRING(20))
   declare estatus: EstatusClave;
 
+  /*
+   * OJO: no siempre es un usuario.id local. Para solicitantes externos (sin
+   * fila en usuario) guarda el id_Usuario de saf.s_usuario, un espacio de
+   * ids distinto. Por eso existe solicitante_nombre: no depender del cruce
+   * por id para mostrar el nombre evita mezclar personas por coincidencia
+   * numerica entre los dos catalogos.
+   */
   @ForeignKey(() => Usuario)
   @AllowNull(false)
   @Column(DataType.INTEGER.UNSIGNED)
   declare solicitante_id: number;
+
+  @Column(DataType.STRING(120))
+  declare solicitante_nombre: string | null;
 
   @ForeignKey(() => Dependencia)
   @Column(DataType.SMALLINT.UNSIGNED)
@@ -352,10 +362,18 @@ export class TicketBitacora extends Model {
   @Column(DataType.DATE)
   declare fecha: Date;
 
-  /** NULL = accion del sistema. */
+  /**
+   * NULL = accion del sistema. Igual que en ticket.solicitante_id, para un
+   * solicitante externo este id es de saf.s_usuario, no de usuario local:
+   * usuario_nombre evita mostrar a la persona equivocada por coincidencia
+   * de ids entre los dos catalogos.
+   */
   @ForeignKey(() => Usuario)
   @Column(DataType.INTEGER.UNSIGNED)
   declare usuario_id: number | null;
+
+  @Column(DataType.STRING(120))
+  declare usuario_nombre: string | null;
 
   @AllowNull(false)
   @Column(DataType.STRING(40))
