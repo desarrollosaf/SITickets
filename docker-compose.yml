@@ -33,7 +33,7 @@ services:
     working_dir: /app
 
     ports:
-      - "3051:3050"
+      - "3050:3050"
 
     volumes:
       - ./backend:/app
