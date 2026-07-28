@@ -12,7 +12,7 @@
 --  correcto).
 -- =====================================================================
 
-USE ticketsv2;
+USE adminplem_ticketsv2;
 
 -- Nota: "ADD COLUMN IF NOT EXISTS" truena en MySQL 9.x con error de sintaxis
 -- (si tu servidor si lo soporta, es mas seguro agregarlo de vuelta). Antes

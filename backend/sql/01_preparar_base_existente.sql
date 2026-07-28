@@ -9,7 +9,7 @@
 --  inicio de sesion necesita.
 -- =====================================================================
 
-USE mesa_ayuda;
+USE adminplem_ticketsv2;
 
 -- 1. Hash de la contrasena. Nunca sale del backend.
 ALTER TABLE usuario
