@@ -29,6 +29,13 @@
         </div>
 
         <div class="d-flex flex-wrap gap-2 mt-3 no-imprimir">
+          <!-- Corrección de datos generales: no cambia el ticket, solo sus datos -->
+          @if (puedeCorregir()) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="abrirDatos()">
+              <i class="bi bi-pencil"></i> Corregir datos
+            </button>
+          }
+
           <!-- Técnico asignado -->
           @if ((atiende() && esMio()) || esAdmin()) {
             @if (relojCorriendo()) {
@@ -124,6 +131,54 @@
       @if (formulario(); as f) {
         <div class="p-3 border-bottom bg-light no-imprimir">
           @switch (f) {
+            @case ('datos') {
+              <div class="alert alert-info py-2 small">
+                Solo se corrigen los datos del reporte. El problema, la prioridad y el técnico no
+                cambian por aquí, y cada corrección queda registrada en la bitácora.
+              </div>
+
+              @if (t.campo_adicional) {
+                <label class="form-label small fw-semibold" for="fm-ctx">{{ t.campo_adicional }}</label>
+                <input id="fm-ctx" class="form-control form-control-sm mb-2" [(ngModel)]="dContexto"
+                       name="dContexto" />
+              }
+
+              @if (!t.interno) {
+                <label class="form-label small fw-semibold" for="fm-dep">Dependencia</label>
+                <select id="fm-dep" class="form-select form-select-sm mb-2"
+                        (change)="cambiaDependenciaDatos($any($event.target).value)">
+                  <option value="">Selecciona…</option>
+                  @for (d of organizacion().dependencias; track d.id) {
+                    <option [value]="d.id" [selected]="d.id === dDependencia()">{{ d.nombre }}</option>
+                  }
+                </select>
+
+                <label class="form-label small fw-semibold" for="fm-area">Área</label>
+                <select id="fm-area" class="form-select form-select-sm mb-2"
+                        [disabled]="!dDependencia()"
+                        (change)="dArea.set($any($event.target).value ? +$any($event.target).value : null)">
+                  <option value="">Sin área</option>
+                  @for (a of areasDeDependencia(); track a.id) {
+                    <option [value]="a.id" [selected]="a.id === dArea()">{{ a.nombre }}</option>
+                  }
+                </select>
+                <div class="form-text mb-2">
+                  La sede esperada se recalcula a partir del área: no se captura aparte.
+                </div>
+
+                <label class="form-label small fw-semibold" for="fm-ext">Extensión</label>
+                <input id="fm-ext" class="form-control form-control-sm mb-2" [(ngModel)]="dExtension"
+                       name="dExtension" maxlength="10" />
+              }
+
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarDatos()">
+                  Guardar cambios
+                </button>
+              </div>
+            }
+
             @case ('espera') {
               <div class="alert alert-info py-2 small">
                 Mientras el ticket esté en espera el reloj de resolución se detiene. Ese tiempo no

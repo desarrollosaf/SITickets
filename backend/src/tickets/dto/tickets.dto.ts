@@ -44,6 +44,35 @@ export class CrearTicketDto {
   extension?: string;
 }
 
+/**
+ * Correccion de los datos generales del reporte. A proposito no admite
+ * problema, servicio, prioridad ni tecnico: eso es cambiar el ticket, y va por
+ * reclasificar / prioridad / reasignar, que exigen motivo y otro rol.
+ */
+export class DatosGeneralesDto {
+  /** El campo adicional del catalogo: inventario, extension afectada, cuenta… */
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  contexto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  extension?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  dependencia?: number;
+
+  /** null deja el ticket sin area. */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  area?: number | null;
+}
+
 export class CrearInternoDto {
   @IsString()
   @MaxLength(20)

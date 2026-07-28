@@ -15,6 +15,7 @@ import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decor
 import {
   CrearInternoDto,
   CrearTicketDto,
+  DatosGeneralesDto,
   MotivoDto,
   PrioridadDto,
   ReasignarDto,
@@ -49,6 +50,21 @@ export class TicketsController {
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.crear(dto, usuario);
+  }
+
+  /**
+   * Correccion de los datos generales. Quien puede hacerla —el solicitante del
+   * ticket o el administrador— lo decide el servicio, que es donde consta de
+   * quien es el reporte.
+   */
+  @HttpCode(200)
+  @Post(':id/datos')
+  datos(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: DatosGeneralesDto,
+    @UsuarioActual() usuario: UsuarioToken,
+  ) {
+    return this.tickets.actualizarDatos(id, dto, usuario);
   }
 
   @Roles('admin')

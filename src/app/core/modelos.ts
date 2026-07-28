@@ -47,6 +47,8 @@ export interface Ticket {
   solicitante: string;
   dependencia: string;
   area: string;
+  dependencia_id: number | null;
+  area_id: number | null;
   extension: string | null;
   sede: string | null;
   tecnico_id: number | null;
@@ -157,6 +159,20 @@ export interface Catalogos {
   estatus: EstatusCatalogo[];
   motivos: { id: number; nombre: string }[];
   sedes: { id: number; nombre: string; radio_m: number }[];
+  /** Dominio institucional que exige el campo «Cuenta de correo». Lo fija el backend. */
+  correo_dominio: string;
+}
+
+/** Bien bajo resguardo del usuario, tal como lo entrega el sistema de bienes. */
+export interface Bien {
+  inventario: string;
+  descripcion: string | null;
+}
+
+export interface BienesUsuario {
+  bienes: Bien[];
+  /** Por que no hay lista: sin RFC, servicio caido… null si la consulta salio bien. */
+  motivo: string | null;
 }
 
 export interface Tecnico {

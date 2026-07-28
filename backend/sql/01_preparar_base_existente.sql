@@ -9,7 +9,7 @@
 --  inicio de sesion necesita.
 -- =====================================================================
 
-USE mesa_ayuda;
+USE adminplem_ticketsv2;
 
 -- 1. Hash de la contrasena. Nunca sale del backend.
 ALTER TABLE usuario
@@ -32,7 +32,7 @@ UPDATE usuario
          LOWER(REPLACE(
            TRIM(SUBSTRING_INDEX(CONVERT(nombre USING ascii), ' ', 2)),
            ' ', '.')),
-         '@sitickets.gob.mx')
+         '@congresoedomex.gob.mx')
  WHERE correo IS NULL OR correo = '';
 
 -- 4. Las contrasenas NO se ponen aqui: un hash bcrypt no se genera en SQL.

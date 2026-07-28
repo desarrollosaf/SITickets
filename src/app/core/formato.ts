@@ -112,6 +112,48 @@ export function resumenUbicacion(s: {
   return { texto: 'sin sede asignada para comparar', clase: 'geo-sd' };
 }
 
+/* =====================================================================
+   Cuenta de correo institucional.
+   Espejo de backend/src/common/correo.ts: el backend vuelve a validar, esto
+   solo evita que el solicitante mande el formulario para recibir un error.
+   ===================================================================== */
+
+export const RE_CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+
+/**
+ * Etiquetas del catalogo que piden una cuenta de correo. Se compara sin
+ * acentos ni mayusculas para que un cambio de redaccion no apague la revision.
+ */
+export function esCampoCuentaCorreo(campo: string | null | undefined): boolean {
+  if (!campo) return false;
+  const limpio = campo
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+  return limpio.includes('cuenta de correo') || limpio.includes('correo electronico');
+}
+
+/**
+ * Etiquetas del catalogo que piden un numero de inventario. Ese campo se surte
+ * del sistema de bienes muebles en vez de capturarse a mano.
+ */
+export function esCampoInventario(campo: string | null | undefined): boolean {
+  return !!campo && campo.toLowerCase().includes('inventario');
+}
+
+/** Devuelve el mensaje a mostrar, o cadena vacia si la cuenta es valida. */
+export function revisaCuentaCorreo(valor: string, dominio: string): string {
+  const limpio = valor.trim().toLowerCase();
+  if (!limpio) return 'Captura la cuenta de correo.';
+  if (!RE_CORREO.test(limpio)) {
+    return `La cuenta de correo no tiene un formato válido (ejemplo: nombre.apellido@${dominio || 'dominio.gob.mx'}).`;
+  }
+  if (dominio && !limpio.endsWith(`@${dominio}`)) {
+    return `La cuenta debe ser del dominio institucional @${dominio}.`;
+  }
+  return '';
+}
+
 /** Mensaje de error legible a partir de la respuesta de NestJS. */
 export function mensajeError(e: unknown): string {
   const err = e as { error?: { message?: string | string[] }; status?: number };

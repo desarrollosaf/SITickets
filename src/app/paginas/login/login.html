@@ -12,9 +12,9 @@
     <div class="tarjeta p-4">
       <form (ngSubmit)="entrar()">
         <div class="mb-3">
-          <label class="form-label small fw-semibold" for="rfc">RFC</label>
-          <input id="rfc" name="rfc" type="text" class="form-control" autocomplete="username"
-                 placeholder="XAXX010101000" [(ngModel)]="rfc" />
+          <label class="form-label small fw-semibold" for="correo">Correo institucional</label>
+          <input id="correo" name="correo" type="email" class="form-control" autocomplete="username"
+                 placeholder="nombre.apellido&#64;congresoedomex.gob.mx" [(ngModel)]="correo" />
         </div>
 
         <div class="mb-3">
