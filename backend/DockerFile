@@ -24,6 +24,10 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 
+# Las migraciones viven fuera de dist/: nest build no las compila ni las
+# copia, y MigracionesService las lee del disco al arrancar.
+COPY --from=build /app/sql ./sql
+
 RUN mkdir -p /app/storage
 
 EXPOSE 3050
