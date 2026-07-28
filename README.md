@@ -87,16 +87,16 @@ Recuerda cambiar `DB_HOST` a `localhost` en `backend/.env` si corres así.
 ## Cuentas sembradas
 
 Todas comparten la contraseña de `SEED_PASSWORD` (`Sitickets2026*` por omisión).
-El correo se arma con los dos apellidos: `apellido.apellido@sitickets.gob.mx`.
+El correo se arma con los dos apellidos: `apellido.apellido@congresoedomex.gob.mx`.
 
 | Perfil | Correo | Qué ve |
 |---|---|---|
-| Administrador | `hernandez.sanchez@sitickets.gob.mx` | Todos los tickets, monitor, tablero, disponibilidad, internos, catálogo |
-| Jefe de departamento | `fabela.rendon@sitickets.gob.mx` | Su bandeja, tickets internos, monitor y tablero |
-| Técnico (impresoras) | `juarez.samaniego@sitickets.gob.mx` | Solo sus tickets turnados y el reloj checador |
-| Técnico (cómputo) | `lara.soto@sitickets.gob.mx` | Ídem |
-| Proveedor externo | `proveedor.externo@sitickets.gob.mx` | Solo impresoras arrendadas |
-| Solicitante | `nava.cortes@sitickets.gob.mx` | Registrar tickets y validar los suyos |
+| Administrador | `hernandez.sanchez@congresoedomex.gob.mx` | Todos los tickets, monitor, tablero, disponibilidad, internos, catálogo |
+| Jefe de departamento | `fabela.rendon@congresoedomex.gob.mx` | Su bandeja, tickets internos, monitor y tablero |
+| Técnico (impresoras) | `juarez.samaniego@congresoedomex.gob.mx` | Solo sus tickets turnados y el reloj checador |
+| Técnico (cómputo) | `lara.soto@congresoedomex.gob.mx` | Ídem |
+| Proveedor externo | `proveedor.externo@congresoedomex.gob.mx` | Solo impresoras arrendadas |
+| Solicitante | `nava.cortes@congresoedomex.gob.mx` | Registrar tickets y validar los suyos |
 
 **Cambia la contraseña del administrador antes de exponer el sistema.**
 Los solicitantes también pueden crear su cuenta desde la pantalla de acceso; el
@@ -200,6 +200,9 @@ src/app/
 | `JWT_SECRET` | **Sustitúyelo** por un valor largo y aleatorio |
 | `JWT_EXPIRES` | Vigencia de la sesión (`8h` por omisión) |
 | `CORS_ORIGIN` | Orígenes permitidos, separados por coma |
+| `CORREO_DOMINIO` | Dominio que exige el campo «Cuenta de correo» y con el que se generan los correos del padrón. Vacío acepta cualquiera |
+| `BIENES_API_URL` | Sistema de bienes muebles que surte el campo «No. de inventario». Se consulta `{BIENES_API_URL}/{rfc}` |
+| `BIENES_API_TIMEOUT_MS` `BIENES_API_TOKEN` | Espera máxima y, si hace falta, token `Bearer` para ese servicio |
 
 ---
 

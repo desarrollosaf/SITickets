@@ -32,7 +32,7 @@
       <div class="col-md-6">
         <label class="form-label small fw-semibold" for="n-prb">Problema</label>
         <select id="n-prb" class="form-select" [disabled]="!servicioId()"
-                (change)="claveProblema.set($any($event.target).value)">
+                (change)="cambiaProblema($any($event.target).value)">
           <option value="">
             {{ servicioId() ? 'Selecciona…' : 'Elige primero el servicio' }}
           </option>
@@ -47,8 +47,61 @@
       @if (p.campo_adicional) {
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
-          <input id="n-ctx" class="form-control" [(ngModel)]="contexto" name="contexto"
-                 [placeholder]="p.campo_adicional" />
+          @if (esCorreo()) {
+            <input id="n-ctx" class="form-control" type="email" inputmode="email"
+                   autocomplete="email" spellcheck="false" autocapitalize="off"
+                   [(ngModel)]="contextoV" name="contexto"
+                   [class.is-invalid]="avisoCorreo()"
+                   [placeholder]="'nombre.apellido@' + dominio()" />
+            @if (avisoCorreo()) {
+              <div class="invalid-feedback d-block">{{ avisoCorreo() }}</div>
+            } @else {
+              <div class="form-text">
+                Cuenta institucional completa, con el dominio <b>&#64;{{ dominio() }}</b>.
+              </div>
+            }
+          } @else if (esInventario()) {
+            @if (cargandoBienes()) {
+              <div class="form-text">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Consultando tus bienes resguardados…
+              </div>
+            } @else if (bienes().length) {
+              <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
+              <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
+                @for (b of bienes(); track b.inventario) {
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" [id]="'bien-' + b.inventario"
+                           [checked]="seleccion().includes(b.inventario)"
+                           (change)="alternaBien(b.inventario)" />
+                    <label class="form-check-label small" [for]="'bien-' + b.inventario">
+                      <b>{{ b.inventario }}</b>
+                      @if (b.descripcion) {
+                        <span class="sub"> · {{ b.descripcion }}</span>
+                      }
+                    </label>
+                  </div>
+                }
+              </div>
+              <div class="form-text" [class.text-danger]="excedeLargo()">
+                @if (seleccion().length) {
+                  {{ seleccion().length }} bien(es) elegido(s): {{ contextoFinal() }}
+                } @else {
+                  Marca los bienes que presentan la falla. Solo aparecen los que tienes bajo
+                  resguardo.
+                }
+              </div>
+            } @else {
+              <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                     [placeholder]="p.campo_adicional" />
+              <div class="form-text">
+                {{ motivoBienes() || 'Captura el número de inventario que aparece en la etiqueta.' }}
+              </div>
+            }
+          } @else {
+            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                   [placeholder]="p.campo_adicional" />
+          }
         </div>
       }
 
@@ -74,7 +127,7 @@
     }
 
     <div class="d-flex gap-2 justify-content-end">
-      <button class="btn btn-outline-secondary" (click)="contexto = ''; texto = ''">Limpiar</button>
+      <button class="btn btn-outline-secondary" (click)="limpiar()">Limpiar</button>
       <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
         @if (guardando()) {
           <span class="spinner-border spinner-border-sm me-2"></span>

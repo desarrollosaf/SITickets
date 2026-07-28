@@ -16,6 +16,7 @@ import {
   Usuario,
 } from '../database/models';
 import { AuthService } from '../auth/auth.service';
+import { dominioInstitucional } from '../common/correo';
 import {
   AREAS,
   DEPENDENCIAS,
@@ -30,13 +31,11 @@ import {
   SOLICITANTES,
 } from './datos-iniciales';
 
-const DOMINIO = 'sitickets.gob.mx';
-
 /**
  * Convierte 'SÁNCHEZ TINOCO ERIKA GUADALUPE' en 'sanchez.tinoco'.
  * Los dos apellidos bastan para distinguir a todo el padron actual.
  */
-function correoDe(nombre: string, usados: Set<string>): string {
+function correoDe(nombre: string, usados: Set<string>, dominio: string): string {
   const limpio = nombre
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -46,9 +45,9 @@ function correoDe(nombre: string, usados: Set<string>): string {
     .split(/\s+/);
 
   const base = limpio.slice(0, 2).join('.') || 'usuario';
-  let correo = `${base}@${DOMINIO}`;
+  let correo = `${base}@${dominio}`;
   let n = 2;
-  while (usados.has(correo)) correo = `${base}${n++}@${DOMINIO}`;
+  while (usados.has(correo)) correo = `${base}${n++}@${dominio}`;
   usados.add(correo);
   return correo;
 }
@@ -85,6 +84,8 @@ export class SeedService implements OnApplicationBootstrap {
   async sembrar() {
     const password = this.config.get<string>('SEED_PASSWORD') ?? 'Sitickets2026*';
     const hash = await AuthService.hash(password);
+    /* Mismo dominio que exige el alta de tickets: una sola fuente. */
+    const dominio = dominioInstitucional(this.config.get('CORREO_DOMINIO'));
 
     await this.prioridades.bulkCreate(PRIORIDADES);
     await this.estatus.bulkCreate(ESTATUS_CATALOGO);
@@ -128,7 +129,7 @@ export class SeedService implements OnApplicationBootstrap {
       PERSONAL.map((p) => ({
         nombre: p.nombre,
         rol: p.rol,
-        correo: correoDe(p.nombre, usados),
+        correo: correoDe(p.nombre, usados, dominio),
         password_hash: hash,
         dependencia_id: informatica,
         area_id: soporte,
@@ -142,7 +143,7 @@ export class SeedService implements OnApplicationBootstrap {
         return {
           nombre: s.nombre,
           rol: 'solicitante' as const,
-          correo: correoDe(s.nombre, usados),
+          correo: correoDe(s.nombre, usados, dominio),
           password_hash: hash,
           dependencia_id: dep,
           area_id: idArea.get(`${dep}|${s.area}`) ?? null,

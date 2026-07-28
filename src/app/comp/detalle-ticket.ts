@@ -13,11 +13,12 @@ import {
   resumenUbicacion,
   ubicacionActual,
 } from '../core/formato';
-import type { Catalogos, Tecnico, TicketDetalle } from '../core/modelos';
+import type { Catalogos, Organizacion, Tecnico, TicketDetalle } from '../core/modelos';
 
 /** Formularios que puede desplegar el cajon. */
 type Formulario =
   | null
+  | 'datos'
   | 'espera'
   | 'resolver'
   | 'cancelar'
@@ -67,6 +68,18 @@ export class DetalleTicket {
   readonly estatus = etiquetaEstatus;
   readonly geo = resumenUbicacion;
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
+
+  /* --- correccion de datos generales --- */
+  readonly organizacion = signal<Organizacion>({ dependencias: [], areas: [] });
+  readonly dContexto = signal('');
+  readonly dExtension = signal('');
+  readonly dDependencia = signal<number | null>(null);
+  readonly dArea = signal<number | null>(null);
+
+  /** Areas de la dependencia elegida: el backend rechaza las de otra. */
+  readonly areasDeDependencia = computed(() =>
+    this.organizacion().areas.filter((a) => a.dependencia_id === this.dDependencia()),
+  );
 
   /* --- campos de los formularios --- */
   motivo = '';
@@ -119,6 +132,13 @@ export class DetalleTicket {
     (this.ticket()?.sesiones ?? []).reduce((a, s) => a + s.segundos, 0),
   );
 
+  /**
+   * Quien puede corregir los datos generales: quien levanto el reporte y el
+   * administrador, mientras el ticket siga abierto. El backend lo vuelve a
+   * revisar; esto solo decide si se ofrece el boton.
+   */
+  readonly puedeCorregir = computed(() => (this.esMiSolicitud() || this.esAdmin()) && this.abierto());
+
   /** Opciones de reclasificacion: servicios de usuario distintos al actual. */
   readonly problemasReclasificacion = computed(() => {
     const t = this.ticket();
@@ -156,6 +176,48 @@ export class DetalleTicket {
     this.dejarEnEspera = true;
     this.error.set('');
     this.formulario.set(f);
+  }
+
+  /** Abre la correccion con los valores que hoy tiene el ticket. */
+  abrirDatos() {
+    const t = this.ticket();
+    if (!t) return;
+    this.dContexto.set(t.contexto ?? '');
+    this.dExtension.set(t.extension ?? '');
+    this.dDependencia.set(t.dependencia_id);
+    this.dArea.set(t.area_id);
+    this.error.set('');
+    this.formulario.set('datos');
+
+    /* El padron de dependencias y areas solo hace falta al corregir. */
+    if (!this.organizacion().dependencias.length) {
+      this.api.organizacion().subscribe({
+        next: (o) => this.organizacion.set(o),
+        error: (e) => this.error.set(mensajeError(e)),
+      });
+    }
+  }
+
+  /** Al cambiar de dependencia el area anterior deja de ser valida. */
+  cambiaDependenciaDatos(valor: string) {
+    this.dDependencia.set(valor ? Number(valor) : null);
+    this.dArea.set(null);
+  }
+
+  enviarDatos() {
+    const t = this.ticket();
+    if (!t) return;
+    this.ocupado.set(true);
+    this.api
+      .datos(t.id, {
+        contexto: this.dContexto().trim(),
+        extension: this.dExtension().trim(),
+        /* Un ticket interno no tiene dependencia del solicitante que corregir. */
+        ...(t.interno
+          ? {}
+          : { dependencia: this.dDependencia() ?? undefined, area: this.dArea() }),
+      })
+      .subscribe({ next: (r) => this.aplicar(r), error: (e) => this.falla(e) });
   }
 
   /** Aplica la respuesta del backend y avisa a la pantalla de atras. */

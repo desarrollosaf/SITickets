@@ -32,7 +32,7 @@ UPDATE usuario
          LOWER(REPLACE(
            TRIM(SUBSTRING_INDEX(CONVERT(nombre USING ascii), ' ', 2)),
            ' ', '.')),
-         '@sitickets.gob.mx')
+         '@congresoedomex.gob.mx')
  WHERE correo IS NULL OR correo = '';
 
 -- 4. Las contrasenas NO se ponen aqui: un hash bcrypt no se genera en SQL.

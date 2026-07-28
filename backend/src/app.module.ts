@@ -8,6 +8,7 @@ import { MODELOS } from './database/models';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { BienesModule } from './bienes/bienes.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OperacionModule } from './operacion/operacion.module';
@@ -44,6 +45,7 @@ import { SeedModule } from './seed/seed.module';
     }),
 
     AuthModule,
+    BienesModule,
     CatalogosModule,
     TicketsModule,
     OperacionModule,

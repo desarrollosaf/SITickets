@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/sequelize';
 import { Op } from 'sequelize';
+import { dominioInstitucional } from '../common/correo';
 import {
   Area,
   CatalogoProblema,
@@ -26,6 +28,7 @@ export class CatalogosService {
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
+    private readonly config: ConfigService,
   ) {}
 
   async organizacion() {
@@ -59,7 +62,13 @@ export class CatalogosService {
       this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
       this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
     ]);
-    return { servicios, problemas, prioridades, estatus, motivos, sedes };
+    /*
+     * El dominio viaja con los catalogos para que el formulario valide la
+     * cuenta de correo contra el mismo valor que exige el backend. Si el area
+     * lo cambia basta reiniciar el API: el front no se recompila.
+     */
+    const correo_dominio = dominioInstitucional(this.config.get('CORREO_DOMINIO'));
+    return { servicios, problemas, prioridades, estatus, motivos, sedes, correo_dominio };
   }
 
   async problemas(origen?: 'usuario' | 'administrador') {

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize } from 'sequelize';
 import {
@@ -24,9 +25,11 @@ import {
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
+import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
   CrearInternoDto,
   CrearTicketDto,
+  DatosGeneralesDto,
   PrioridadDto,
   ReasignarDto,
   ReclasificarDto,
@@ -58,8 +61,10 @@ export class TicketsService {
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
+    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
+    private readonly config: ConfigService,
   ) {}
 
   /* ==================================================================
@@ -225,6 +230,9 @@ export class TicketsService {
       solicitante: t.solicitante?.nombre ?? '—',
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
+      /* Los ids los usa el formulario de correccion para preseleccionar. */
+      dependencia_id: t.dependencia_id,
+      area_id: t.area_id,
       extension: t.extension,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
@@ -268,6 +276,21 @@ export class TicketsService {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
 
+    /*
+     * Cuando el catalogo pide una cuenta de correo, el contexto deja de ser
+     * texto libre. Se revisa aqui y no solo en la pantalla, porque el
+     * formulario se puede saltar llamando al API directo.
+     */
+    let contexto = dto.contexto?.trim() || null;
+    if (esCampoCuentaCorreo(problema.campo_adicional)) {
+      const revision = revisaCuentaCorreo(
+        contexto,
+        dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+      );
+      if ('error' in revision) throw new BadRequestException(revision.error);
+      contexto = revision.correo;
+    }
+
     const quien = await this.usuarios.findByPk(usuario.id);
     if (!quien) throw new ForbiddenException('Sesion invalida');
 
@@ -290,7 +313,7 @@ export class TicketsService {
           area_id: quien.area_id,
           sede_id: area?.sede_id ?? null,
           extension: dto.extension?.trim() || quien.extension,
-          contexto: dto.contexto?.trim() || null,
+          contexto,
           texto_libre: problema.requiere_texto ? dto.texto!.trim() : null,
         },
         { transaction: tx },
@@ -314,6 +337,110 @@ export class TicketsService {
       return t;
     });
 
+    return this.detalle(ticket.id, usuario);
+  }
+
+  /* ==================================================================
+     Correccion de los datos generales del reporte
+
+     Es lo unico que el solicitante puede tocar despues del alta. El ticket en
+     si —problema, servicio, prioridad, tecnico— no se mueve por aqui: para eso
+     estan reclasificar, prioridad y reasignar, que piden motivo y otro rol.
+     ================================================================== */
+
+  async actualizarDatos(id: number, dto: DatosGeneralesDto, usuario: UsuarioToken) {
+    const ticket = await this.tickets.findOne({
+      where: { id, ...this.alcance(usuario) },
+      include: INCLUDES,
+    });
+    if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
+
+    const suyo = ticket.solicitante_id === usuario.id;
+    if (!suyo && usuario.rol !== 'admin') {
+      throw new ForbiddenException('Solo quien levanto el reporte o el administrador lo corrigen');
+    }
+    if (ESTATUS_FINALES.includes(ticket.estatus)) {
+      throw new BadRequestException('El ticket ya esta cerrado o cancelado: sus datos no se tocan');
+    }
+
+    /* Cada cambio se anota por separado: la bitacora guarda antes y despues. */
+    const cambios: { campo: string; antes: string; nuevo: string }[] = [];
+    const nuevos: Record<string, unknown> = {};
+    const anota = (campo: string, antes: unknown, nuevo: unknown) => {
+      cambios.push({ campo, antes: String(antes ?? '—'), nuevo: String(nuevo ?? '—') });
+    };
+
+    if (dto.contexto !== undefined) {
+      let contexto = dto.contexto.trim() || null;
+      if (esCampoCuentaCorreo(ticket.problema?.campo_adicional)) {
+        const revision = revisaCuentaCorreo(
+          contexto,
+          dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+        );
+        if ('error' in revision) throw new BadRequestException(revision.error);
+        contexto = revision.correo;
+      }
+      if (contexto !== ticket.contexto) {
+        anota(ticket.problema?.campo_adicional ?? 'Contexto', ticket.contexto, contexto);
+        nuevos.contexto = contexto;
+      }
+    }
+
+    if (dto.extension !== undefined) {
+      const extension = dto.extension.trim() || null;
+      if (extension !== ticket.extension) {
+        anota('Extension', ticket.extension, extension);
+        nuevos.extension = extension;
+      }
+    }
+
+    /*
+     * Dependencia y area viajan juntas: el area tiene que pertenecer a la
+     * dependencia, y la sede esperada del §16 se recalcula a partir del area.
+     */
+    if (dto.dependencia !== undefined || dto.area !== undefined) {
+      const depId = dto.dependencia ?? ticket.dependencia_id;
+      const dependencia = depId ? await this.dependencias.findByPk(depId) : null;
+      if (depId && !dependencia) throw new BadRequestException('La dependencia no existe');
+
+      const areaId = dto.area === undefined ? ticket.area_id : dto.area;
+      const area = areaId ? await this.areas.findByPk(areaId) : null;
+      if (areaId && !area) throw new BadRequestException('El area no existe');
+      if (area && area.dependencia_id !== depId) {
+        throw new BadRequestException('El area elegida no pertenece a esa dependencia');
+      }
+
+      if (depId !== ticket.dependencia_id) {
+        anota('Dependencia', ticket.dependencia?.nombre, dependencia?.nombre);
+        nuevos.dependencia_id = depId;
+      }
+      if (areaId !== ticket.area_id) {
+        anota('Area', ticket.area?.nombre, area?.nombre);
+        nuevos.area_id = areaId;
+        /* La sede no se captura: sale del area, igual que en el alta. */
+        const sede = area?.sede_id ?? null;
+        if (sede !== ticket.sede_id) nuevos.sede_id = sede;
+      }
+    }
+
+    if (!cambios.length) throw new BadRequestException('No hay ningun cambio que guardar');
+
+    await this.db.transaction(async (tx) => {
+      await ticket.update(nuevos, { transaction: tx });
+      for (const c of cambios) {
+        /* El detalle nombra el campo; el antes y el despues van en su columna,
+           que es como la pantalla de bitacora los presenta. */
+        await this.reglas.anota(ticket.id, usuario.id, 'Correccion de datos', c.campo, tx, {
+          antes: c.antes.slice(0, 80),
+          nuevo: c.nuevo.slice(0, 80),
+        });
+      }
+    });
+
+    this.traza.registra(
+      '§9',
+      `${ticket.folio}: ${usuario.nombre} corrigio ${cambios.map((c) => c.campo).join(', ')}.`,
+    );
     return this.detalle(ticket.id, usuario);
   }
 

@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { API } from './api';
 import type {
   Agenda,
+  BienesUsuario,
   Catalogos,
   Geo,
   LineaTraza,
@@ -54,6 +55,17 @@ export class TicketsService {
     tecnicos: number[];
   }) {
     return this.http.post<TicketDetalle>(`${API}/tickets/internos`, datos);
+  }
+
+  /**
+   * Corrige los datos generales del reporte. El ticket en si —problema,
+   * prioridad, tecnico— no se toca por aqui.
+   */
+  datos(
+    id: number,
+    d: { contexto?: string; extension?: string; dependencia?: number; area?: number | null },
+  ) {
+    return this.http.post<TicketDetalle>(`${API}/tickets/${id}/datos`, d);
   }
 
   /* ---------------- ciclo de vida ---------------- */
@@ -112,6 +124,10 @@ export class TicketsService {
   }
   organizacion() {
     return this.http.get<Organizacion>(`${API}/catalogos/organizacion`);
+  }
+  /** Resguardos del usuario de la sesion, para el campo «No. de inventario». */
+  bienes() {
+    return this.http.get<BienesUsuario>(`${API}/bienes/mios`);
   }
   tecnicos() {
     return this.http.get<Tecnico[]>(`${API}/catalogos/tecnicos`);
