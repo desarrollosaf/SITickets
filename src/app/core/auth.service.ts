@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { API } from './api';
-import type { Organizacion, Rol, Sesion, UsuarioSesion } from './modelos';
+import type { Rol, Sesion, UsuarioSesion } from './modelos';
 
 const LLAVE = 'sitickets.sesion';
 
@@ -45,30 +45,14 @@ export class AuthService {
     return this.token;
   }
 
-  login(correo: string, password: string) {
+  login(rfc: string, password: string) {
     return this.http
-      .post<Sesion>(`${API}/auth/login`, { correo, password })
+      .post<Sesion>(`${API}/auth/login`, { rfc, password })
       .pipe(tap((s) => this.guardar(s)));
-  }
-
-  registrar(datos: {
-    nombre: string;
-    correo: string;
-    password: string;
-    dependencia_id: number;
-    area_id: number;
-    extension?: string;
-  }) {
-    return this.http.post<Sesion>(`${API}/auth/registro`, datos).pipe(tap((s) => this.guardar(s)));
   }
 
   cambiarPassword(actual: string, nueva: string) {
     return this.http.post<{ ok: true }>(`${API}/auth/password`, { actual, nueva });
-  }
-
-  /** Catalogo publico que necesita el formulario de alta de cuenta. */
-  organizacion() {
-    return this.http.get<Organizacion>(`${API}/catalogos/organizacion`);
   }
 
   salir() {

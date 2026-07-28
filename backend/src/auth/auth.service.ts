@@ -1,14 +1,10 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { Area, Dependencia, Usuario } from '../database/models';
-import { CambiarPasswordDto, LoginDto, RegistroDto } from './dto/auth.dto';
+import { Area, Dependencia, SUsuario, Usuario, UserSaf } from '../database/models';
+import type { UsuarioToken } from '../common/usuario-actual.decorator';
+import { CambiarPasswordDto, LoginDto } from './dto/auth.dto';
 
 /** Coste de bcrypt. 12 es el punto razonable hoy entre seguridad y latencia. */
 const ROUNDS = 12;
@@ -32,7 +28,8 @@ export interface SesionRespuesta {
 export class AuthService {
   constructor(
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
-    @InjectModel(Area) private readonly areas: typeof Area,
+    @InjectModel(UserSaf, 'saf') private readonly usuariosSaf: typeof UserSaf,
+    @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     private readonly jwt: JwtService,
   ) {}
 
@@ -41,77 +38,97 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<SesionRespuesta> {
-    const usuario = await this.usuarios.findOne({
-      where: { correo: dto.correo.trim().toLowerCase() },
-      include: [Dependencia, Area],
-    });
+    const rfc = dto.rfc.trim().toUpperCase();
+
+    const cuentaSaf = await this.usuariosSaf.findOne({ where: { rfc } });
 
     /*
-     * Se compara siempre contra un hash, exista o no la cuenta. Sin esto, el
-     * tiempo de respuesta delataria que correos estan dados de alta.
+     * Se compara siempre contra un hash, exista o no la cuenta en saf. Sin
+     * esto, el tiempo de respuesta delataria que rfcs estan dados de alta.
      */
-    const hash = usuario?.password_hash ?? '$2a$12$invalidoinvalidoinvalidoinvalidoinvalidoinvalidoinvalidoinv';
+    const hash = cuentaSaf?.password ?? '$2a$12$invalidoinvalidoinvalidoinvalidoinvalidoinvalidoinvalidoinv';
     const coincide = await bcrypt.compare(dto.password, hash);
 
-    if (!usuario || !coincide || !usuario.activo) {
-      throw new UnauthorizedException('Correo o contrasena incorrectos');
+    if (!cuentaSaf || !coincide) {
+      throw new UnauthorizedException('RFC o contrasena incorrectos');
     }
-    return this.emitir(usuario);
+
+    /*
+     * Existe en ticketsv2.usuario -> tiene rol asignado (tecnico, jefe,
+     * admin, proveedor o un solicitante que ya se registro antes). Se usa
+     * ese perfil tal cual, sin tocar nada.
+     */
+    const local = await this.usuarios.findOne({ where: { rfc }, include: [Dependencia, Area] });
+    if (local) {
+      if (!local.activo) throw new UnauthorizedException('RFC o contrasena incorrectos');
+      return {
+        token: this.jwt.sign({ sub: local.id, rol: local.rol, externo: false }),
+        usuario: this.resumen(local),
+      };
+    }
+
+    /*
+     * No tiene rol asignado localmente: es un solicitante. No se crea fila
+     * en usuario; su identidad es el padron de saf, revalidado en cada
+     * peticion (ver JwtStrategy).
+     */
+    const sUsuario = await this.sUsuarios.findOne({ where: { N_Usuario: rfc } });
+    if (!sUsuario || sUsuario.Estado !== 1) {
+      throw new UnauthorizedException('RFC o contrasena incorrectos');
+    }
+
+    return {
+      token: this.jwt.sign({ sub: sUsuario.id_Usuario, rol: 'solicitante', externo: true }),
+      usuario: {
+        id: sUsuario.id_Usuario,
+        nombre: sUsuario.Nombre,
+        correo: null,
+        rol: 'solicitante',
+        extension: null,
+        dependencia: null,
+        area: null,
+        dependencia_id: null,
+        area_id: null,
+      },
+    };
   }
 
-  async registrar(dto: RegistroDto): Promise<SesionRespuesta> {
-    const correo = dto.correo.trim().toLowerCase();
-
-    if (await this.usuarios.count({ where: { correo } })) {
-      throw new ConflictException('Ese correo ya tiene una cuenta');
+  async cambiarPassword(usuario: UsuarioToken, dto: CambiarPasswordDto): Promise<{ ok: true }> {
+    if (usuario.externo) {
+      throw new ForbiddenException('Tu contrasena se administra en el sistema institucional');
     }
 
-    const area = await this.areas.findByPk(dto.area_id);
-    if (!area || area.dependencia_id !== dto.dependencia_id) {
-      throw new BadRequestException('El area no corresponde a la dependencia elegida');
-    }
+    const local = await this.usuarios.findByPk(usuario.id);
+    if (!local?.password_hash) throw new UnauthorizedException('Sesion invalida');
 
-    /* El rol se fija aqui, no se toma del cuerpo: nadie se registra como admin. */
-    const usuario = await this.usuarios.create({
-      nombre: dto.nombre.trim().toUpperCase(),
-      correo,
-      password_hash: await AuthService.hash(dto.password),
-      dependencia_id: dto.dependencia_id,
-      area_id: dto.area_id,
-      extension: dto.extension?.trim() || null,
-      rol: 'solicitante',
-      activo: true,
-    });
-
-    await usuario.reload({ include: [Dependencia, Area] });
-    return this.emitir(usuario);
-  }
-
-  async cambiarPassword(id: number, dto: CambiarPasswordDto): Promise<{ ok: true }> {
-    const usuario = await this.usuarios.findByPk(id);
-    if (!usuario?.password_hash) throw new UnauthorizedException('Sesion invalida');
-
-    if (!(await bcrypt.compare(dto.actual, usuario.password_hash))) {
+    if (!(await bcrypt.compare(dto.actual, local.password_hash))) {
       throw new UnauthorizedException('La contrasena actual no coincide');
     }
-    await usuario.update({ password_hash: await AuthService.hash(dto.nueva) });
+    await local.update({ password_hash: await AuthService.hash(dto.nueva) });
     return { ok: true };
   }
 
-  async perfil(id: number) {
-    const usuario = await this.usuarios.findByPk(id, {
+  async perfil(usuario: UsuarioToken) {
+    if (usuario.externo) {
+      return {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        correo: null,
+        rol: usuario.rol,
+        extension: null,
+        dependencia: null,
+        area: null,
+        dependencia_id: null,
+        area_id: null,
+      };
+    }
+
+    const local = await this.usuarios.findByPk(usuario.id, {
       attributes: { exclude: ['password_hash'] },
       include: [Dependencia, Area],
     });
-    if (!usuario) throw new UnauthorizedException('Sesion invalida');
-    return this.resumen(usuario);
-  }
-
-  private emitir(usuario: Usuario): SesionRespuesta {
-    return {
-      token: this.jwt.sign({ sub: usuario.id, rol: usuario.rol }),
-      usuario: this.resumen(usuario),
-    };
+    if (!local) throw new UnauthorizedException('Sesion invalida');
+    return this.resumen(local);
   }
 
   private resumen(usuario: Usuario) {

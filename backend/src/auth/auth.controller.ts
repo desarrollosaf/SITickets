@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Post, HttpCode } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { CambiarPasswordDto, LoginDto, RegistroDto } from './dto/auth.dto';
+import { CambiarPasswordDto, LoginDto } from './dto/auth.dto';
 import { Publico } from '../common/roles.decorator';
-import { UsuarioActual } from '../common/usuario-actual.decorator';
+import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -18,21 +18,14 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
-  @Publico()
-  @Throttle({ default: { limit: 3, ttl: 300_000 } })
-  @Post('registro')
-  registro(@Body() dto: RegistroDto) {
-    return this.auth.registrar(dto);
-  }
-
   @Get('yo')
-  yo(@UsuarioActual('id') id: number) {
-    return this.auth.perfil(id);
+  yo(@UsuarioActual() usuario: UsuarioToken) {
+    return this.auth.perfil(usuario);
   }
 
   @HttpCode(200)
   @Post('password')
-  password(@UsuarioActual('id') id: number, @Body() dto: CambiarPasswordDto) {
-    return this.auth.cambiarPassword(id, dto);
+  password(@UsuarioActual() usuario: UsuarioToken, @Body() dto: CambiarPasswordDto) {
+    return this.auth.cambiarPassword(usuario, dto);
   }
 }

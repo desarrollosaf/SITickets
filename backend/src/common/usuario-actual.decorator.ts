@@ -7,6 +7,8 @@ export interface UsuarioToken {
   nombre: string;
   rol: Rol;
   correo: string | null;
+  /** true = identidad de saf.s_usuario, sin fila en ticketsv2.usuario. */
+  externo: boolean;
 }
 
 /**

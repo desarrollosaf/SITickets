@@ -4,14 +4,15 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import type ms from 'ms';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Area, Usuario } from '../database/models';
+import { SUsuario, Usuario, UserSaf } from '../database/models';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([Usuario, Area]),
+    SequelizeModule.forFeature([Usuario]),
+    SequelizeModule.forFeature([UserSaf, SUsuario], 'saf'),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

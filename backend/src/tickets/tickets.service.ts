@@ -14,8 +14,10 @@ import {
   ESTATUS,
   ESTATUS_FINALES,
   EstatusClave,
+  SDependencia,
   Sede,
   Servicio,
+  SUsuario,
   Ticket,
   TicketBitacora,
   TicketSesion,
@@ -62,6 +64,8 @@ export class TicketsService {
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
+    @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
+    @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
     private readonly config: ConfigService,
@@ -195,7 +199,7 @@ export class TicketsService {
         motivo: b.motivo,
         valor_antes: b.valor_antes,
         valor_nuevo: b.valor_nuevo,
-        usuario: b.usuario?.nombre ?? 'Sistema',
+        usuario: b.usuario_nombre ?? b.usuario?.nombre ?? 'Sistema',
       })),
     };
   }
@@ -227,7 +231,7 @@ export class TicketsService {
       estatus: t.estatus,
       contexto: t.contexto,
       solicitante_id: t.solicitante_id,
-      solicitante: t.solicitante?.nombre ?? '—',
+      solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
       /* Los ids los usa el formulario de correccion para preseleccionar. */
@@ -263,6 +267,54 @@ export class TicketsService {
      §2 · alta del solicitante
      ================================================================== */
 
+  /**
+   * Datos de quien registra el ticket. Si tiene fila local (staff, o un
+   * solicitante que ya se registro antes) salen de ahi, igual que siempre.
+   * Si es un solicitante externo (usuario.externo) salen de saf.s_usuario:
+   * no hay fila local que consultar. area_id y sede_id quedan en null para
+   * el externo porque el catalogo de departamentos de saf no empata limpio
+   * con el de areas de aqui; dependencia_id si se resuelve por nombre.
+   */
+  private async resolverQuien(usuario: UsuarioToken): Promise<{
+    nombre: string;
+    dependencia_id: number | null;
+    area_id: number | null;
+    sede_id: number | null;
+    extension: string | null;
+  }> {
+    if (!usuario.externo) {
+      const quien = await this.usuarios.findByPk(usuario.id);
+      if (!quien) throw new ForbiddenException('Sesion invalida');
+      const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
+      return {
+        nombre: quien.nombre,
+        dependencia_id: quien.dependencia_id,
+        area_id: quien.area_id,
+        sede_id: area?.sede_id ?? null,
+        extension: quien.extension,
+      };
+    }
+
+    const sUsuario = await this.sUsuarios.findByPk(usuario.id);
+    if (!sUsuario) throw new ForbiddenException('Sesion invalida');
+    return {
+      nombre: sUsuario.Nombre,
+      dependencia_id: await this.resolverDependenciaSaf(sUsuario.id_Dependencia),
+      area_id: null,
+      sede_id: null,
+      extension: null,
+    };
+  }
+
+  /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
+  private async resolverDependenciaSaf(idSaf: number | null): Promise<number | null> {
+    if (!idSaf) return null;
+    const sDep = await this.sDependencias.findByPk(idSaf);
+    if (!sDep) return null;
+    const local = await this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
+    return local?.id ?? null;
+  }
+
   async crear(dto: CrearTicketDto, usuario: UsuarioToken) {
     const problema = await this.problemas.findOne({
       where: { clave: dto.problema, activo: true },
@@ -276,25 +328,7 @@ export class TicketsService {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
 
-    /*
-     * Cuando el catalogo pide una cuenta de correo, el contexto deja de ser
-     * texto libre. Se revisa aqui y no solo en la pantalla, porque el
-     * formulario se puede saltar llamando al API directo.
-     */
-    let contexto = dto.contexto?.trim() || null;
-    if (esCampoCuentaCorreo(problema.campo_adicional)) {
-      const revision = revisaCuentaCorreo(
-        contexto,
-        dominioInstitucional(this.config.get('CORREO_DOMINIO')),
-      );
-      if ('error' in revision) throw new BadRequestException(revision.error);
-      contexto = revision.correo;
-    }
-
-    const quien = await this.usuarios.findByPk(usuario.id);
-    if (!quien) throw new ForbiddenException('Sesion invalida');
-
-    const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
+    const quien = await this.resolverQuien(usuario);
 
     const ticket = await this.db.transaction(async (tx) => {
       const folio = await this.reglas.siguienteFolio(problema.servicio_id, tx);
@@ -308,10 +342,11 @@ export class TicketsService {
           /* §4 la prioridad la impone el catalogo. El usuario no la elige. */
           prioridad: problema.prioridad,
           estatus: ESTATUS.REGISTRADO,
-          solicitante_id: quien.id,
+          solicitante_id: usuario.id,
+          solicitante_nombre: quien.nombre,
           dependencia_id: quien.dependencia_id,
           area_id: quien.area_id,
-          sede_id: area?.sede_id ?? null,
+          sede_id: quien.sede_id,
           extension: dto.extension?.trim() || quien.extension,
           contexto,
           texto_libre: problema.requiere_texto ? dto.texto!.trim() : null,
@@ -321,10 +356,12 @@ export class TicketsService {
 
       await this.reglas.anota(
         t.id,
-        quien.id,
+        usuario.id,
         'Registro',
         `${problema.servicio.nombre} · ${problema.descripcion}`,
         tx,
+        undefined,
+        quien.nombre,
       );
       this.traza.registra('§2', `Ticket ${folio} registrado por ${quien.nombre} · ${problema.descripcion}.`);
       this.traza.registra(
@@ -479,6 +516,7 @@ export class TicketsService {
           /* Nace asignado: nadie lo solicito, el area lo programo. */
           estatus: ESTATUS.ASIGNADO,
           solicitante_id: usuario.id,
+          solicitante_nombre: usuario.nombre,
           tecnico_id: responsable,
           interno: true,
           fecha_plan: dto.fecha_plan ?? null,
@@ -659,6 +697,10 @@ export class TicketsService {
       t.id,
       usuario.id,
       usuario.rol === 'admin' ? 'Cerrado por el administrador' : 'Validado por el usuario',
+      undefined,
+      undefined,
+      undefined,
+      usuario.nombre,
     );
     this.traza.registra('§10', `${t.folio} validado. Cierre real, no por omision.`);
     return this.detalle(id, usuario);
@@ -675,7 +717,7 @@ export class TicketsService {
       rechazos: t.rechazos + 1,
       f_resolucion: null,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Rechazado por el usuario', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Rechazado por el usuario', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra(
       '§5',
       `${t.folio} rechazado por el solicitante (${motivo}). Regresa a EN ATENCION; conserva el folio.`,
@@ -695,7 +737,7 @@ export class TicketsService {
       f_validacion: null,
       cierre_por_omision: false,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Reapertura', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Reapertura', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra('§5', `${t.folio} reabierto (reapertura #${t.reaperturas + 1}). El folio no cambia.`);
     return this.detalle(id, usuario);
   }
@@ -726,7 +768,7 @@ export class TicketsService {
       f_cancelacion: new Date(),
       motivo_cancelacion: motivo,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Cancelado', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Cancelado', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra('§5', `${t.folio} cancelado (${motivo}).`);
     return this.detalle(id, usuario);
   }

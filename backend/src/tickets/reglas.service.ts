@@ -324,7 +324,11 @@ export class ReglasService {
      bitacora (§9)
      ------------------------------------------------------------------ */
 
-  /** usuario_id nulo = accion del sistema, no de una persona. */
+  /**
+   * usuario_id nulo = accion del sistema, no de una persona. usuarioNombre
+   * solo hace falta cuando quien actua puede ser un solicitante externo (sin
+   * fila en usuario): evita que el cruce por id muestre a otra persona.
+   */
   async anota(
     ticketId: number,
     usuarioId: number | null,
@@ -332,11 +336,13 @@ export class ReglasService {
     detalle?: string | null,
     tx?: Transaction,
     extra?: { motivo?: string; antes?: string; nuevo?: string },
+    usuarioNombre?: string | null,
   ): Promise<void> {
     await this.bitacora.create(
       {
         ticket_id: ticketId,
         usuario_id: usuarioId,
+        usuario_nombre: usuarioNombre ?? null,
         accion,
         detalle: detalle ?? null,
         motivo: extra?.motivo ?? null,

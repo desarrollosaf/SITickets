@@ -4,7 +4,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { MODELOS } from './database/models';
+import { MODELOS, SDependencia, SUsuario, UserSaf } from './database/models';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
@@ -39,6 +39,30 @@ import { SeedModule } from './seed/seed.module';
         synchronize: config.get('DB_SYNC') === 'true',
         /* @nestjs/sequelize solo ejecuta sync() cuando esta activo. */
         autoLoadModels: true,
+        retryAttempts: 20,
+        retryDelay: 3000,
+      }),
+    }),
+
+    /*
+     * Base externa 'saf': ahi vive el padron real de rfc/password que valida
+     * el login. Solo lectura, no la gestiona este sistema.
+     */
+    SequelizeModule.forRootAsync({
+      name: 'saf',
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        dialect: 'mysql' as const,
+        host: config.get('SAF_DB_HOST', 'localhost'),
+        port: Number(config.get('SAF_DB_PORT', 3306)),
+        database: config.get('SAF_DB_NAME', 'saf'),
+        username: config.get('SAF_DB_USER', 'root'),
+        password: config.get('SAF_DB_PASS', ''),
+        models: [UserSaf, SUsuario, SDependencia],
+        logging: false,
+        timezone: '-06:00',
+        synchronize: false,
+        autoLoadModels: false,
         retryAttempts: 20,
         retryDelay: 3000,
       }),
