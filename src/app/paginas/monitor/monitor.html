@@ -58,6 +58,23 @@
                 <span class="pulso me-1"></span>
               }
               {{ a.tecnico }} <span style="color: #7f92ae">· {{ a.problema }}</span>
+              @if (a.lat_inicio !== null && a.lng_inicio !== null) {
+                <a class="no-imprimir ms-1" style="color: #7fb2e3"
+                   [href]="'https://www.google.com/maps?q=' + a.lat_inicio + ',' + a.lng_inicio"
+                   target="_blank" rel="noopener">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  @if (a.distancia_m !== null) {
+                    {{ a.distancia_m }} m
+                    {{ a.en_sitio ? '(en sitio)' : '(fuera de sitio)' }}
+                  } @else {
+                    Ver ubicación
+                  }
+                </a>
+              } @else {
+                <span class="ms-1" style="color: #5a6f8a">
+                  <i class="bi bi-geo-alt"></i> sin ubicación
+                </span>
+              }
             </div>
             @if (a.motivo_espera) {
               <div class="small mt-1" style="color: #f0b45c">
