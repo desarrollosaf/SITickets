@@ -663,7 +663,13 @@ export class TicketsService {
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.EN_ESPERA, ESTATUS.ASIGNADO]);
 
-    /* Al resolver se cierra cualquier sesion de reloj que siguiera corriendo. */
+    /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
+    const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
+    if (!sesionAbierta) {
+      throw new BadRequestException('Inicia el reloj antes de marcar el ticket como resuelto');
+    }
+
+    /* Al resolver se cierra la sesion de reloj que seguia corriendo. */
     await this.sesiones.update(
       { fin: new Date(), motivo: 'Servicio concluido' },
       { where: { ticket_id: t.id, fin: null } },
@@ -839,9 +845,9 @@ export class TicketsService {
      §6 · reclasificacion. Cambia el servicio; el folio nunca.
      ------------------------------------------------------------------ */
 
+  /** Solo el administrador reclasifica: @Roles('admin') en el controller ya lo garantiza. */
   async reclasificar(id: number, dto: ReclasificarDto, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
-    if (usuario.rol !== 'admin') this.exigeTecnico(t, usuario);
     if (ESTATUS_FINALES.includes(t.estatus)) {
       throw new BadRequestException('Un ticket cerrado o cancelado ya no se reclasifica');
     }

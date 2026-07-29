@@ -38,7 +38,7 @@ export class Monitor implements OnDestroy {
     );
   }, 1000);
 
-  private readonly refresco = setInterval(() => this.cargar(), 8000);
+  private readonly refresco = setInterval(() => this.cargar(), 3000);
 
   constructor() {
     this.cargar();

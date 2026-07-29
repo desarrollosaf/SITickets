@@ -125,6 +125,21 @@ export interface Problema {
   servicio: string;
   servicio_clave: string;
   origen: 'usuario' | 'administrador';
+  /** Solo viene en el listado de administracion; el publico solo trae activas. */
+  orden?: number;
+  activo?: boolean;
+}
+
+/** Cuerpo para crear o editar una opcion del catalogo de problemas. */
+export interface ProblemaForm {
+  servicio_id: number;
+  clave: string;
+  descripcion: string;
+  prioridad: string;
+  campo_adicional?: string;
+  requiere_texto?: boolean;
+  orden?: number;
+  activo?: boolean;
 }
 
 export interface Servicio {
@@ -210,6 +225,7 @@ export interface Monitor {
     tecnico: string;
     reloj_desde: string | null;
     seg_campo: number;
+    motivo_espera: string | null;
   }[];
   cola: {
     turno: number;
