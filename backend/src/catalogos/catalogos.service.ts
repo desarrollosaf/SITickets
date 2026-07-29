@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op } from 'sequelize';
+import { Op, UniqueConstraintError } from 'sequelize';
 import { dominioInstitucional } from '../common/correo';
 import {
   Area,
@@ -15,6 +15,7 @@ import {
   TecnicoServicio,
   Usuario,
 } from '../database/models';
+import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 
 @Injectable()
 export class CatalogosService {
@@ -88,18 +89,97 @@ export class CatalogosService {
       ],
     });
 
-    return filas.map((p) => ({
+    return filas.map((p) => this.mapaProblema(p));
+  }
+
+  private mapaProblema(p: CatalogoProblema) {
+    return {
       id: p.id,
       clave: p.clave,
       descripcion: p.descripcion,
       prioridad: p.prioridad,
       campo_adicional: p.campo_adicional,
       requiere_texto: p.requiere_texto,
+      orden: p.orden,
+      activo: p.activo,
       servicio_id: p.servicio_id,
       servicio: p.servicio.nombre,
       servicio_clave: p.servicio.clave,
       origen: p.servicio.origen,
-    }));
+    };
+  }
+
+  /** Todas las opciones (activas e inactivas): lo que necesita el admin para administrarlas. */
+  async problemasAdmin() {
+    const filas = await this.problemasM.findAll({
+      include: [{ model: Servicio, as: 'servicio', required: true }],
+      order: [
+        [{ model: Servicio, as: 'servicio' }, 'nombre', 'ASC'],
+        ['orden', 'ASC'],
+      ],
+    });
+    return filas.map((p) => this.mapaProblema(p));
+  }
+
+  async crearProblema(dto: CrearProblemaDto) {
+    const servicio = await this.servicios.findByPk(dto.servicio_id);
+    if (!servicio) throw new BadRequestException('El servicio no existe');
+
+    try {
+      const creado = await this.problemasM.create({
+        servicio_id: dto.servicio_id,
+        clave: dto.clave.trim().toUpperCase(),
+        descripcion: dto.descripcion.trim(),
+        prioridad: dto.prioridad,
+        campo_adicional: dto.campo_adicional?.trim() || null,
+        requiere_texto: dto.requiere_texto ?? false,
+        orden: dto.orden ?? 0,
+      });
+      return this.unaProblema(creado.id);
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe una opcion con esa clave');
+      }
+      throw e;
+    }
+  }
+
+  async actualizarProblema(id: number, dto: ActualizarProblemaDto) {
+    const problema = await this.problemasM.findByPk(id);
+    if (!problema) throw new NotFoundException('La opcion no existe');
+
+    if (dto.servicio_id !== undefined) {
+      const servicio = await this.servicios.findByPk(dto.servicio_id);
+      if (!servicio) throw new BadRequestException('El servicio no existe');
+    }
+
+    try {
+      await problema.update({
+        ...(dto.servicio_id !== undefined && { servicio_id: dto.servicio_id }),
+        ...(dto.clave !== undefined && { clave: dto.clave.trim().toUpperCase() }),
+        ...(dto.descripcion !== undefined && { descripcion: dto.descripcion.trim() }),
+        ...(dto.prioridad !== undefined && { prioridad: dto.prioridad }),
+        ...(dto.campo_adicional !== undefined && {
+          campo_adicional: dto.campo_adicional?.trim() || null,
+        }),
+        ...(dto.requiere_texto !== undefined && { requiere_texto: dto.requiere_texto }),
+        ...(dto.orden !== undefined && { orden: dto.orden }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe una opcion con esa clave');
+      }
+      throw e;
+    }
+    return this.unaProblema(id);
+  }
+
+  private async unaProblema(id: number) {
+    const p = await this.problemasM.findByPk(id, {
+      include: [{ model: Servicio, as: 'servicio', required: true }],
+    });
+    return this.mapaProblema(p!);
   }
 
   /** Padron con especialidad. Nunca incluye el hash de contrasena. */

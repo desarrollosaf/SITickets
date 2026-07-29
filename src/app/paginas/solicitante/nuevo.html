@@ -22,7 +22,8 @@
     <div class="row g-3 mb-3">
       <div class="col-md-6">
         <label class="form-label small fw-semibold" for="n-srv">Tipo de servicio</label>
-        <select id="n-srv" class="form-select" (change)="cambiaServicio($any($event.target).value)">
+        <select id="n-srv" class="form-select" [value]="servicioId() ?? ''"
+                (change)="cambiaServicio($any($event.target).value)">
           <option value="">Selecciona…</option>
           @for (s of servicios(); track s.id) {
             <option [value]="s.id">{{ s.nombre }}</option>
@@ -31,7 +32,7 @@
       </div>
       <div class="col-md-6">
         <label class="form-label small fw-semibold" for="n-prb">Problema</label>
-        <select id="n-prb" class="form-select" [disabled]="!servicioId()"
+        <select id="n-prb" class="form-select" [disabled]="!servicioId()" [value]="claveProblema()"
                 (change)="cambiaProblema($any($event.target).value)">
           <option value="">
             {{ servicioId() ? 'Selecciona…' : 'Elige primero el servicio' }}
@@ -127,7 +128,8 @@
     }
 
     <div class="d-flex gap-2 justify-content-end">
-      <button class="btn btn-outline-secondary" (click)="limpiar()">Limpiar</button>
+      <button class="btn btn-outline-secondary" (click)="regresar()">Regresar</button>
+      <button class="btn btn-outline-secondary" (click)="limpiarFormulario()">Limpiar</button>
       <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
         @if (guardando()) {
           <span class="spinner-border spinner-border-sm me-2"></span>

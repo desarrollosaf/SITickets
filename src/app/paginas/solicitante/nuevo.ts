@@ -164,6 +164,19 @@ export class Nuevo {
     this.texto = '';
   }
 
+  /** Boton "Limpiar": reinicia todo el formulario, no solo el contexto del problema actual. */
+  limpiarFormulario() {
+    this.servicioId.set(null);
+    this.claveProblema.set('');
+    this.extension = this.auth.usuario()?.extension ?? '';
+    this.error.set('');
+    this.limpiar();
+  }
+
+  regresar() {
+    void this.router.navigate(['/mis-tickets']);
+  }
+
   guardar() {
     const p = this.problema();
     this.error.set('');

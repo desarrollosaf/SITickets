@@ -1,7 +1,7 @@
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
     <h1 class="h5 mb-1">Monitor de turnos</h1>
-    <p class="sub mb-0">Pantalla para proyectar en el área. Se actualiza sola cada 8 segundos.</p>
+    <p class="sub mb-0">Pantalla para proyectar en el área. Se actualiza sola cada 3 segundos.</p>
   </div>
   <button class="btn btn-sm btn-outline-secondary" (click)="pantallaCompleta()">
     <i class="bi bi-arrows-fullscreen"></i> Pantalla completa
@@ -41,7 +41,12 @@
           <div class="atendiendo mb-2" [class.pausa]="!a.reloj_desde">
             <div class="d-flex justify-content-between align-items-start gap-2">
               <div>
-                <div class="mono fw-semibold">{{ a.folio }}</div>
+                <div class="mono fw-semibold">
+                  {{ a.folio }}
+                  @if (a.estatus === 'EN_ESPERA') {
+                    <span class="chip ms-1" style="background: #3a2f1f; color: #f0b45c">EN ESPERA</span>
+                  }
+                </div>
                 <div class="small" style="color: #7f92ae">{{ a.servicio }} · {{ a.prioridad }}</div>
               </div>
               <div class="mono h5 mb-0">
@@ -54,6 +59,11 @@
               }
               {{ a.tecnico }} <span style="color: #7f92ae">· {{ a.problema }}</span>
             </div>
+            @if (a.motivo_espera) {
+              <div class="small mt-1" style="color: #f0b45c">
+                <i class="bi bi-pause-circle"></i> {{ a.motivo_espera }}
+              </div>
+            }
           </div>
         }
 

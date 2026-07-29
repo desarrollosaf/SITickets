@@ -70,6 +70,7 @@ export class MonitorService {
           tecnico: t.tecnico?.nombre ?? 'Sin asignar',
           reloj_desde: sesion?.inicio ?? null,
           seg_campo: acumulado.get(t.id) ?? 0,
+          motivo_espera: t.estatus === ESTATUS.EN_ESPERA ? t.motivo_espera : null,
         };
       })
       .sort((a, b) => {

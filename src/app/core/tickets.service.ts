@@ -9,6 +9,8 @@ import type {
   LineaTraza,
   Monitor,
   Organizacion,
+  Problema,
+  ProblemaForm,
   Tablero,
   Tecnico,
   Ticket,
@@ -131,6 +133,18 @@ export class TicketsService {
   }
   tecnicos() {
     return this.http.get<Tecnico[]>(`${API}/catalogos/tecnicos`);
+  }
+
+  /* ---------------- administracion del catalogo de problemas ---------------- */
+
+  problemasAdmin() {
+    return this.http.get<Problema[]>(`${API}/catalogos/problemas/admin`);
+  }
+  crearProblema(datos: ProblemaForm) {
+    return this.http.post<Problema>(`${API}/catalogos/problemas`, datos);
+  }
+  actualizarProblema(id: number, datos: Partial<ProblemaForm>) {
+    return this.http.patch<Problema>(`${API}/catalogos/problemas/${id}`, datos);
   }
   monitor() {
     return this.http.get<Monitor>(`${API}/monitor`);

@@ -156,8 +156,7 @@ export class TicketsController {
     return this.tickets.reasignar(id, dto, usuario);
   }
 
-  /** El tecnico tambien puede: detecta el error de clasificacion en sitio. */
-  @Roles('admin', 'tecnico', 'jefe', 'proveedor')
+  @Roles('admin')
   @HttpCode(200)
   @Post(':id/reclasificar')
   reclasificar(

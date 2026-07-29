@@ -54,21 +54,23 @@
               </button>
             }
             @if (t.estatus === 'EN_ATENCION') {
-              <button class="btn btn-sm btn-success" (click)="abrirFormulario('resolver')">
+              <button class="btn btn-sm btn-success" [disabled]="!relojCorriendo()"
+                      [title]="relojCorriendo() ? '' : 'Inicia el reloj para poder marcar el ticket como resuelto'"
+                      (click)="abrirFormulario('resolver')">
                 Marcar resuelto
               </button>
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('espera')">
                 Poner en espera
               </button>
+              @if (!relojCorriendo()) {
+                <div class="w-100 small sub mt-1">
+                  <i class="bi bi-info-circle"></i> Inicia el reloj para poder marcar el ticket como resuelto.
+                </div>
+              }
             }
             @if (t.estatus === 'EN_ESPERA') {
               <button class="btn btn-sm btn-outline-secondary" [disabled]="ocupado()" (click)="reanudar()">
                 Reanudar
-              </button>
-            }
-            @if (abierto() && atiende()) {
-              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reclasificar')">
-                Reclasificar
               </button>
             }
           }
