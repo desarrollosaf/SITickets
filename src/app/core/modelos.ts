@@ -226,6 +226,10 @@ export interface Monitor {
     reloj_desde: string | null;
     seg_campo: number;
     motivo_espera: string | null;
+    lat_inicio: number | null;
+    lng_inicio: number | null;
+    en_sitio: boolean | null;
+    distancia_m: number | null;
   }[];
   cola: {
     turno: number;

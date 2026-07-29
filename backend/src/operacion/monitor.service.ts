@@ -57,9 +57,25 @@ export class MonitorService {
 
     const acumulado = await this.acumuladoEnSitio(enCurso.map((t) => t.id));
 
+    /* La ubicacion de inicio se muestra aunque el reloj ya se haya detenido:
+       es donde el tecnico salio a atender, no donde esta ahora mismo. */
+    const idsCurso = enCurso.map((t) => t.id);
+    const sesionesCurso = idsCurso.length
+      ? await this.sesiones.findAll({
+          where: { ticket_id: { [Op.in]: idsCurso } },
+          order: [['inicio', 'DESC']],
+        })
+      : [];
+    const ultimaSesion = new Map<number, (typeof sesionesCurso)[number]>();
+    for (const s of sesionesCurso) {
+      const id = Number(s.ticket_id);
+      if (!ultimaSesion.has(id)) ultimaSesion.set(id, s);
+    }
+
     const atencion = enCurso
       .map((t) => {
         const sesion = porTicket.get(t.id);
+        const ultima = ultimaSesion.get(t.id);
         return {
           id: t.id,
           folio: t.folio,
@@ -71,6 +87,10 @@ export class MonitorService {
           reloj_desde: sesion?.inicio ?? null,
           seg_campo: acumulado.get(t.id) ?? 0,
           motivo_espera: t.estatus === ESTATUS.EN_ESPERA ? t.motivo_espera : null,
+          lat_inicio: ultima?.lat_inicio ?? null,
+          lng_inicio: ultima?.lng_inicio ?? null,
+          en_sitio: ultima?.en_sitio ?? null,
+          distancia_m: ultima?.distancia_m ?? null,
         };
       })
       .sort((a, b) => {
