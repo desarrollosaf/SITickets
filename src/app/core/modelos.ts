@@ -47,6 +47,8 @@ export interface Ticket {
   solicitante: string;
   dependencia: string;
   area: string;
+  dependencia_id: number | null;
+  area_id: number | null;
   extension: string | null;
   sede: string | null;
   tecnico_id: number | null;
@@ -123,6 +125,21 @@ export interface Problema {
   servicio: string;
   servicio_clave: string;
   origen: 'usuario' | 'administrador';
+  /** Solo viene en el listado de administracion; el publico solo trae activas. */
+  orden?: number;
+  activo?: boolean;
+}
+
+/** Cuerpo para crear o editar una opcion del catalogo de problemas. */
+export interface ProblemaForm {
+  servicio_id: number;
+  clave: string;
+  descripcion: string;
+  prioridad: string;
+  campo_adicional?: string;
+  requiere_texto?: boolean;
+  orden?: number;
+  activo?: boolean;
 }
 
 export interface Servicio {
@@ -157,6 +174,20 @@ export interface Catalogos {
   estatus: EstatusCatalogo[];
   motivos: { id: number; nombre: string }[];
   sedes: { id: number; nombre: string; radio_m: number }[];
+  /** Dominio institucional que exige el campo «Cuenta de correo». Lo fija el backend. */
+  correo_dominio: string;
+}
+
+/** Bien bajo resguardo del usuario, tal como lo entrega el sistema de bienes. */
+export interface Bien {
+  inventario: string;
+  descripcion: string | null;
+}
+
+export interface BienesUsuario {
+  bienes: Bien[];
+  /** Por que no hay lista: sin RFC, servicio caido… null si la consulta salio bien. */
+  motivo: string | null;
 }
 
 export interface Tecnico {
@@ -194,6 +225,11 @@ export interface Monitor {
     tecnico: string;
     reloj_desde: string | null;
     seg_campo: number;
+    motivo_espera: string | null;
+    lat_inicio: number | null;
+    lng_inicio: number | null;
+    en_sitio: boolean | null;
+    distancia_m: number | null;
   }[];
   cola: {
     turno: number;

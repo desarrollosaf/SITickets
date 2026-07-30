@@ -1,0 +1,153 @@
+<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Catálogo de problemas</h1>
+    <p class="sub mb-0">
+      Sustituye al campo de texto libre. Cada opción trae su prioridad y el dato de contexto que se
+      pide al elegirla.
+    </p>
+  </div>
+  <button class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+    <i class="bi bi-plus-lg"></i> Nueva opción
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
+}
+
+@if (mostrarForm()) {
+  <div class="cajon-fondo" (click)="cancelar()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(720px, 94vw); max-height: 90vh; overflow-y: auto">
+    <h2 class="h6 mb-3">{{ editandoId() ? 'Editar opción' : 'Nueva opción' }}</h2>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
+        <select id="f-srv" class="form-select" [(ngModel)]="servicioId" name="servicioId">
+          <option [value]="null">Selecciona…</option>
+          @for (s of servicios(); track s.id) {
+            <option [value]="s.id">{{ s.nombre }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold" for="f-clave">Clave</label>
+        <input id="f-clave" class="form-control" [(ngModel)]="clave" name="clave" maxlength="20" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold" for="f-orden">Orden</label>
+        <input id="f-orden" type="number" min="0" class="form-control" [(ngModel)]="orden" name="orden" />
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold" for="f-desc">Opción (lo que ve el usuario)</label>
+        <input id="f-desc" class="form-control" [(ngModel)]="descripcion" name="descripcion" maxlength="160" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold" for="f-prio">Prioridad</label>
+        <select id="f-prio" class="form-select" [(ngModel)]="prioridad" name="prioridad">
+          @for (p of prioridades; track p) {
+            <option [value]="p">{{ p }} · {{ nombrePrioridad[p] }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold" for="f-ctx">Campo adicional (opcional)</label>
+        <input id="f-ctx" class="form-control" [(ngModel)]="campoAdicional" name="campoAdicional"
+               placeholder="Ej. Número de inventario" />
+        <div class="form-text">Dato que se le pide al usuario al elegir esta opción.</div>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="f-texto" [(ngModel)]="requiereTexto"
+                 name="requiereTexto" />
+          <label class="form-check-label small" for="f-texto">Habilita texto libre (solo «Otro»)</label>
+        </div>
+      </div>
+    </div>
+
+    @if (errorForm()) {
+      <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar
+      </button>
+    </div>
+  </div>
+}
+
+@for (g of grupos(); track g.servicio_id) {
+  <div class="tarjeta mb-3 overflow-hidden">
+    <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+      <h2 class="h6 mb-0">
+        {{ g.servicio }}
+        <span class="sub fw-normal">
+          · {{ g.problemas.length }} opciones · origen {{ g.origen }}
+        </span>
+      </h2>
+      <button class="btn btn-outline-secondary btn-sm" (click)="abrirNuevo(g.servicio_id)">
+        <i class="bi bi-plus-lg"></i> Agregar aquí
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr class="sub">
+            <th style="width: 100px">Clave</th>
+            <th>Opción</th>
+            <th style="width: 130px">Prioridad</th>
+            <th style="width: 200px">Campo adicional</th>
+            <th style="width: 90px">Estado</th>
+            <th style="width: 160px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of g.problemas; track p.id) {
+            <tr [class.text-muted]="!p.activo">
+              <td class="mono sub">{{ p.clave }}</td>
+              <td>
+                {{ p.descripcion }}
+                @if (p.requiere_texto) {
+                  <span class="chip chip-bandera ms-1">habilita texto libre</span>
+                }
+              </td>
+              <td>
+                <span class="chip" [class]="'chip-' + p.prioridad">{{ p.prioridad }}</span>
+                <span class="sub ms-1">{{ nombrePrioridad[p.prioridad] }}</span>
+              </td>
+              <td class="sub">{{ p.campo_adicional || '—' }}</td>
+              <td>
+                @if (p.activo) {
+                  <span class="badge text-bg-success-subtle text-success-emphasis">Activo</span>
+                } @else {
+                  <span class="badge text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+                }
+              </td>
+              <td class="text-end">
+                <button class="btn btn-outline-secondary btn-sm" (click)="abrirEditar(p)">Editar</button>
+                <button class="btn btn-sm ms-1"
+                        [class.btn-outline-danger]="p.activo"
+                        [class.btn-outline-success]="!p.activo"
+                        (click)="alternarActivo(p)">
+                  {{ p.activo ? 'Dar de baja' : 'Reactivar' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+}

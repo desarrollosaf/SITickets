@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize } from 'sequelize';
 import {
@@ -13,8 +14,10 @@ import {
   ESTATUS,
   ESTATUS_FINALES,
   EstatusClave,
+  SDependencia,
   Sede,
   Servicio,
+  SUsuario,
   Ticket,
   TicketBitacora,
   TicketSesion,
@@ -24,9 +27,11 @@ import {
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
+import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
   CrearInternoDto,
   CrearTicketDto,
+  DatosGeneralesDto,
   PrioridadDto,
   ReasignarDto,
   ReclasificarDto,
@@ -58,8 +63,12 @@ export class TicketsService {
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
+    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
+    @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
+    @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
+    private readonly config: ConfigService,
   ) {}
 
   /* ==================================================================
@@ -190,7 +199,7 @@ export class TicketsService {
         motivo: b.motivo,
         valor_antes: b.valor_antes,
         valor_nuevo: b.valor_nuevo,
-        usuario: b.usuario?.nombre ?? 'Sistema',
+        usuario: b.usuario_nombre ?? b.usuario?.nombre ?? 'Sistema',
       })),
     };
   }
@@ -222,9 +231,12 @@ export class TicketsService {
       estatus: t.estatus,
       contexto: t.contexto,
       solicitante_id: t.solicitante_id,
-      solicitante: t.solicitante?.nombre ?? '—',
+      solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
+      /* Los ids los usa el formulario de correccion para preseleccionar. */
+      dependencia_id: t.dependencia_id,
+      area_id: t.area_id,
       extension: t.extension,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
@@ -255,6 +267,54 @@ export class TicketsService {
      §2 · alta del solicitante
      ================================================================== */
 
+  /**
+   * Datos de quien registra el ticket. Si tiene fila local (staff, o un
+   * solicitante que ya se registro antes) salen de ahi, igual que siempre.
+   * Si es un solicitante externo (usuario.externo) salen de saf.s_usuario:
+   * no hay fila local que consultar. area_id y sede_id quedan en null para
+   * el externo porque el catalogo de departamentos de saf no empata limpio
+   * con el de areas de aqui; dependencia_id si se resuelve por nombre.
+   */
+  private async resolverQuien(usuario: UsuarioToken): Promise<{
+    nombre: string;
+    dependencia_id: number | null;
+    area_id: number | null;
+    sede_id: number | null;
+    extension: string | null;
+  }> {
+    if (!usuario.externo) {
+      const quien = await this.usuarios.findByPk(usuario.id);
+      if (!quien) throw new ForbiddenException('Sesion invalida');
+      const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
+      return {
+        nombre: quien.nombre,
+        dependencia_id: quien.dependencia_id,
+        area_id: quien.area_id,
+        sede_id: area?.sede_id ?? null,
+        extension: quien.extension,
+      };
+    }
+
+    const sUsuario = await this.sUsuarios.findByPk(usuario.id);
+    if (!sUsuario) throw new ForbiddenException('Sesion invalida');
+    return {
+      nombre: sUsuario.Nombre,
+      dependencia_id: await this.resolverDependenciaSaf(sUsuario.id_Dependencia),
+      area_id: null,
+      sede_id: null,
+      extension: null,
+    };
+  }
+
+  /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
+  private async resolverDependenciaSaf(idSaf: number | null): Promise<number | null> {
+    if (!idSaf) return null;
+    const sDep = await this.sDependencias.findByPk(idSaf);
+    if (!sDep) return null;
+    const local = await this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
+    return local?.id ?? null;
+  }
+
   async crear(dto: CrearTicketDto, usuario: UsuarioToken) {
     const problema = await this.problemas.findOne({
       where: { clave: dto.problema, activo: true },
@@ -268,10 +328,19 @@ export class TicketsService {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
 
-    const quien = await this.usuarios.findByPk(usuario.id);
-    if (!quien) throw new ForbiddenException('Sesion invalida');
+    /* El campo adicional del catalogo. Si pide cuenta de correo se valida aqui
+       con la misma regla que la correccion de datos generales. */
+    let contexto = dto.contexto?.trim() || null;
+    if (esCampoCuentaCorreo(problema.campo_adicional)) {
+      const revision = revisaCuentaCorreo(
+        contexto,
+        dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+      );
+      if ('error' in revision) throw new BadRequestException(revision.error);
+      contexto = revision.correo;
+    }
 
-    const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
+    const quien = await this.resolverQuien(usuario);
 
     const ticket = await this.db.transaction(async (tx) => {
       const folio = await this.reglas.siguienteFolio(problema.servicio_id, tx);
@@ -285,12 +354,13 @@ export class TicketsService {
           /* §4 la prioridad la impone el catalogo. El usuario no la elige. */
           prioridad: problema.prioridad,
           estatus: ESTATUS.REGISTRADO,
-          solicitante_id: quien.id,
+          solicitante_id: usuario.id,
+          solicitante_nombre: quien.nombre,
           dependencia_id: quien.dependencia_id,
           area_id: quien.area_id,
-          sede_id: area?.sede_id ?? null,
+          sede_id: quien.sede_id,
           extension: dto.extension?.trim() || quien.extension,
-          contexto: dto.contexto?.trim() || null,
+          contexto,
           texto_libre: problema.requiere_texto ? dto.texto!.trim() : null,
         },
         { transaction: tx },
@@ -298,10 +368,12 @@ export class TicketsService {
 
       await this.reglas.anota(
         t.id,
-        quien.id,
+        usuario.id,
         'Registro',
         `${problema.servicio.nombre} · ${problema.descripcion}`,
         tx,
+        undefined,
+        quien.nombre,
       );
       this.traza.registra('§2', `Ticket ${folio} registrado por ${quien.nombre} · ${problema.descripcion}.`);
       this.traza.registra(
@@ -314,6 +386,110 @@ export class TicketsService {
       return t;
     });
 
+    return this.detalle(ticket.id, usuario);
+  }
+
+  /* ==================================================================
+     Correccion de los datos generales del reporte
+
+     Es lo unico que el solicitante puede tocar despues del alta. El ticket en
+     si —problema, servicio, prioridad, tecnico— no se mueve por aqui: para eso
+     estan reclasificar, prioridad y reasignar, que piden motivo y otro rol.
+     ================================================================== */
+
+  async actualizarDatos(id: number, dto: DatosGeneralesDto, usuario: UsuarioToken) {
+    const ticket = await this.tickets.findOne({
+      where: { id, ...this.alcance(usuario) },
+      include: INCLUDES,
+    });
+    if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
+
+    const suyo = ticket.solicitante_id === usuario.id;
+    if (!suyo && usuario.rol !== 'admin') {
+      throw new ForbiddenException('Solo quien levanto el reporte o el administrador lo corrigen');
+    }
+    if (ESTATUS_FINALES.includes(ticket.estatus)) {
+      throw new BadRequestException('El ticket ya esta cerrado o cancelado: sus datos no se tocan');
+    }
+
+    /* Cada cambio se anota por separado: la bitacora guarda antes y despues. */
+    const cambios: { campo: string; antes: string; nuevo: string }[] = [];
+    const nuevos: Record<string, unknown> = {};
+    const anota = (campo: string, antes: unknown, nuevo: unknown) => {
+      cambios.push({ campo, antes: String(antes ?? '—'), nuevo: String(nuevo ?? '—') });
+    };
+
+    if (dto.contexto !== undefined) {
+      let contexto = dto.contexto.trim() || null;
+      if (esCampoCuentaCorreo(ticket.problema?.campo_adicional)) {
+        const revision = revisaCuentaCorreo(
+          contexto,
+          dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+        );
+        if ('error' in revision) throw new BadRequestException(revision.error);
+        contexto = revision.correo;
+      }
+      if (contexto !== ticket.contexto) {
+        anota(ticket.problema?.campo_adicional ?? 'Contexto', ticket.contexto, contexto);
+        nuevos.contexto = contexto;
+      }
+    }
+
+    if (dto.extension !== undefined) {
+      const extension = dto.extension.trim() || null;
+      if (extension !== ticket.extension) {
+        anota('Extension', ticket.extension, extension);
+        nuevos.extension = extension;
+      }
+    }
+
+    /*
+     * Dependencia y area viajan juntas: el area tiene que pertenecer a la
+     * dependencia, y la sede esperada del §16 se recalcula a partir del area.
+     */
+    if (dto.dependencia !== undefined || dto.area !== undefined) {
+      const depId = dto.dependencia ?? ticket.dependencia_id;
+      const dependencia = depId ? await this.dependencias.findByPk(depId) : null;
+      if (depId && !dependencia) throw new BadRequestException('La dependencia no existe');
+
+      const areaId = dto.area === undefined ? ticket.area_id : dto.area;
+      const area = areaId ? await this.areas.findByPk(areaId) : null;
+      if (areaId && !area) throw new BadRequestException('El area no existe');
+      if (area && area.dependencia_id !== depId) {
+        throw new BadRequestException('El area elegida no pertenece a esa dependencia');
+      }
+
+      if (depId !== ticket.dependencia_id) {
+        anota('Dependencia', ticket.dependencia?.nombre, dependencia?.nombre);
+        nuevos.dependencia_id = depId;
+      }
+      if (areaId !== ticket.area_id) {
+        anota('Area', ticket.area?.nombre, area?.nombre);
+        nuevos.area_id = areaId;
+        /* La sede no se captura: sale del area, igual que en el alta. */
+        const sede = area?.sede_id ?? null;
+        if (sede !== ticket.sede_id) nuevos.sede_id = sede;
+      }
+    }
+
+    if (!cambios.length) throw new BadRequestException('No hay ningun cambio que guardar');
+
+    await this.db.transaction(async (tx) => {
+      await ticket.update(nuevos, { transaction: tx });
+      for (const c of cambios) {
+        /* El detalle nombra el campo; el antes y el despues van en su columna,
+           que es como la pantalla de bitacora los presenta. */
+        await this.reglas.anota(ticket.id, usuario.id, 'Correccion de datos', c.campo, tx, {
+          antes: c.antes.slice(0, 80),
+          nuevo: c.nuevo.slice(0, 80),
+        });
+      }
+    });
+
+    this.traza.registra(
+      '§9',
+      `${ticket.folio}: ${usuario.nombre} corrigio ${cambios.map((c) => c.campo).join(', ')}.`,
+    );
     return this.detalle(ticket.id, usuario);
   }
 
@@ -352,6 +528,7 @@ export class TicketsService {
           /* Nace asignado: nadie lo solicito, el area lo programo. */
           estatus: ESTATUS.ASIGNADO,
           solicitante_id: usuario.id,
+          solicitante_nombre: usuario.nombre,
           tecnico_id: responsable,
           interno: true,
           fecha_plan: dto.fecha_plan ?? null,
@@ -486,7 +663,13 @@ export class TicketsService {
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.EN_ESPERA, ESTATUS.ASIGNADO]);
 
-    /* Al resolver se cierra cualquier sesion de reloj que siguiera corriendo. */
+    /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
+    const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
+    if (!sesionAbierta) {
+      throw new BadRequestException('Inicia el reloj antes de marcar el ticket como resuelto');
+    }
+
+    /* Al resolver se cierra la sesion de reloj que seguia corriendo. */
     await this.sesiones.update(
       { fin: new Date(), motivo: 'Servicio concluido' },
       { where: { ticket_id: t.id, fin: null } },
@@ -532,6 +715,10 @@ export class TicketsService {
       t.id,
       usuario.id,
       usuario.rol === 'admin' ? 'Cerrado por el administrador' : 'Validado por el usuario',
+      undefined,
+      undefined,
+      undefined,
+      usuario.nombre,
     );
     this.traza.registra('§10', `${t.folio} validado. Cierre real, no por omision.`);
     return this.detalle(id, usuario);
@@ -548,7 +735,7 @@ export class TicketsService {
       rechazos: t.rechazos + 1,
       f_resolucion: null,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Rechazado por el usuario', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Rechazado por el usuario', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra(
       '§5',
       `${t.folio} rechazado por el solicitante (${motivo}). Regresa a EN ATENCION; conserva el folio.`,
@@ -568,7 +755,7 @@ export class TicketsService {
       f_validacion: null,
       cierre_por_omision: false,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Reapertura', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Reapertura', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra('§5', `${t.folio} reabierto (reapertura #${t.reaperturas + 1}). El folio no cambia.`);
     return this.detalle(id, usuario);
   }
@@ -599,7 +786,7 @@ export class TicketsService {
       f_cancelacion: new Date(),
       motivo_cancelacion: motivo,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Cancelado', motivo);
+    await this.reglas.anota(t.id, usuario.id, 'Cancelado', motivo, undefined, undefined, usuario.nombre);
     this.traza.registra('§5', `${t.folio} cancelado (${motivo}).`);
     return this.detalle(id, usuario);
   }
@@ -658,9 +845,9 @@ export class TicketsService {
      §6 · reclasificacion. Cambia el servicio; el folio nunca.
      ------------------------------------------------------------------ */
 
+  /** Solo el administrador reclasifica: @Roles('admin') en el controller ya lo garantiza. */
   async reclasificar(id: number, dto: ReclasificarDto, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
-    if (usuario.rol !== 'admin') this.exigeTecnico(t, usuario);
     if (ESTATUS_FINALES.includes(t.estatus)) {
       throw new BadRequestException('Un ticket cerrado o cancelado ya no se reclasifica');
     }

@@ -22,8 +22,12 @@ import {
 
 export * from './catalogos.model';
 export * from './operacion.model';
+export * from './saf.model';
 
-/** Orden importa: sequelize.sync crea las tablas en esta secuencia. */
+/**
+ * Modelos de la conexion principal. UserSaf queda fuera: vive en la conexion
+ * secundaria 'saf' y se registra aparte en AppModule/AuthModule.
+ */
 export const MODELOS = [
   Dependencia,
   Sede,
