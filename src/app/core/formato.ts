@@ -120,16 +120,18 @@ export function resumenUbicacion(s: {
 
 export const RE_CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/** Quita acentos/diacriticos para comparar sin importar como se hayan escrito. */
+export function quitarAcentos(texto: string): string {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 /**
  * Etiquetas del catalogo que piden una cuenta de correo. Se compara sin
  * acentos ni mayusculas para que un cambio de redaccion no apague la revision.
  */
 export function esCampoCuentaCorreo(campo: string | null | undefined): boolean {
   if (!campo) return false;
-  const limpio = campo
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+  const limpio = quitarAcentos(campo).toLowerCase();
   return limpio.includes('cuenta de correo') || limpio.includes('correo electronico');
 }
 

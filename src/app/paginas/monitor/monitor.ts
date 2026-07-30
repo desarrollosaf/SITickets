@@ -1,7 +1,7 @@
 import { Component, OnDestroy, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { TicketsService } from '../../core/tickets.service';
-import { cronometro, duracion, mensajeError } from '../../core/formato';
+import { cronometro, duracion, mensajeError, NOMBRE_PRIORIDAD } from '../../core/formato';
 import type { Monitor as DatosMonitor } from '../../core/modelos';
 
 /**
@@ -22,6 +22,7 @@ export class Monitor implements OnDestroy {
 
   readonly crono = cronometro;
   readonly dur = duracion;
+  readonly nombrePrioridad = NOMBRE_PRIORIDAD;
 
   /** Los cronómetros suben en pantalla sin volver a pedir datos al servidor. */
   private readonly segundero = setInterval(() => {

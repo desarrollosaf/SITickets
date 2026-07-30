@@ -58,6 +58,11 @@ export const routes: Routes = [
         canActivate: [guardRol('admin')],
         loadComponent: () => import('./paginas/catalogo/catalogo').then((m) => m.Catalogo),
       },
+      {
+        path: 'usuarios',
+        canActivate: [guardRol('admin')],
+        loadComponent: () => import('./paginas/usuarios/usuarios').then((m) => m.Usuarios),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },
     ],
   },
