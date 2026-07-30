@@ -102,6 +102,21 @@ body {
 table.tickets tbody tr { cursor: pointer; }
 table.tickets tbody tr:hover { background: #f7f9fc; }
 
+/* Resuelto, esperando que el solicitante confirme o rechace. */
+table.tickets tbody tr.por-confirmar { background: #fff8ec; border-left: 3px solid #f0b45c; }
+table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
+
+@keyframes parpadeo-aviso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.chip-confirmar {
+  background: #e9f2ff;
+  color: #1f5fa8;
+  border: 1px solid #b8d4f5;
+  animation: parpadeo-aviso 1.2s ease-in-out infinite;
+}
+
 .vencido { color: var(--p1); font-weight: 600; }
 
 /* Barra de avance contra el objetivo de resolucion */

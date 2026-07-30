@@ -14,6 +14,7 @@ import { CatalogosModule } from './catalogos/catalogos.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OperacionModule } from './operacion/operacion.module';
 import { SeedModule } from './seed/seed.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { SeedModule } from './seed/seed.module';
     TicketsModule,
     OperacionModule,
     SeedModule,
+    UsuariosModule,
   ],
   providers: [
     /* Orden importa: primero autentica, luego verifica el rol. */

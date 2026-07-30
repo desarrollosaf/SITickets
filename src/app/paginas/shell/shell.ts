@@ -20,6 +20,7 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/disponibilidad', etiqueta: 'Disponibilidad', icono: 'bi-calendar3' },
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
     { ruta: '/catalogo', etiqueta: 'Catálogo', icono: 'bi-list-check' },
+    { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
   ],
   tecnico: [{ ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' }],
   proveedor: [{ ruta: '/bandeja', etiqueta: 'Tickets turnados', icono: 'bi-clipboard-check' }],

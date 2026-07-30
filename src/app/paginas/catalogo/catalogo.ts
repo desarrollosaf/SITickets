@@ -26,9 +26,16 @@ export class Catalogo {
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
   readonly prioridades = ['P1', 'P2', 'P3', 'P4'];
 
+  /** null = nada elegido todavia: no se muestra ningun catalogo. */
+  readonly filtroServicioId = signal<number | null>(null);
+
   readonly grupos = computed<Grupo[]>(() => {
+    const filtro = this.filtroServicioId();
+    if (filtro === null) return [];
+
     const mapa = new Map<number, Grupo>();
     for (const p of this.problemas()) {
+      if (p.servicio_id !== filtro) continue;
       if (!mapa.has(p.servicio_id)) {
         mapa.set(p.servicio_id, {
           servicio_id: p.servicio_id,

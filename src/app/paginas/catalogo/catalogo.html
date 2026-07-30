@@ -15,6 +15,16 @@
   <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
 }
 
+<div class="mb-3" style="max-width: 340px">
+  <label class="form-label small fw-semibold" for="filtro-srv">Filtrar por tipo de servicio</label>
+  <select id="filtro-srv" class="form-select" [(ngModel)]="filtroServicioId" name="filtroServicio">
+    <option [ngValue]="null">Selecciona…</option>
+    @for (s of servicios(); track s.id) {
+      <option [ngValue]="s.id">{{ s.nombre }}</option>
+    }
+  </select>
+</div>
+
 @if (mostrarForm()) {
   <div class="cajon-fondo" (click)="cancelar()"></div>
   <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
@@ -85,6 +95,13 @@
         Guardar
       </button>
     </div>
+  </div>
+}
+
+@if (filtroServicioId() === null) {
+  <div class="tarjeta p-4 text-center sub">
+    <i class="bi bi-filter-circle fs-4 d-block mb-2"></i>
+    Elige un tipo de servicio para ver sus opciones.
   </div>
 }
 

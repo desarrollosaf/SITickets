@@ -33,6 +33,7 @@ import type { Catalogos, Ticket } from '../../core/modelos';
 
     <app-tabla-tickets
       [tickets]="tickets()"
+      [pedirConfirmacion]="true"
       vacio="Aún no has registrado tickets"
       ayudaVacio="Cuando reportes algo aparecerá aquí con su seguimiento."
       (abrir)="abierto.set($event)" />
