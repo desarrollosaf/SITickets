@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '
 import { CatalogosService } from './catalogos.service';
 import { Publico, Roles } from '../common/roles.decorator';
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
+import { ActualizarPrioridadDto } from './dto/prioridad.dto';
+import { CrearServicioDto } from './dto/servicio.dto';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -42,14 +44,27 @@ export class CatalogosController {
     return this.catalogos.crearProblema(dto);
   }
 
+  /** Alta de un nuevo tipo de servicio (tabla servicio). */
+  @Roles('admin')
+  @Post('servicios')
+  crearServicio(@Body() dto: CrearServicioDto) {
+    return this.catalogos.crearServicio(dto);
+  }
+
   @Roles('admin')
   @Patch('problemas/:id')
   actualizarProblema(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarProblemaDto) {
     return this.catalogos.actualizarProblema(id, dto);
   }
 
-  /** Padron de tecnicos: lo consulta el admin para reasignar. */
-  @Roles('admin', 'jefe')
+  @Roles('admin')
+  @Patch('prioridades/:clave')
+  actualizarPrioridad(@Param('clave') clave: string, @Body() dto: ActualizarPrioridadDto) {
+    return this.catalogos.actualizarPrioridad(clave, dto);
+  }
+
+  /** Padron de tecnicos: lo consulta el admin/operador para reasignar. */
+  @Roles('admin', 'jefe', 'operador')
   @Get('tecnicos')
   tecnicos() {
     return this.catalogos.tecnicos();

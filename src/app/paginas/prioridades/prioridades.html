@@ -1,0 +1,87 @@
+<div>
+  <h1 class="h5 mb-1">Prioridades</h1>
+  <p class="sub mb-3">
+    Tiempo objetivo de respuesta y resolución para cada nivel. Cada opción del catálogo de
+    problemas trae una de estas prioridades asignada de forma fija.
+  </p>
+
+  @if (error()) {
+    <div class="alert alert-danger py-2 small">{{ error() }}</div>
+  }
+
+  <div class="tarjeta overflow-hidden">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr class="sub">
+            <th style="width: 90px">Clave</th>
+            <th>Nombre</th>
+            <th>Tiempo de respuesta</th>
+            <th>Tiempo de resolución</th>
+            <th style="width: 90px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of prioridades(); track p.clave) {
+            <tr>
+              <td><span class="chip" [class]="'chip-' + p.clave">{{ p.clave }}</span></td>
+              <td class="fw-semibold" style="font-size: 0.86rem">{{ p.nombre }}</td>
+              <td class="sub">{{ dur(p.minutos_respuesta) }}</td>
+              <td class="sub">{{ dur(p.minutos_resolucion) }}</td>
+              <td class="text-end">
+                <button class="btn btn-outline-secondary btn-sm" (click)="abrirEditar(p)">Editar</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  @if (editando(); as p) {
+    <div class="cajon-fondo" (click)="cerrarEdicion()"></div>
+    <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+         style="z-index: 1050; width: min(480px, 94vw)">
+      <h2 class="h6 mb-3">Editar {{ p.clave }} · {{ p.nombre }}</h2>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold" for="pr-nombre">Nombre</label>
+        <input id="pr-nombre" class="form-control" [(ngModel)]="editNombre" name="editNombre"
+               maxlength="20" />
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-6">
+          <label class="form-label small fw-semibold" for="pr-resp">
+            Tiempo de respuesta (min)
+          </label>
+          <input id="pr-resp" type="number" min="1" class="form-control"
+                 [(ngModel)]="editMinRespuesta" name="editMinRespuesta" />
+          <div class="form-text">{{ dur(editMinRespuesta) }}</div>
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold" for="pr-res">
+            Tiempo de resolución (min)
+          </label>
+          <input id="pr-res" type="number" min="1" class="form-control"
+                 [(ngModel)]="editMinResolucion" name="editMinResolucion" />
+          <div class="form-text">{{ dur(editMinResolucion) }}</div>
+        </div>
+      </div>
+
+      @if (errorEdicion()) {
+        <div class="alert alert-danger py-2 small">{{ errorEdicion() }}</div>
+      }
+
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary" (click)="cerrarEdicion()">Cancelar</button>
+        <button class="btn btn-primary" [disabled]="guardando()" (click)="guardarEdicion()">
+          @if (guardando()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+          }
+          Guardar
+        </button>
+      </div>
+    </div>
+  }
+</div>

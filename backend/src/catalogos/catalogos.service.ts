@@ -16,6 +16,8 @@ import {
   Usuario,
 } from '../database/models';
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
+import { ActualizarPrioridadDto } from './dto/prioridad.dto';
+import { CrearServicioDto } from './dto/servicio.dto';
 
 @Injectable()
 export class CatalogosService {
@@ -144,6 +146,25 @@ export class CatalogosService {
     }
   }
 
+  /** Alta de un nuevo tipo de servicio. Nace activo; el resto de banderas por defecto en false. */
+  async crearServicio(dto: CrearServicioDto) {
+    try {
+      return await this.servicios.create({
+        clave: dto.clave.trim().toUpperCase(),
+        nombre: dto.nombre.trim(),
+        prefijo_folio: dto.prefijo_folio.trim().toUpperCase(),
+        origen: dto.origen,
+        externo: dto.externo ?? false,
+        multi_tecnico: dto.multi_tecnico ?? false,
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un servicio con esa clave');
+      }
+      throw e;
+    }
+  }
+
   async actualizarProblema(id: number, dto: ActualizarProblemaDto) {
     const problema = await this.problemasM.findByPk(id);
     if (!problema) throw new NotFoundException('La opcion no existe');
@@ -180,6 +201,22 @@ export class CatalogosService {
       include: [{ model: Servicio, as: 'servicio', required: true }],
     });
     return this.mapaProblema(p!);
+  }
+
+  /**
+   * P1-P4 son fijas (son la clave primaria y varias reglas del sistema
+   * las dan por hecho); solo se ajustan nombre y tiempos objetivo.
+   */
+  async actualizarPrioridad(clave: string, dto: ActualizarPrioridadDto) {
+    const prioridad = await this.prioridades.findByPk(clave);
+    if (!prioridad) throw new NotFoundException('Esa prioridad no existe');
+
+    await prioridad.update({
+      ...(dto.nombre !== undefined && { nombre: dto.nombre.trim() }),
+      ...(dto.minutos_respuesta !== undefined && { minutos_respuesta: dto.minutos_respuesta }),
+      ...(dto.minutos_resolucion !== undefined && { minutos_resolucion: dto.minutos_resolucion }),
+    });
+    return prioridad;
   }
 
   /** Padron con especialidad. Nunca incluye el hash de contrasena. */

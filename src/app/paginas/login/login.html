@@ -14,7 +14,8 @@
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="rfc">RFC</label>
           <input id="rfc" name="rfc" type="text" class="form-control text-uppercase" autocomplete="username"
-                 maxlength="13" placeholder="AAAA000000AAA" [(ngModel)]="rfc" />
+                 maxlength="10" placeholder="AAAA000000" [(ngModel)]="rfc" />
+          <div class="form-text">10 caracteres, sin homoclave.</div>
         </div>
 
         <div class="mb-3">

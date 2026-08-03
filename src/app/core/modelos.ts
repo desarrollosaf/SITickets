@@ -2,7 +2,14 @@
    Contratos con el API. Espejo de lo que devuelve NestJS.
    ===================================================================== */
 
-export type Rol = 'solicitante' | 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+export type Rol =
+  | 'solicitante'
+  | 'tecnico'
+  | 'jefe'
+  | 'admin'
+  | 'proveedor'
+  | 'operador'
+  | 'gestor';
 
 export type EstatusClave =
   | 'REGISTRADO'
@@ -45,6 +52,9 @@ export interface Ticket {
   contexto: string | null;
   solicitante_id: number;
   solicitante: string;
+  /** Solo trae valor cuando un admin/gestor registro el ticket a nombre de otro. */
+  registrado_por: number | null;
+  registrado_por_nombre: string | null;
   dependencia: string;
   area: string;
   dependencia_id: number | null;
@@ -243,6 +253,8 @@ export interface Monitor {
     min_espera: number;
   }[];
   rezago: Rezago;
+  /** Cuantos tickets se resolvieron hoy en total. */
+  finalizados_hoy: number;
 }
 
 export interface Desempeno {
@@ -322,14 +334,14 @@ export interface RegistrarUsuarioForm {
   id_usuario_saf: number;
   correo?: string;
   extension?: string;
-  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
   /** Tipo de servicio del que sera tecnico (tecnico_servicio). Solo aplica si rol es tecnico. */
   servicio_id?: number;
 }
 
 /** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
 export interface ActualizarUsuarioForm {
-  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
   correo?: string;
   extension?: string;
   servicio_id?: number;

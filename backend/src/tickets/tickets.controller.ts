@@ -41,12 +41,23 @@ export class TicketsController {
     return this.tickets.listar(usuario, filtros);
   }
 
+  /**
+   * Busqueda de usuarios activos de saf para que el administrador elija a
+   * nombre de quien registra un ticket (§2). Va antes de ':id' para que no se
+   * confunda "solicitantes" con un identificador de ticket.
+   */
+  @Roles('admin', 'gestor')
+  @Get('solicitantes')
+  buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.buscarSolicitantes(q, usuario);
+  }
+
   @Get(':id')
   detalle(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.detalle(id, usuario);
   }
 
-  @Roles('solicitante', 'admin')
+  @Roles('solicitante', 'admin', 'operador', 'gestor')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.crear(dto, usuario);
@@ -145,7 +156,7 @@ export class TicketsController {
     return this.tickets.cancelar(id, dto.motivo, usuario);
   }
 
-  @Roles('admin')
+  @Roles('admin', 'operador')
   @HttpCode(200)
   @Post(':id/reasignar')
   reasignar(

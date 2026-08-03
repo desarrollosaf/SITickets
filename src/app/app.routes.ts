@@ -14,17 +14,17 @@ export const routes: Routes = [
     children: [
       {
         path: 'tickets',
-        canActivate: [guardRol('admin')],
+        canActivate: [guardRol('admin', 'operador')],
         loadComponent: () => import('./paginas/tickets/tickets').then((m) => m.Tickets),
       },
       {
         path: 'nuevo',
-        canActivate: [guardRol('solicitante', 'admin')],
+        canActivate: [guardRol('solicitante', 'admin', 'operador', 'gestor')],
         loadComponent: () => import('./paginas/solicitante/nuevo').then((m) => m.Nuevo),
       },
       {
         path: 'mis-tickets',
-        canActivate: [guardRol('solicitante', 'admin')],
+        canActivate: [guardRol('solicitante', 'admin', 'gestor')],
         loadComponent: () => import('./paginas/solicitante/mis-tickets').then((m) => m.MisTickets),
       },
       {
@@ -34,12 +34,12 @@ export const routes: Routes = [
       },
       {
         path: 'monitor',
-        canActivate: [guardRol('admin', 'jefe', 'tecnico', 'proveedor')],
+        canActivate: [guardRol('admin', 'jefe', 'tecnico', 'proveedor', 'operador')],
         loadComponent: () => import('./paginas/monitor/monitor').then((m) => m.Monitor),
       },
       {
         path: 'tablero',
-        canActivate: [guardRol('admin', 'jefe')],
+        canActivate: [guardRol('admin', 'jefe', 'operador')],
         loadComponent: () => import('./paginas/tablero/tablero').then((m) => m.Tablero),
       },
       {
@@ -62,6 +62,12 @@ export const routes: Routes = [
         path: 'usuarios',
         canActivate: [guardRol('admin')],
         loadComponent: () => import('./paginas/usuarios/usuarios').then((m) => m.Usuarios),
+      },
+      {
+        path: 'prioridades',
+        canActivate: [guardRol('admin')],
+        loadComponent: () =>
+          import('./paginas/prioridades/prioridades').then((m) => m.Prioridades),
       },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },
     ],

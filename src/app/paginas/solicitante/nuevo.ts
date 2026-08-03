@@ -11,7 +11,7 @@ import {
   NOMBRE_PRIORIDAD,
   revisaCuentaCorreo,
 } from '../../core/formato';
-import type { Bien, Catalogos, Problema } from '../../core/modelos';
+import type { Bien, CandidatoSaf, Catalogos, Problema } from '../../core/modelos';
 
 /** Lo que cabe en ticket.contexto (VARCHAR 160). */
 const LARGO_CONTEXTO = 160;
@@ -101,6 +101,53 @@ export class Nuevo {
       this.catalogos()?.prioridades.find((x) => x.clave === p.prioridad)?.minutos_resolucion ?? 0
     );
   });
+
+  /* ---------------- §2 registrar a nombre de otro usuario (admin y gestor) ---------------- */
+
+  /** Solo el admin ve el tiempo objetivo de resolucion; no aplica a operador/gestor. */
+  readonly esAdmin = computed(() => this.auth.rol() === 'admin');
+  /** Admin y gestor pueden elegir a nombre de quien registran el ticket. */
+  readonly puedeElegirUsuario = computed(() =>
+    ['admin', 'gestor'].includes(this.auth.rol() ?? ''),
+  );
+
+  busquedaUsuario = '';
+  readonly resultadosUsuario = signal<CandidatoSaf[]>([]);
+  readonly buscandoUsuario = signal(false);
+  readonly usuarioElegido = signal<CandidatoSaf | null>(null);
+  private temporizadorUsuario: ReturnType<typeof setTimeout> | null = null;
+
+  onBuscarUsuario() {
+    if (this.temporizadorUsuario) clearTimeout(this.temporizadorUsuario);
+    const texto = this.busquedaUsuario.trim();
+    if (texto.length < 3) {
+      this.resultadosUsuario.set([]);
+      return;
+    }
+    this.temporizadorUsuario = setTimeout(() => {
+      this.buscandoUsuario.set(true);
+      this.api.buscarSolicitantes(texto).subscribe({
+        next: (r) => {
+          this.buscandoUsuario.set(false);
+          this.resultadosUsuario.set(r);
+        },
+        error: (e) => {
+          this.buscandoUsuario.set(false);
+          this.error.set(mensajeError(e));
+        },
+      });
+    }, 350);
+  }
+
+  elegirUsuario(c: CandidatoSaf) {
+    this.usuarioElegido.set(c);
+    this.busquedaUsuario = '';
+    this.resultadosUsuario.set([]);
+  }
+
+  quitarUsuario() {
+    this.usuarioElegido.set(null);
+  }
 
   constructor() {
     this.extension = this.auth.usuario()?.extension ?? '';
@@ -222,6 +269,9 @@ export class Nuevo {
           : this.contextoFinal() || undefined,
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
+        a_nombre_de: this.puedeElegirUsuario()
+          ? (this.usuarioElegido()?.id_usuario_saf ?? undefined)
+          : undefined,
       })
       .subscribe({
         next: () => {

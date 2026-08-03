@@ -14,12 +14,14 @@ interface Opcion {
 /** Menu por rol. Cada perfil ve solo las pantallas de su trabajo. */
 const MENUS: Record<Rol, Opcion[]> = {
   admin: [
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
     { ruta: '/tickets', etiqueta: 'Todos los tickets', icono: 'bi-inboxes' },
     { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
     { ruta: '/disponibilidad', etiqueta: 'Disponibilidad', icono: 'bi-calendar3' },
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
     { ruta: '/catalogo', etiqueta: 'Catálogo', icono: 'bi-list-check' },
+    { ruta: '/prioridades', etiqueta: 'Prioridades', icono: 'bi-speedometer2' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
   ],
   tecnico: [{ ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' }],
@@ -34,6 +36,16 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
     { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
   ],
+  operador: [
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/tickets', etiqueta: 'Todos los tickets', icono: 'bi-inboxes' },
+    { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
+    { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
+  ],
+  gestor: [
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+  ],
 };
 
 const NOMBRE_ROL: Record<Rol, string> = {
@@ -42,6 +54,8 @@ const NOMBRE_ROL: Record<Rol, string> = {
   jefe: 'Jefe de departamento',
   proveedor: 'Proveedor externo',
   solicitante: 'Solicitante',
+  operador: 'Operador',
+  gestor: 'Gestor',
 };
 
 @Component({

@@ -116,6 +116,8 @@ export class DetalleTicket {
   );
   readonly atiende = computed(() => ['tecnico', 'jefe', 'proveedor'].includes(this.rol() ?? ''));
   readonly esAdmin = computed(() => this.rol() === 'admin');
+  /** El operador tambien puede reasignar tecnico, aunque no es admin. */
+  readonly puedeReasignar = computed(() => this.esAdmin() || this.rol() === 'operador');
   readonly abierto = computed(
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),
   );

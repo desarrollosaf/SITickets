@@ -81,8 +81,19 @@ export class TicketsService {
    * navegador. Aqui el alcance sale del token y no se puede ampliar por URL.
    */
   private alcance(usuario: UsuarioToken): Record<string, unknown> {
-    if (usuario.rol === 'admin') return {};
+    /** El operador ve todo, igual que el administrador, pero no administra catalogos. */
+    if (usuario.rol === 'admin' || usuario.rol === 'operador') return {};
     if (usuario.rol === 'solicitante') return { solicitante_id: usuario.id };
+    /**
+     * El gestor ve su propio historico (lo que registro para si mismo) y lo
+     * que registro a nombre de otros (ahi solicitante_id es el id de esa
+     * otra persona, no el suyo; por eso se busca tambien por registrado_por).
+     */
+    if (usuario.rol === 'gestor') {
+      return {
+        [Op.or]: [{ solicitante_id: usuario.id }, { registrado_por: usuario.id }],
+      };
+    }
     if (ROLES_TECNICOS.includes(usuario.rol)) {
       return {
         [Op.or]: [
@@ -232,6 +243,9 @@ export class TicketsService {
       contexto: t.contexto,
       solicitante_id: t.solicitante_id,
       solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
+      /** Solo trae valor cuando alguien registro el ticket a nombre de otro. */
+      registrado_por: t.registrado_por,
+      registrado_por_nombre: t.registrado_por_nombre,
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
       /* Los ids los usa el formulario de correccion para preseleccionar. */
@@ -295,15 +309,9 @@ export class TicketsService {
       };
     }
 
-    const sUsuario = await this.sUsuarios.findByPk(usuario.id);
-    if (!sUsuario) throw new ForbiddenException('Sesion invalida');
-    return {
-      nombre: sUsuario.Nombre,
-      dependencia_id: await this.resolverDependenciaSaf(sUsuario.id_Dependencia),
-      area_id: null,
-      sede_id: null,
-      extension: null,
-    };
+    const datos = await this.datosSaf(usuario.id);
+    if (!datos) throw new ForbiddenException('Sesion invalida');
+    return { ...datos, area_id: null, sede_id: null, extension: null };
   }
 
   /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
@@ -313,6 +321,82 @@ export class TicketsService {
     if (!sDep) return null;
     const local = await this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
     return local?.id ?? null;
+  }
+
+  /**
+   * Nombre y dependencia de un usuario activo de saf, dado su id_Usuario.
+   * Se usa tanto para la sesion del solicitante externo (§2) como para que
+   * el administrador registre un ticket a nombre de otro usuario activo.
+   */
+  private async datosSaf(
+    idUsuarioSaf: number,
+  ): Promise<{ nombre: string; dependencia_id: number | null } | null> {
+    const sUsuario = await this.sUsuarios.findByPk(idUsuarioSaf);
+    if (!sUsuario || sUsuario.Estado !== 1) return null;
+    return {
+      nombre: sUsuario.Nombre,
+      dependencia_id: await this.resolverDependenciaSaf(sUsuario.id_Dependencia),
+    };
+  }
+
+  /**
+   * Dependencia (id de saf) de un usuario local, cruzando su rfc contra
+   * saf.s_usuario.N_Usuario. Se usa para saber a que dependencia pertenece
+   * un gestor, y limitarlo a registrar solo a nombre de gente de esa misma
+   * dependencia. Sin rfc (o sin match en saf) no se le puede identificar
+   * dependencia, asi que no se le ofrece nadie: es el default seguro.
+   */
+  private async dependenciaSafDeGestor(usuarioId: number): Promise<number | null> {
+    const local = await this.usuarios.findByPk(usuarioId);
+    if (!local?.rfc) return null;
+    const sUsuario = await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } });
+    return sUsuario?.id_Dependencia ?? null;
+  }
+
+  /**
+   * Busqueda de usuarios activos de saf para que el administrador (o el
+   * gestor) elija a nombre de quien registra un ticket. A diferencia de
+   * UsuariosService.buscarSaf (que excluye a quien ya tiene rol asignado,
+   * porque es para dar de alta personal) aqui no se excluye a nadie: cualquier
+   * activo puede ser solicitante. El gestor solo ve gente de su misma
+   * dependencia (saf); el administrador ve a todos.
+   */
+  async buscarSolicitantes(q: string, usuario: UsuarioToken) {
+    const texto = q.trim();
+    if (texto.length < 3) return [];
+
+    const where: Record<string, unknown> = { Estado: 1, Nombre: { [Op.like]: `%${texto}%` } };
+    if (usuario.rol === 'gestor') {
+      const dependenciaSaf = await this.dependenciaSafDeGestor(usuario.id);
+      if (!dependenciaSaf) return [];
+      where.id_Dependencia = dependenciaSaf;
+    }
+
+    const candidatos = await this.sUsuarios.findAll({
+      where,
+      order: [['Nombre', 'ASC']],
+      limit: 20,
+    });
+
+    const resultado: {
+      id_usuario_saf: number;
+      nombre: string;
+      rfc: string;
+      dependencia_id: number | null;
+      dependencia: string | null;
+    }[] = [];
+    for (const s of candidatos) {
+      const dependenciaId = await this.resolverDependenciaSaf(s.id_Dependencia);
+      const dependencia = dependenciaId ? await this.dependencias.findByPk(dependenciaId) : null;
+      resultado.push({
+        id_usuario_saf: s.id_Usuario,
+        nombre: s.Nombre,
+        rfc: s.N_Usuario,
+        dependencia_id: dependenciaId,
+        dependencia: dependencia?.nombre ?? null,
+      });
+    }
+    return resultado;
   }
 
   async crear(dto: CrearTicketDto, usuario: UsuarioToken) {
@@ -340,7 +424,56 @@ export class TicketsService {
       contexto = revision.correo;
     }
 
-    const quien = await this.resolverQuien(usuario);
+    /*
+     * §2 a nombre de otro usuario: solo el administrador y el gestor pueden
+     * mandar a_nombre_de, y solo con un usuario activo de saf. El id que
+     * queda en solicitante_id vive en el espacio de ids de saf (igual que el
+     * solicitante externo de siempre), por eso el nombre se denormaliza en
+     * solicitante_nombre en vez de confiar en el join. registrado_por deja
+     * rastro de quien lo dio de alta realmente (siempre un usuario.id local).
+     */
+    const ROLES_A_NOMBRE_DE = ['admin', 'gestor'];
+    let quien: {
+      nombre: string;
+      dependencia_id: number | null;
+      area_id: number | null;
+      sede_id: number | null;
+      extension: string | null;
+    };
+    let solicitanteId: number;
+    let registradoPor: number | null = null;
+    let registradoPorNombre: string | null = null;
+
+    if (dto.a_nombre_de) {
+      if (!ROLES_A_NOMBRE_DE.includes(usuario.rol)) {
+        throw new ForbiddenException(
+          'Solo el administrador o el gestor pueden registrar un ticket a nombre de otro usuario',
+        );
+      }
+      const datos = await this.datosSaf(dto.a_nombre_de);
+      if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
+
+      /* El gestor solo registra a nombre de gente de su misma dependencia (saf). */
+      if (usuario.rol === 'gestor') {
+        const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([
+          this.dependenciaSafDeGestor(usuario.id),
+          this.sUsuarios.findByPk(dto.a_nombre_de),
+        ]);
+        if (!dependenciaGestor || sUsuarioObjetivo?.id_Dependencia !== dependenciaGestor) {
+          throw new ForbiddenException(
+            'Solo puedes registrar tickets a nombre de alguien de tu misma dependencia',
+          );
+        }
+      }
+
+      quien = { ...datos, area_id: null, sede_id: null, extension: null };
+      solicitanteId = dto.a_nombre_de;
+      registradoPor = usuario.id;
+      registradoPorNombre = usuario.nombre;
+    } else {
+      quien = await this.resolverQuien(usuario);
+      solicitanteId = usuario.id;
+    }
 
     const ticket = await this.db.transaction(async (tx) => {
       const folio = await this.reglas.siguienteFolio(problema.servicio_id, tx);
@@ -354,8 +487,10 @@ export class TicketsService {
           /* §4 la prioridad la impone el catalogo. El usuario no la elige. */
           prioridad: problema.prioridad,
           estatus: ESTATUS.REGISTRADO,
-          solicitante_id: usuario.id,
+          solicitante_id: solicitanteId,
           solicitante_nombre: quien.nombre,
+          registrado_por: registradoPor,
+          registrado_por_nombre: registradoPorNombre,
           dependencia_id: quien.dependencia_id,
           area_id: quien.area_id,
           sede_id: quien.sede_id,
@@ -370,12 +505,18 @@ export class TicketsService {
         t.id,
         usuario.id,
         'Registro',
-        `${problema.servicio.nombre} · ${problema.descripcion}`,
+        `${problema.servicio.nombre} · ${problema.descripcion}` +
+          (dto.a_nombre_de ? ` (registrado por ${usuario.nombre} a nombre de ${quien.nombre})` : ''),
         tx,
         undefined,
-        quien.nombre,
+        dto.a_nombre_de ? usuario.nombre : quien.nombre,
       );
-      this.traza.registra('§2', `Ticket ${folio} registrado por ${quien.nombre} · ${problema.descripcion}.`);
+      this.traza.registra(
+        '§2',
+        dto.a_nombre_de
+          ? `Ticket ${folio} registrado por ${usuario.nombre} a nombre de ${quien.nombre} · ${problema.descripcion}.`
+          : `Ticket ${folio} registrado por ${quien.nombre} · ${problema.descripcion}.`,
+      );
       this.traza.registra(
         '§4',
         `Prioridad ${problema.prioridad} asignada por catalogo (${problema.clave}). El usuario no la eligio.`,
