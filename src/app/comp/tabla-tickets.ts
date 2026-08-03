@@ -30,7 +30,8 @@ import type { Ticket } from '../core/modelos';
             </thead>
             <tbody>
               @for (t of tickets(); track t.id) {
-                <tr (click)="abrir.emit(t.id)">
+                <tr (click)="abrir.emit(t.id)"
+                    [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'">
                   <td>
                     <span class="folio">{{ t.folio }}</span>
                     @if (t.reclasificado) {
@@ -42,6 +43,13 @@ import type { Ticket } from '../core/modelos';
                     <div class="sub text-truncate" style="max-width: 340px">
                       {{ t.interno ? (t.contexto || 'Trabajo interno del área') : t.solicitante + ' · ' + t.dependencia }}
                     </div>
+                    @if (pedirConfirmacion() && t.estatus === 'RESUELTO') {
+                      <div class="d-flex flex-wrap gap-1 mt-1">
+                        <span class="chip chip-confirmar">
+                          <i class="bi bi-question-circle"></i> ¿Sí quedó resuelto? Da clic para confirmar
+                        </span>
+                      </div>
+                    }
                     @if (marcas(t).length) {
                       <div class="d-flex flex-wrap gap-1 mt-1">
                         @for (b of marcas(t); track b.texto) {
@@ -76,6 +84,8 @@ export class TablaTickets {
   readonly sinTecnico = input(false);
   readonly vacio = input('Sin tickets');
   readonly ayudaVacio = input('Ajusta los filtros o registra uno nuevo.');
+  /** Solo tiene sentido en "Mis tickets": el solicitante debe confirmar o rechazar. */
+  readonly pedirConfirmacion = input(false);
 
   readonly abrir = output<number>();
 

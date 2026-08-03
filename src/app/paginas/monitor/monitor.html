@@ -47,7 +47,12 @@
                     <span class="chip ms-1" style="background: #3a2f1f; color: #f0b45c">EN ESPERA</span>
                   }
                 </div>
-                <div class="small" style="color: #7f92ae">{{ a.servicio }} · {{ a.prioridad }}</div>
+                <div class="small" style="color: #7f92ae">
+                  {{ a.servicio }} ·
+                  <span class="chip" [class]="'chip-' + a.prioridad">
+                    {{ a.prioridad }} · {{ nombrePrioridad[a.prioridad] }}
+                  </span>
+                </div>
               </div>
               <div class="mono h5 mb-0">
                 {{ a.seg_campo ? crono(a.seg_campo) : '—' }}
@@ -108,7 +113,12 @@
           <div class="turno" [class.p1]="c.prioridad === 'P1'" [class.p2]="c.prioridad === 'P2'">
             <span class="no">{{ c.turno }}</span>
             <div style="min-width: 0">
-              <div class="mono">{{ c.folio }}</div>
+              <div class="mono">
+                {{ c.folio }}
+                <span class="chip ms-1" [class]="'chip-' + c.prioridad">
+                  {{ c.prioridad }} · {{ nombrePrioridad[c.prioridad] }}
+                </span>
+              </div>
               <div class="small text-truncate" style="color: #7f92ae">
                 {{ c.servicio }} · {{ c.dependencia }}
               </div>

@@ -54,13 +54,16 @@ export class AuthService {
     }
 
     /*
-     * Existe en ticketsv2.usuario -> tiene rol asignado (tecnico, jefe,
-     * admin, proveedor o un solicitante que ya se registro antes). Se usa
-     * ese perfil tal cual, sin tocar nada.
+     * Existe en ticketsv2.usuario y sigue activo -> tiene rol asignado
+     * (tecnico, jefe, admin, proveedor o un solicitante que ya se registro
+     * antes). Se usa ese perfil tal cual, sin tocar nada.
+     *
+     * Si existe pero esta dado de baja (activo=false), NO se rechaza el
+     * login: pierde el rol de staff y cae al mismo flujo de abajo, como
+     * cualquier solicitante identificado por saf.
      */
     const local = await this.usuarios.findOne({ where: { rfc }, include: [Dependencia, Area] });
-    if (local) {
-      if (!local.activo) throw new UnauthorizedException('RFC o contrasena incorrectos');
+    if (local?.activo) {
       return {
         token: this.jwt.sign({ sub: local.id, rol: local.rol, externo: false }),
         usuario: this.resumen(local),
@@ -68,9 +71,9 @@ export class AuthService {
     }
 
     /*
-     * No tiene rol asignado localmente: es un solicitante. No se crea fila
-     * en usuario; su identidad es el padron de saf, revalidado en cada
-     * peticion (ver JwtStrategy).
+     * No tiene rol asignado localmente (o lo tenia y se lo dieron de baja):
+     * es un solicitante. No se crea fila en usuario; su identidad es el
+     * padron de saf, revalidado en cada peticion (ver JwtStrategy).
      */
     const sUsuario = await this.sUsuarios.findOne({ where: { N_Usuario: rfc } });
     if (!sUsuario || sUsuario.Estado !== 1) {

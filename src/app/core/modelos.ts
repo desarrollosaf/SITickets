@@ -290,3 +290,48 @@ export interface Geo {
   exactitud?: number;
   motivo_sin_ubicacion?: string;
 }
+
+/* =====================================================================
+   §12 · alta de personal interno (tecnico/jefe/admin/proveedor)
+   ===================================================================== */
+
+/** Un resultado de busqueda en saf.s_usuario, activo y sin rol asignado aun. */
+export interface CandidatoSaf {
+  id_usuario_saf: number;
+  nombre: string;
+  rfc: string;
+  dependencia_id: number | null;
+  dependencia: string | null;
+}
+
+export interface UsuarioStaff {
+  id: number;
+  rfc: string | null;
+  nombre: string;
+  rol: Rol;
+  correo: string | null;
+  extension: string | null;
+  servicios: string[];
+  servicio_id: number | null;
+  dependencia: string | null;
+  area: string | null;
+  activo: boolean;
+}
+
+export interface RegistrarUsuarioForm {
+  id_usuario_saf: number;
+  correo?: string;
+  extension?: string;
+  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  /** Tipo de servicio del que sera tecnico (tecnico_servicio). Solo aplica si rol es tecnico. */
+  servicio_id?: number;
+}
+
+/** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
+export interface ActualizarUsuarioForm {
+  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  correo?: string;
+  extension?: string;
+  servicio_id?: number;
+  activo?: boolean;
+}

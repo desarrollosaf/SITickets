@@ -1,0 +1,247 @@
+<div>
+  <h1 class="h5 mb-1">Registrar usuario</h1>
+  <p class="sub mb-3">
+    Busca a la persona en el padrón institucional y asígnale su rol de personal interno
+    (técnico, jefe, administrador o proveedor).
+  </p>
+
+  @if (error()) {
+    <div class="alert alert-danger py-2 small">{{ error() }}</div>
+  }
+  @if (aviso()) {
+    <div class="alert alert-success py-2 small">{{ aviso() }}</div>
+  }
+
+  <div class="tarjeta p-4 mb-4">
+    <label class="form-label small fw-semibold" for="u-buscar">Buscar por nombre</label>
+    <input id="u-buscar" class="form-control" [(ngModel)]="busqueda" name="busqueda"
+           (ngModelChange)="onBuscar()" placeholder="Mínimo 3 letras del nombre…" autocomplete="off" />
+
+    @if (buscando()) {
+      <div class="form-text">
+        <span class="spinner-border spinner-border-sm me-2"></span>Buscando…
+      </div>
+    }
+
+    @if (resultados().length) {
+      <div class="border rounded mt-2" style="max-height: 260px; overflow-y: auto">
+        @for (c of resultados(); track c.id_usuario_saf) {
+          <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
+                  (click)="elegir(c)">
+            <div class="fw-semibold" style="font-size: 0.9rem">{{ c.nombre }}</div>
+            <div class="sub" style="font-size: 0.78rem">
+              {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
+            </div>
+          </button>
+        }
+      </div>
+    } @else if (busqueda.trim().length >= 3 && !buscando()) {
+      <div class="form-text">Sin resultados (o ya tiene rol asignado aquí).</div>
+    }
+  </div>
+
+  @if (seleccionado(); as c) {
+    <div class="tarjeta p-4 mb-4">
+      <h2 class="h6 mb-3">Dar de alta a {{ c.nombre }}</h2>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">RFC</label>
+          <input class="form-control" [value]="c.rfc" disabled />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="u-rol">Rol</label>
+          <select id="u-rol" class="form-select" [(ngModel)]="rol" name="rol">
+            <option value="">Selecciona…</option>
+            <option value="tecnico">Técnico</option>
+            <option value="jefe">Jefe de departamento</option>
+            <option value="admin">Administrador</option>
+            <option value="proveedor">Proveedor externo</option>
+          </select>
+        </div>
+      </div>
+
+      @if (mostrarServicio()) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="u-servicio">Tipo de servicio</label>
+          <select id="u-servicio" class="form-select" [(ngModel)]="servicioId" name="servicioId">
+            <option [ngValue]="null">Selecciona…</option>
+            @for (s of servicios(); track s.id) {
+              <option [ngValue]="s.id">{{ s.nombre }}</option>
+            }
+          </select>
+          <div class="form-text">Opcional; puede quedar sin especialidad y asignarse después.</div>
+        </div>
+      }
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="u-correo">Correo (opcional)</label>
+          <input id="u-correo" type="email" class="form-control" [(ngModel)]="correo" name="correo" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="u-ext">Extensión (opcional)</label>
+          <input id="u-ext" class="form-control" [(ngModel)]="extension" name="extension" maxlength="10" />
+        </div>
+      </div>
+
+      @if (errorForm()) {
+        <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+      }
+
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+        <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+          @if (guardando()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+          }
+          Registrar
+        </button>
+      </div>
+    </div>
+  }
+
+  <div class="tarjeta overflow-hidden">
+    <div class="p-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <h2 class="h6 mb-0">Personal ya registrado · {{ staffFiltrado().length }}</h2>
+      <input class="form-control form-control-sm" style="max-width: 260px" [(ngModel)]="filtroStaff"
+             name="filtroStaff" (ngModelChange)="onFiltroStaff()"
+             placeholder="Buscar por nombre, rfc o rol…" />
+    </div>
+
+    @if (!staffFiltrado().length) {
+      <div class="p-4 text-center sub">
+        @if (staff().length) {
+          Nadie coincide con "{{ filtroStaff }}".
+        } @else {
+          Aún no hay personal registrado.
+        }
+      </div>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr class="sub">
+              <th>Nombre</th>
+              <th style="width: 130px">RFC</th>
+              <th style="width: 160px">Rol</th>
+              <th>Dependencia / área</th>
+              <th>Servicios</th>
+              <th style="width: 90px">Estado</th>
+              <th style="width: 190px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of staffPagina(); track u.id) {
+              <tr [class.text-muted]="!u.activo">
+                <td>{{ u.nombre }}</td>
+                <td class="mono sub">{{ u.rfc || '—' }}</td>
+                <td>
+                  <span class="badge" [class]="claseRol[u.rol] ?? 'text-bg-light'">
+                    {{ nombreRol[u.rol] ?? u.rol }}
+                  </span>
+                </td>
+                <td class="sub">{{ u.dependencia || '—' }} @if (u.area) { · {{ u.area }} }</td>
+                <td class="sub">{{ u.servicios.length ? u.servicios.join(', ') : '—' }}</td>
+                <td>
+                  @if (u.activo) {
+                    <span class="badge text-bg-success-subtle text-success-emphasis">Activo</span>
+                  } @else {
+                    <span class="badge text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+                  }
+                </td>
+                <td class="text-end">
+                  <button class="btn btn-outline-secondary btn-sm" (click)="abrirEditar(u)">Editar</button>
+                  <button class="btn btn-sm ms-1"
+                          [class.btn-outline-danger]="u.activo"
+                          [class.btn-outline-success]="!u.activo"
+                          (click)="alternarActivo(u)">
+                    {{ u.activo ? 'Dar de baja' : 'Reactivar' }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (totalPaginas() > 1) {
+        <div class="p-3 border-top d-flex align-items-center justify-content-between">
+          <span class="sub small">Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
+                    (click)="paginaAnterior()">
+              <i class="bi bi-chevron-left"></i> Anterior
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
+                    (click)="paginaSiguiente()">
+              Siguiente <i class="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+
+  @if (editando(); as u) {
+    <div class="cajon-fondo" (click)="cerrarEdicion()"></div>
+    <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+         style="z-index: 1050; width: min(560px, 94vw); max-height: 90vh; overflow-y: auto">
+      <h2 class="h6 mb-3">Editar a {{ u.nombre }}</h2>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">RFC</label>
+          <input class="form-control" [value]="u.rfc || '—'" disabled />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="e-rol">Rol</label>
+          <select id="e-rol" class="form-select" [(ngModel)]="editRol" name="editRol">
+            <option value="tecnico">Técnico</option>
+            <option value="jefe">Jefe de departamento</option>
+            <option value="admin">Administrador</option>
+            <option value="proveedor">Proveedor externo</option>
+          </select>
+        </div>
+      </div>
+
+      @if (mostrarServicioEdicion()) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="e-servicio">Tipo de servicio</label>
+          <select id="e-servicio" class="form-select" [(ngModel)]="editServicioId" name="editServicioId">
+            <option [ngValue]="null">Selecciona…</option>
+            @for (s of servicios(); track s.id) {
+              <option [ngValue]="s.id">{{ s.nombre }}</option>
+            }
+          </select>
+        </div>
+      }
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="e-correo">Correo (opcional)</label>
+          <input id="e-correo" type="email" class="form-control" [(ngModel)]="editCorreo" name="editCorreo" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold" for="e-ext">Extensión (opcional)</label>
+          <input id="e-ext" class="form-control" [(ngModel)]="editExtension" name="editExtension"
+                 maxlength="10" />
+        </div>
+      </div>
+
+      @if (errorEdicion()) {
+        <div class="alert alert-danger py-2 small">{{ errorEdicion() }}</div>
+      }
+
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-outline-secondary" (click)="cerrarEdicion()">Cancelar</button>
+        <button class="btn btn-primary" [disabled]="guardandoEdicion()" (click)="guardarEdicion()">
+          @if (guardandoEdicion()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+          }
+          Guardar
+        </button>
+      </div>
+    </div>
+  }
+</div>
