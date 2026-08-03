@@ -129,7 +129,23 @@ export class MonitorService {
         min_espera: Math.round((Date.now() - new Date(t.f_registro).getTime()) / 60_000),
       }));
 
-    return { atencion, cola, rezago: await this.rezago(objetivos) };
+    return {
+      atencion,
+      cola,
+      rezago: await this.rezago(objetivos),
+      finalizados_hoy: await this.finalizadosHoy(),
+    };
+  }
+
+  /**
+   * Cuantos tickets se resolvieron hoy en total, para la franja inferior del
+   * monitor. Se cuenta por f_resolucion, no por estatus actual: si un ticket
+   * resuelto hoy fue rechazado despues, f_resolucion vuelve a null (lo pone
+   * en null `rechazar()`) y deja de contar, que es lo correcto: no quedo
+   * finalizado de verdad.
+   */
+  private finalizadosHoy(): Promise<number> {
+    return this.tickets.count({ where: { f_resolucion: { [Op.gte]: inicioDelDia() } } });
   }
 
   /* ==================================================================

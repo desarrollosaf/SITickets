@@ -4,13 +4,16 @@ import { API } from './api';
 import type {
   Agenda,
   BienesUsuario,
+  CandidatoSaf,
   Catalogos,
   Geo,
   LineaTraza,
   Monitor,
   Organizacion,
+  Prioridad,
   Problema,
   ProblemaForm,
+  Servicio,
   Tablero,
   Tecnico,
   Ticket,
@@ -46,8 +49,19 @@ export class TicketsService {
 
   /* ---------------- alta ---------------- */
 
-  crear(datos: { problema: string; contexto?: string; texto?: string; extension?: string }) {
+  crear(datos: {
+    problema: string;
+    contexto?: string;
+    texto?: string;
+    extension?: string;
+    a_nombre_de?: number;
+  }) {
     return this.http.post<TicketDetalle>(`${API}/tickets`, datos);
+  }
+
+  /** Solo el administrador: usuarios activos de saf para registrar a nombre de otro (§2). */
+  buscarSolicitantes(q: string) {
+    return this.http.get<CandidatoSaf[]>(`${API}/tickets/solicitantes`, { params: { q } });
   }
 
   crearInterno(datos: {
@@ -145,6 +159,23 @@ export class TicketsService {
   }
   actualizarProblema(id: number, datos: Partial<ProblemaForm>) {
     return this.http.patch<Problema>(`${API}/catalogos/problemas/${id}`, datos);
+  }
+  crearServicio(datos: {
+    clave: string;
+    nombre: string;
+    prefijo_folio: string;
+    origen: 'usuario' | 'administrador';
+    externo?: boolean;
+    multi_tecnico?: boolean;
+  }) {
+    return this.http.post<Servicio>(`${API}/catalogos/servicios`, datos);
+  }
+
+  actualizarPrioridad(
+    clave: string,
+    datos: { nombre?: string; minutos_respuesta?: number; minutos_resolucion?: number },
+  ) {
+    return this.http.patch<Prioridad>(`${API}/catalogos/prioridades/${clave}`, datos);
   }
   monitor() {
     return this.http.get<Monitor>(`${API}/monitor`);

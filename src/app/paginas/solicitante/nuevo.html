@@ -7,11 +7,54 @@
 
   <div class="tarjeta p-4">
     <div class="row g-3 mb-3">
-      <div class="col-md-8">
-        <label class="form-label small fw-semibold" for="n-usuario">Servidor público</label>
-        <input id="n-usuario" class="form-control" [value]="auth.usuario()?.nombre" disabled />
-        <div class="form-text">Tomado de tu sesión. No editable.</div>
-      </div>
+      @if (puedeElegirUsuario()) {
+        <div class="col-md-8">
+          <label class="form-label small fw-semibold" for="n-buscar">Registrar a nombre de</label>
+          @if (usuarioElegido(); as u) {
+            <div class="d-flex align-items-center gap-2">
+              <input class="form-control" [value]="u.nombre" disabled />
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarUsuario()">
+                Cambiar
+              </button>
+            </div>
+            <div class="form-text">{{ u.rfc }} · {{ u.dependencia || 'Sin dependencia identificada' }}</div>
+          } @else {
+            <input id="n-buscar" class="form-control" [(ngModel)]="busquedaUsuario" name="busquedaUsuario"
+                   (ngModelChange)="onBuscarUsuario()" placeholder="Mínimo 3 letras del nombre…"
+                   autocomplete="off" />
+            @if (buscandoUsuario()) {
+              <div class="form-text">
+                <span class="spinner-border spinner-border-sm me-2"></span>Buscando…
+              </div>
+            }
+            @if (resultadosUsuario().length) {
+              <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
+                @for (c of resultadosUsuario(); track c.id_usuario_saf) {
+                  <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
+                          (click)="elegirUsuario(c)">
+                    <div class="fw-semibold" style="font-size: 0.9rem">{{ c.nombre }}</div>
+                    <div class="sub" style="font-size: 0.78rem">
+                      {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
+                    </div>
+                  </button>
+                }
+              </div>
+            } @else if (busquedaUsuario.trim().length >= 3 && !buscandoUsuario()) {
+              <div class="form-text">Sin resultados.</div>
+            } @else {
+              <div class="form-text">
+                Si no eliges a nadie, el ticket queda registrado a tu propio nombre.
+              </div>
+            }
+          }
+        </div>
+      } @else {
+        <div class="col-md-8">
+          <label class="form-label small fw-semibold" for="n-usuario">Servidor público</label>
+          <input id="n-usuario" class="form-control" [value]="auth.usuario()?.nombre" disabled />
+          <div class="form-text">Tomado de tu sesión. No editable.</div>
+        </div>
+      }
       <div class="col-md-4">
         <label class="form-label small fw-semibold" for="n-ext">Extensión</label>
         <input id="n-ext" class="form-control" [(ngModel)]="extension" name="extension" />
@@ -119,7 +162,9 @@
         <span class="chip" [class]="'chip-' + p.prioridad">
           {{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}
         </span>
-        &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
+        @if (esAdmin()) {
+          &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
+        }
       </div>
     }
 

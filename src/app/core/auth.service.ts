@@ -72,6 +72,7 @@ export class AuthService {
   inicioDeRol(rol: Rol): string {
     switch (rol) {
       case 'admin':
+      case 'operador':
         return '/tickets';
       case 'tecnico':
       case 'proveedor':

@@ -10,6 +10,8 @@ const NOMBRE_ROL: Record<string, string> = {
   jefe: 'Jefe de departamento',
   admin: 'Administrador',
   proveedor: 'Proveedor externo',
+  operador: 'Operador',
+  gestor: 'Gestor',
 };
 
 const CLASE_ROL: Record<string, string> = {
@@ -17,6 +19,8 @@ const CLASE_ROL: Record<string, string> = {
   tecnico: 'text-bg-info-subtle text-info-emphasis',
   jefe: 'text-bg-warning-subtle text-warning-emphasis',
   proveedor: 'text-bg-secondary-subtle text-secondary-emphasis',
+  operador: 'text-bg-primary-subtle text-primary-emphasis',
+  gestor: 'text-bg-success-subtle text-success-emphasis',
 };
 
 /** §12 · alta de personal interno: se busca en saf, se confirma rol (y servicio si es tecnico). */
@@ -71,7 +75,7 @@ export class Usuarios {
 
   correo = '';
   extension = '';
-  rol: '' | 'tecnico' | 'jefe' | 'admin' | 'proveedor' = '';
+  rol: '' | 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = '';
   servicioId: number | null = null;
 
   /* ---------------- tipo de servicio (solo si rol es tecnico) ---------------- */
@@ -193,7 +197,7 @@ export class Usuarios {
   readonly guardandoEdicion = signal(false);
   readonly errorEdicion = signal('');
 
-  editRol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' = 'tecnico';
+  editRol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = 'tecnico';
   editCorreo = '';
   editExtension = '';
   editServicioId: number | null = null;
@@ -204,7 +208,7 @@ export class Usuarios {
 
   abrirEditar(u: UsuarioStaff) {
     this.editando.set(u);
-    this.editRol = u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+    this.editRol = u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
     this.editCorreo = u.correo ?? '';
     this.editExtension = u.extension ?? '';
     this.editServicioId = u.servicio_id;
@@ -247,7 +251,7 @@ export class Usuarios {
   alternarActivo(u: UsuarioStaff) {
     this.api
       .actualizar(u.id, {
-        rol: u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor',
+        rol: u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor',
         correo: u.correo ?? undefined,
         extension: u.extension ?? undefined,
         servicio_id: u.servicio_id ?? undefined,

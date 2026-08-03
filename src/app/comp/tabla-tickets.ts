@@ -43,6 +43,11 @@ import type { Ticket } from '../core/modelos';
                     <div class="sub text-truncate" style="max-width: 340px">
                       {{ t.interno ? (t.contexto || 'Trabajo interno del área') : t.solicitante + ' · ' + t.dependencia }}
                     </div>
+                    @if (t.registrado_por_nombre) {
+                      <div class="sub text-truncate" style="max-width: 340px; font-size: 0.72rem">
+                        Registrado por {{ t.registrado_por_nombre }}
+                      </div>
+                    }
                     @if (pedirConfirmacion() && t.estatus === 'RESUELTO') {
                       <div class="d-flex flex-wrap gap-1 mt-1">
                         <span class="chip chip-confirmar">

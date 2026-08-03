@@ -8,15 +8,15 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor'];
+const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
 /**
  * Edicion de personal ya registrado. rfc y nombre no se tocan (vienen de
  * saf); aqui solo se corrige rol, contacto, servicio y alta/baja.
  */
 export class ActualizarUsuarioDto {
-  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin o proveedor' })
-  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin, proveedor, operador o gestor' })
+  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
 
   /** '' limpia el campo. Sin @IsEmail estricto: solo se valida si viene algo. */
   @IsOptional()

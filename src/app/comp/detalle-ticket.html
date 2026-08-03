@@ -75,12 +75,16 @@
             }
           }
 
+          <!-- Reasignar: administrador y operador -->
+          @if (puedeReasignar() && abierto()) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reasignar')">
+              Reasignar
+            </button>
+          }
+
           <!-- Administrador -->
           @if (esAdmin()) {
             @if (abierto()) {
-              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reasignar')">
-                Reasignar
-              </button>
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reclasificar')">
                 Reclasificar
               </button>
@@ -434,6 +438,11 @@
 
             <dt class="col-5 sub fw-normal">{{ t.interno ? 'Generado por' : 'Solicitante' }}</dt>
             <dd class="col-7">{{ t.solicitante }}</dd>
+
+            @if (t.registrado_por_nombre) {
+              <dt class="col-5 sub fw-normal">Registrado por</dt>
+              <dd class="col-7">{{ t.registrado_por_nombre }}</dd>
+            }
 
             @if (!t.interno) {
               <dt class="col-5 sub fw-normal">Dependencia</dt>
