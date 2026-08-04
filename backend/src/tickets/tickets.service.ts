@@ -354,12 +354,12 @@ export class TicketsService {
   }
 
   /**
-   * Busqueda de usuarios activos de saf para que el administrador (o el
-   * gestor) elija a nombre de quien registra un ticket. A diferencia de
+   * Busqueda de usuarios activos de saf para que admin/operador/gestor elijan
+   * a nombre de quien registran un ticket. A diferencia de
    * UsuariosService.buscarSaf (que excluye a quien ya tiene rol asignado,
    * porque es para dar de alta personal) aqui no se excluye a nadie: cualquier
    * activo puede ser solicitante. El gestor solo ve gente de su misma
-   * dependencia (saf); el administrador ve a todos.
+   * dependencia (saf); admin y operador ven a todos.
    */
   async buscarSolicitantes(q: string, usuario: UsuarioToken) {
     const texto = q.trim();
@@ -425,14 +425,14 @@ export class TicketsService {
     }
 
     /*
-     * §2 a nombre de otro usuario: solo el administrador y el gestor pueden
-     * mandar a_nombre_de, y solo con un usuario activo de saf. El id que
-     * queda en solicitante_id vive en el espacio de ids de saf (igual que el
+     * §2 a nombre de otro usuario: solo admin/operador/gestor pueden mandar
+     * a_nombre_de, y solo con un usuario activo de saf. El id que queda en
+     * solicitante_id vive en el espacio de ids de saf (igual que el
      * solicitante externo de siempre), por eso el nombre se denormaliza en
      * solicitante_nombre en vez de confiar en el join. registrado_por deja
      * rastro de quien lo dio de alta realmente (siempre un usuario.id local).
      */
-    const ROLES_A_NOMBRE_DE = ['admin', 'gestor'];
+    const ROLES_A_NOMBRE_DE = ['admin', 'operador', 'gestor'];
     let quien: {
       nombre: string;
       dependencia_id: number | null;
@@ -447,7 +447,7 @@ export class TicketsService {
     if (dto.a_nombre_de) {
       if (!ROLES_A_NOMBRE_DE.includes(usuario.rol)) {
         throw new ForbiddenException(
-          'Solo el administrador o el gestor pueden registrar un ticket a nombre de otro usuario',
+          'Tu perfil no puede registrar un ticket a nombre de otro usuario',
         );
       }
       const datos = await this.datosSaf(dto.a_nombre_de);
