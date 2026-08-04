@@ -46,7 +46,7 @@ export class TicketsController {
    * nombre de quien registra un ticket (§2). Va antes de ':id' para que no se
    * confunda "solicitantes" con un identificador de ticket.
    */
-  @Roles('admin', 'gestor')
+  @Roles('admin', 'operador', 'gestor')
   @Get('solicitantes')
   buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.buscarSolicitantes(q, usuario);

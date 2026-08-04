@@ -102,13 +102,13 @@ export class Nuevo {
     );
   });
 
-  /* ---------------- §2 registrar a nombre de otro usuario (admin y gestor) ---------------- */
+  /* ---------------- §2 registrar a nombre de otro usuario (admin, operador y gestor) ---------------- */
 
   /** Solo el admin ve el tiempo objetivo de resolucion; no aplica a operador/gestor. */
   readonly esAdmin = computed(() => this.auth.rol() === 'admin');
-  /** Admin y gestor pueden elegir a nombre de quien registran el ticket. */
+  /** Admin, operador y gestor pueden elegir a nombre de quien registran el ticket. */
   readonly puedeElegirUsuario = computed(() =>
-    ['admin', 'gestor'].includes(this.auth.rol() ?? ''),
+    ['admin', 'operador', 'gestor'].includes(this.auth.rol() ?? ''),
   );
 
   busquedaUsuario = '';
