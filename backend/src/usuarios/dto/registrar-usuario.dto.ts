@@ -1,6 +1,6 @@
 import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
-const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor'];
+const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
 /**
  * Alta de personal interno. El nombre, rfc y dependencia NO vienen del
@@ -23,8 +23,8 @@ export class RegistrarUsuarioDto {
   @MaxLength(10)
   extension?: string;
 
-  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin o proveedor' })
-  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin, proveedor, operador o gestor' })
+  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
 
   /** Tipo de servicio del que sera tecnico (tecnico_servicio). Solo aplica si rol es tecnico. */
   @IsOptional()

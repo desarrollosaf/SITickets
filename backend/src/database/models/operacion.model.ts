@@ -103,6 +103,20 @@ export class Ticket extends Model {
   @Column(DataType.STRING(120))
   declare solicitante_nombre: string | null;
 
+  /**
+   * Quien realmente dio de alta el ticket, cuando es distinto del
+   * solicitante (admin o gestor registrando "a nombre de" otro usuario).
+   * NULL cuando el propio solicitante se registro. A diferencia de
+   * solicitante_id, aqui siempre es un usuario.id local real (nunca un id
+   * de saf), asi que si lleva llave foranea.
+   */
+  @ForeignKey(() => Usuario)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare registrado_por: number | null;
+
+  @Column(DataType.STRING(120))
+  declare registrado_por_nombre: string | null;
+
   @ForeignKey(() => Dependencia)
   @Column(DataType.SMALLINT.UNSIGNED)
   declare dependencia_id: number | null;

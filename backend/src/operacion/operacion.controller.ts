@@ -14,14 +14,14 @@ export class OperacionController {
   ) {}
 
   /** §17 · pantalla de turnos. La ve el area completa, no solo el admin. */
-  @Roles('admin', 'jefe', 'tecnico', 'proveedor')
+  @Roles('admin', 'jefe', 'tecnico', 'proveedor', 'operador')
   @Get('monitor')
   monitor() {
     return this.monitorSrv.monitor();
   }
 
   /** §13 · tablero de indicadores. */
-  @Roles('admin', 'jefe')
+  @Roles('admin', 'jefe', 'operador')
   @Get('tablero')
   async tablero() {
     const [rezago, desempeno, disponibilidad, compras] = await Promise.all([

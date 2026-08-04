@@ -42,6 +42,12 @@ export class CrearTicketDto {
   @IsString()
   @MaxLength(10)
   extension?: string;
+
+  /** Solo lo usan admin/gestor: registra el ticket a nombre de este usuario de saf. */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  a_nombre_de?: number;
 }
 
 /**

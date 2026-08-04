@@ -78,7 +78,7 @@ export class UsuariosService {
   /** Personal ya dado de alta aqui (tecnico/jefe/admin/proveedor), para referencia en pantalla. */
   async listar() {
     const filas = await this.usuarios.findAll({
-      where: { rol: { [Op.in]: ['tecnico', 'jefe', 'admin', 'proveedor'] } },
+      where: { rol: { [Op.in]: ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'] } },
       include: [Dependencia, Area, { model: TecnicoServicio, include: [Servicio] }],
       order: [
         ['rol', 'ASC'],

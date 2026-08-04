@@ -104,7 +104,14 @@ export class Area extends Model {
   declare sede: Sede;
 }
 
-export type Rol = 'solicitante' | 'tecnico' | 'jefe' | 'admin' | 'proveedor';
+export type Rol =
+  | 'solicitante'
+  | 'tecnico'
+  | 'jefe'
+  | 'admin'
+  | 'proveedor'
+  | 'operador'
+  | 'gestor';
 
 @Table({ tableName: 'usuario', timestamps: false })
 export class Usuario extends Model {
@@ -142,7 +149,7 @@ export class Usuario extends Model {
 
   @Index('ix_usuario_rol')
   @Default('solicitante')
-  @Column(DataType.ENUM('solicitante', 'tecnico', 'jefe', 'admin', 'proveedor'))
+  @Column(DataType.ENUM('solicitante', 'tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'))
   declare rol: Rol;
 
   @Default(true)
