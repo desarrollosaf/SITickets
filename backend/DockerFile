@@ -18,6 +18,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Chromium del sistema para Puppeteer (genera el dictamen en pdf). Se le pide
+# que no intente descargar el suyo propio: en Alpine no corre bien.
+RUN apk add --no-cache chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
 COPY package*.json ./
 
 RUN npm ci --omit=dev
@@ -27,6 +33,10 @@ COPY --from=build /app/dist ./dist
 # Las migraciones viven fuera de dist/: nest build no las compila ni las
 # copia, y MigracionesService las lee del disco al arrancar.
 COPY --from=build /app/sql ./sql
+
+# Membrete institucional para el dictamen de baja (DictamenService lee
+# assets/membrete.png en tiempo de ejecucion, no se compila con nest build).
+COPY --from=build /app/assets ./assets
 
 RUN mkdir -p /app/storage
 

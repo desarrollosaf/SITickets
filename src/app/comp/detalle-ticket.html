@@ -54,17 +54,24 @@
               </button>
             }
             @if (t.estatus === 'EN_ATENCION') {
-              <button class="btn btn-sm btn-success" [disabled]="!relojCorriendo()"
-                      [title]="relojCorriendo() ? '' : 'Inicia el reloj para poder marcar el ticket como resuelto'"
-                      (click)="abrirFormulario('resolver')">
-                Marcar resuelto
-              </button>
+              @if (esCmpTicket()) {
+                <button class="btn btn-sm btn-success" [disabled]="ocupado()"
+                        (click)="abrirAtenderCmp()">
+                  Atender ticket
+                </button>
+              } @else {
+                <button class="btn btn-sm btn-success" [disabled]="!relojCorriendo()"
+                        [title]="relojCorriendo() ? '' : 'Inicia el reloj para poder marcar el ticket como resuelto'"
+                        (click)="abrirFormulario('resolver')">
+                  Marcar resuelto
+                </button>
+              }
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('espera')">
                 Poner en espera
               </button>
-              @if (!relojCorriendo()) {
+              @if (!relojCorriendo() && !esCmpTicket()) {
                 <div class="w-100 small sub mt-1">
-                  <i class="bi bi-info-circle"></i> Inicia el reloj para poder marcar el ticket como resuelto.
+                  <i class="bi bi-info-circle"></i> Inicia el reloj para poder marcar resuelto el ticket.
                 </div>
               }
             }
@@ -130,6 +137,11 @@
 
         @if (error()) {
           <div class="alert alert-danger py-2 small mt-3 mb-0">{{ error() }}</div>
+        }
+        @if (avisoCustodia()) {
+          <div class="alert alert-warning py-2 small mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle"></i> {{ avisoCustodia() }}
+          </div>
         }
       </header>
 
@@ -245,6 +257,80 @@
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
                 <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="enviarResolver()">
                   Marcar resuelto
+                </button>
+              </div>
+            }
+
+            @case ('atender-cmp') {
+              <div class="alert alert-info py-2 small">
+                El equipo queda asignado temporalmente a ti en SIASAF mientras dura el servicio.
+              </div>
+
+              <label class="form-label small fw-semibold" for="fm-resultado">Qué se hizo con el equipo</label>
+              <select id="fm-resultado" class="form-select form-select-sm mb-2" [(ngModel)]="resultadoCmp"
+                      name="resultadoCmp">
+                <option value="reparado">Reparado</option>
+                <option value="baja">Dado de baja</option>
+              </select>
+
+              @if (resultadoCmp === 'reparado') {
+                <label class="form-label small fw-semibold" for="fm-cmp-dx">Diagnóstico (causa)</label>
+                <input id="fm-cmp-dx" class="form-control form-control-sm mb-2" [(ngModel)]="diagnostico"
+                       name="diagnostico" placeholder="Qué estaba fallando" />
+                <label class="form-label small fw-semibold" for="fm-cmp-sol">Solución aplicada</label>
+                <input id="fm-cmp-sol" class="form-control form-control-sm mb-2" [(ngModel)]="solucion"
+                       name="solucion" placeholder="Qué se hizo" />
+                <label class="form-label small fw-semibold" for="fm-cmp-ref">Refacciones o insumos</label>
+                <input id="fm-cmp-ref" class="form-control form-control-sm mb-2" [(ngModel)]="refacciones"
+                       name="refacciones" placeholder="Ninguna, o descripción y cantidad" />
+              } @else {
+                <div class="alert alert-light border py-2 small mb-2">
+                  El sistema genera el dictamen técnico en PDF a partir de lo que captures aquí.
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                  <label class="form-label small fw-semibold mb-1" for="fm-observaciones">
+                    Observaciones (cuerpo del dictamen)
+                  </label>
+                  <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 mb-1"
+                          style="font-size: 0.75rem"
+                          [disabled]="mejorandoRedaccion() || observacionesBaja.trim().length < 10"
+                          (click)="mejorarRedaccion()">
+                    @if (mejorandoRedaccion()) {
+                      <span class="spinner-border spinner-border-sm me-1" style="width:0.7rem;height:0.7rem"></span>
+                    }
+                    Mejorar redacción
+                  </button>
+                </div>
+                <textarea id="fm-observaciones" rows="4" class="form-control form-control-sm mb-1"
+                          [(ngModel)]="observacionesBaja" name="observacionesBaja"
+                          placeholder="Describe la revisión realizada y el porqué de la baja"></textarea>
+                <div class="form-text mb-2">
+                  Escríbelo con tus palabras y usa «Mejorar redacción» para pasarlo a formato técnico; el
+                  resultado se puede seguir editando antes de enviar.
+                </div>
+
+                <label class="form-label small fw-semibold" for="fm-fotos">
+                  Fotos del equipo (anexo fotográfico, opcional)
+                </label>
+                <input id="fm-fotos" type="file" accept="image/jpeg,image/png" multiple
+                       class="form-control form-control-sm mb-2" (change)="onFotosSeleccionadas($event)" />
+                @if (fotosBaja.length) {
+                  <div class="d-flex flex-wrap gap-2 mb-2">
+                    @for (f of fotosBaja; track f.name + $index) {
+                      <span class="chip d-inline-flex align-items-center gap-1">
+                        {{ f.name }}
+                        <button type="button" class="btn-close btn-close-sm" style="font-size: 0.6rem"
+                                (click)="quitarFotoBaja($index)" aria-label="Quitar"></button>
+                      </span>
+                    }
+                  </div>
+                }
+              }
+
+              <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="enviarAtenderCmp()">
+                  Finalizar ticket
                 </button>
               </div>
             }
@@ -429,7 +515,16 @@
 
             @if (t.contexto) {
               <dt class="col-5 sub fw-normal">{{ t.campo_adicional || 'Contexto' }}</dt>
-              <dd class="col-7">{{ t.contexto }}</dd>
+              <dd class="col-7">
+                {{ t.contexto }}
+                @if (t.servicio_clave === 'CMP') {
+                  @if (bienTicket()?.bien; as b) {
+                    <span class="sub"> · {{ b.descripcion }}</span>
+                  } @else if (bienTicket()?.motivo) {
+                    <div class="sub" style="font-size: 0.78rem">{{ bienTicket()!.motivo }}</div>
+                  }
+                }
+              </dd>
             }
             @if (t.texto_libre) {
               <dt class="col-5 sub fw-normal">Descripción</dt>
@@ -479,16 +574,30 @@
         </div>
 
         <!-- Cierre técnico -->
-        @if (t.diagnostico) {
+        @if (t.diagnostico || t.resultado_cmp === 'baja') {
           <div class="tarjeta p-3 mb-3">
             <h3 class="h6 mb-3">Cierre técnico</h3>
             <dl class="row mb-0 small">
-              <dt class="col-5 sub fw-normal">Diagnóstico</dt>
-              <dd class="col-7">{{ t.diagnostico }}</dd>
-              <dt class="col-5 sub fw-normal">Solución aplicada</dt>
-              <dd class="col-7">{{ t.solucion }}</dd>
-              <dt class="col-5 sub fw-normal">Refacciones</dt>
-              <dd class="col-7">{{ t.refacciones || 'Ninguna' }}</dd>
+              @if (t.resultado_cmp === 'baja') {
+                <dt class="col-5 sub fw-normal">Resultado</dt>
+                <dd class="col-7">Equipo dado de baja</dd>
+                @if (t.tiene_dictamen) {
+                  <dt class="col-5 sub fw-normal">Dictamen</dt>
+                  <dd class="col-7">
+                    <button type="button" class="btn btn-sm btn-outline-secondary no-imprimir"
+                            (click)="descargarDictamen()">
+                      <i class="bi bi-file-earmark-pdf"></i> Ver dictamen
+                    </button>
+                  </dd>
+                }
+              } @else {
+                <dt class="col-5 sub fw-normal">Diagnóstico</dt>
+                <dd class="col-7">{{ t.diagnostico }}</dd>
+                <dt class="col-5 sub fw-normal">Solución aplicada</dt>
+                <dd class="col-7">{{ t.solucion }}</dd>
+                <dt class="col-5 sub fw-normal">Refacciones</dt>
+                <dd class="col-7">{{ t.refacciones || 'Ninguna' }}</dd>
+              }
               <dt class="col-5 sub fw-normal">Resuelto</dt>
               <dd class="col-7">{{ fmt(t.f_resolucion) }}</dd>
               @if (t.f_validacion) {

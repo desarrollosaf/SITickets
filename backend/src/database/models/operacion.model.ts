@@ -223,6 +223,14 @@ export class Ticket extends Model {
   @Column(DataType.STRING(300))
   declare refacciones: string | null;
 
+  /** Solo en servicio CMP: como termino la atencion del equipo. */
+  @Column(DataType.ENUM('reparado', 'baja'))
+  declare resultado_cmp: 'reparado' | 'baja' | null;
+
+  /** Ruta relativa en disco del dictamen de baja (pdf). Solo si resultado_cmp = 'baja'. */
+  @Column(DataType.STRING(255))
+  declare dictamen_url: string | null;
+
   @Column(DataType.STRING(200))
   declare motivo_espera: string | null;
 

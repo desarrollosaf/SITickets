@@ -4,13 +4,24 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
-import { MODELOS, SDependencia, SUsuario, UserSaf } from './database/models';
+import {
+  BienMueble,
+  EstatusBien,
+  MODELOS,
+  SDependencia,
+  SDepartamento,
+  SDireccion,
+  ServidorBien,
+  SUsuario,
+  UserSaf,
+} from './database/models';
 import { MigracionesModule } from './database/migraciones.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { BienesModule } from './bienes/bienes.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
+import { IaModule } from './ia/ia.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OperacionModule } from './operacion/operacion.module';
 import { SeedModule } from './seed/seed.module';
@@ -60,7 +71,33 @@ import { UsuariosModule } from './usuarios/usuarios.module';
         database: config.get('SAF_DB_NAME', 'saf'),
         username: config.get('SAF_DB_USER', 'root'),
         password: config.get('SAF_DB_PASS', ''),
-        models: [UserSaf, SUsuario, SDependencia],
+        models: [UserSaf, SUsuario, SDependencia, SDireccion, SDepartamento],
+        logging: false,
+        timezone: '-06:00',
+        synchronize: false,
+        autoLoadModels: false,
+        retryAttempts: 20,
+        retryDelay: 3000,
+      }),
+    }),
+
+    /*
+     * Base externa 'bienes': padron de bienes muebles y quien los tiene bajo
+     * resguardo (servidor_biens). Solo lectura; se usa para el servicio
+     * EQUIPO DE COMPUTO en vez de pegarle a la API remota de SIASAF, para no
+     * tocar datos reales de resguardo en pruebas/desarrollo.
+     */
+    SequelizeModule.forRootAsync({
+      name: 'bienes',
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        dialect: 'mysql' as const,
+        host: config.get('BIENES_DB_HOST', 'localhost'),
+        port: Number(config.get('BIENES_DB_PORT', 3306)),
+        database: config.get('BIENES_DB_NAME', 'bienes'),
+        username: config.get('BIENES_DB_USER', 'root'),
+        password: config.get('BIENES_DB_PASS', ''),
+        models: [BienMueble, EstatusBien, ServidorBien],
         logging: false,
         timezone: '-06:00',
         synchronize: false,
@@ -76,6 +113,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     AuthModule,
     BienesModule,
     CatalogosModule,
+    IaModule,
     TicketsModule,
     OperacionModule,
     SeedModule,

@@ -111,30 +111,61 @@
                 Consultando tus bienes resguardados…
               </div>
             } @else if (bienes().length) {
-              <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
-              <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
-                @for (b of bienes(); track b.inventario) {
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" [id]="'bien-' + b.inventario"
-                           [checked]="seleccion().includes(b.inventario)"
-                           (change)="alternaBien(b.inventario)" />
-                    <label class="form-check-label small" [for]="'bien-' + b.inventario">
-                      <b>{{ b.inventario }}</b>
-                      @if (b.descripcion) {
-                        <span class="sub"> · {{ b.descripcion }}</span>
-                      }
-                    </label>
-                  </div>
-                }
-              </div>
-              <div class="form-text" [class.text-danger]="excedeLargo()">
-                @if (seleccion().length) {
-                  {{ seleccion().length }} bien(es) elegido(s): {{ contextoFinal() }}
-                } @else {
-                  Marca los bienes que presentan la falla. Solo aparecen los que tienes bajo
-                  resguardo.
-                }
-              </div>
+              @if (esCmp()) {
+                <!-- Un solo equipo: es el que se va a reparar. -->
+                <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
+                  @for (b of bienes(); track b.inventario) {
+                    <div class="form-check">
+                      <input class="form-check-input" type="radio" name="bienCmp"
+                             [id]="'bien-' + b.inventario" [disabled]="b.en_mantenimiento"
+                             [checked]="seleccion()[0] === b.inventario"
+                             (change)="elegirBienUnico(b.inventario)" />
+                      <label class="form-check-label small" [class.text-muted]="b.en_mantenimiento"
+                             [for]="'bien-' + b.inventario">
+                        <b>{{ b.inventario }}</b>
+                        @if (b.descripcion) {
+                          <span class="sub"> · {{ b.descripcion }}</span>
+                        }
+                        @if (b.en_mantenimiento) {
+                          <span class="chip chip-bandera ms-1">En atención</span>
+                        }
+                      </label>
+                    </div>
+                  }
+                </div>
+                <div class="form-text">
+                  @if (seleccion().length) {
+                    Equipo elegido: {{ contextoFinal() }}
+                  } @else {
+                    Elige el equipo que se va a reparar. Solo aparecen los que tienes asignados.
+                  }
+                </div>
+              } @else {
+                <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
+                <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
+                  @for (b of bienes(); track b.inventario) {
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" [id]="'bien-' + b.inventario"
+                             [checked]="seleccion().includes(b.inventario)"
+                             (change)="alternaBien(b.inventario)" />
+                      <label class="form-check-label small" [for]="'bien-' + b.inventario">
+                        <b>{{ b.inventario }}</b>
+                        @if (b.descripcion) {
+                          <span class="sub"> · {{ b.descripcion }}</span>
+                        }
+                      </label>
+                    </div>
+                  }
+                </div>
+                <div class="form-text" [class.text-danger]="excedeLargo()">
+                  @if (seleccion().length) {
+                    {{ seleccion().length }} bien(es) elegido(s): {{ contextoFinal() }}
+                  } @else {
+                    Marca los bienes que presentan la falla. Solo aparecen los que tienes bajo
+                    resguardo.
+                  }
+                </div>
+              }
             } @else {
               <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
                      [placeholder]="p.campo_adicional" />
