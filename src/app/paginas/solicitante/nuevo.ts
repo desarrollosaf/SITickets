@@ -59,6 +59,8 @@ export class Nuevo {
 
   /** true cuando el campo adicional del catalogo pide numero de inventario. */
   readonly esInventario = computed(() => esCampoInventario(this.problema()?.campo_adicional));
+  /** Equipo de computo: un solo equipo por ticket, sacado de una API distinta. */
+  readonly esCmp = computed(() => this.problema()?.servicio_clave === 'CMP');
 
   readonly bienes = signal<Bien[]>([]);
   readonly cargandoBienes = signal(false);
@@ -177,7 +179,8 @@ export class Nuevo {
   private cargaBienes() {
     this.bienesPedidos = true;
     this.cargandoBienes.set(true);
-    this.api.bienes().subscribe({
+    const peticion = this.esCmp() ? this.api.bienesCmp() : this.api.bienes();
+    peticion.subscribe({
       next: (r) => {
         this.cargandoBienes.set(false);
         this.bienes.set(r.bienes);
@@ -193,6 +196,11 @@ export class Nuevo {
         this.bienesPedidos = false;
       },
     });
+  }
+
+  /** Equipo de computo: se elige un solo equipo, el que se va a reparar. */
+  elegirBienUnico(inventario: string) {
+    this.seleccion.set([inventario]);
   }
 
   /** Multi-select: un mismo reporte puede abarcar varios bienes del resguardo. */

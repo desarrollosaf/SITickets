@@ -38,6 +38,13 @@ export class SUsuario extends Model {
 
   @Column(DataType.INTEGER)
   declare id_Dependencia: number | null;
+
+  /** Solo se leen para el dictamen de baja (§ EQUIPO DE COMPUTO); no se usan para nada mas. */
+  @Column(DataType.INTEGER)
+  declare id_Direccion: number | null;
+
+  @Column(DataType.INTEGER)
+  declare id_Departamento: number | null;
 }
 
 /** Catalogo de dependencias de saf. Solo se usa para emparejar por nombre con ticketsv2.dependencia. */
@@ -49,4 +56,29 @@ export class SDependencia extends Model {
 
   @Column(DataType.STRING(100))
   declare Nombre: string;
+}
+
+/** Solo para el dictamen de baja: nombre de la direccion del solicitante. */
+@Table({ tableName: 't_direccion', timestamps: false })
+export class SDireccion extends Model {
+  @PrimaryKey
+  @Column(DataType.INTEGER)
+  declare id_Direccion: number;
+
+  @Column(DataType.STRING(100))
+  declare Nombre: string;
+}
+
+/** Solo para el dictamen de baja: nombre del departamento del solicitante. */
+@Table({ tableName: 't_departamento', timestamps: false })
+export class SDepartamento extends Model {
+  @PrimaryKey
+  @Column(DataType.INTEGER)
+  declare id_Departamento: number;
+
+  @Column(DataType.STRING(100))
+  declare Nombre: string;
+
+  @Column(DataType.STRING(500))
+  declare nombre_completo: string | null;
 }

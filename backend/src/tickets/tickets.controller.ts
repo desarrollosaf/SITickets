@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,7 +8,11 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { TicketsService } from './tickets.service';
 import { RelojService } from './reloj.service';
 import { Roles } from '../common/roles.decorator';
@@ -24,6 +29,7 @@ import {
   RelojInicioDto,
   ResolverDto,
 } from './dto/tickets.dto';
+import { AtenderCmpDto } from './dto/atender-cmp.dto';
 
 @Controller('tickets')
 export class TicketsController {
@@ -55,6 +61,12 @@ export class TicketsController {
   @Get(':id')
   detalle(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.detalle(id, usuario);
+  }
+
+  /** Equipo de computo asignado al solicitante (solo servicio CMP). */
+  @Get(':id/bien')
+  bienDelTicket(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.bienDelTicket(id, usuario);
   }
 
   @Roles('solicitante', 'admin', 'operador', 'gestor')
@@ -116,6 +128,42 @@ export class TicketsController {
     @UsuarioActual() usuario: UsuarioToken,
   ) {
     return this.tickets.resolver(id, dto, usuario);
+  }
+
+  /**
+   * Cierre de tickets de Equipo de cómputo (CMP): reparado o dado de baja.
+   * Si es baja, el sistema genera el dictamen en pdf; las fotos son solo
+   * evidencia para el anexo fotografico del propio dictamen, por eso van a
+   * memoria (no se guardan sueltas en disco).
+   */
+  @HttpCode(200)
+  @Post(':id/atender-cmp')
+  @UseInterceptors(
+    FilesInterceptor('fotos', 12, {
+      storage: memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!['image/jpeg', 'image/png'].includes(file.mimetype)) {
+          return cb(new BadRequestException('Las fotos deben ser JPG o PNG'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  atenderCmp(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AtenderCmpDto,
+    @UploadedFiles() fotos: Express.Multer.File[] | undefined,
+    @UsuarioActual() usuario: UsuarioToken,
+  ) {
+    const archivos = (fotos ?? []).map((f) => ({ buffer: f.buffer, mimetype: f.mimetype }));
+    return this.tickets.atenderCmp(id, dto, archivos, usuario);
+  }
+
+  /** Descarga el dictamen de baja adjunto a un ticket CMP. */
+  @Get(':id/dictamen')
+  dictamen(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.dictamenDelTicket(id, usuario);
   }
 
   @HttpCode(200)

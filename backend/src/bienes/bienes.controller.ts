@@ -14,6 +14,12 @@ export class BienesController {
    */
   @Get('mios')
   mios(@UsuarioActual() usuario: UsuarioToken) {
-    return this.bienes.delUsuario(usuario.id);
+    return this.bienes.delUsuario(usuario);
+  }
+
+  /** Igual que /mios, pero para EQUIPO DE COMPUTO: un solo equipo, otra API. */
+  @Get('mios-cmp')
+  miosCmp(@UsuarioActual() usuario: UsuarioToken) {
+    return this.bienes.delUsuarioCmp(usuario);
   }
 }
