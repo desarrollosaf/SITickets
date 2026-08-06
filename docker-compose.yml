@@ -46,12 +46,17 @@ services:
       NODE_ENV: development
       PORT: 3050
       CHOKIDAR_USEPOLLING: "true"
+      # Puppeteer usa el Chromium del sistema (instalado via apk abajo) en vez
+      # de intentar descargar el suyo, que no corre bien en Alpine.
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
+      PUPPETEER_EXECUTABLE_PATH: "/usr/bin/chromium-browser"
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
     command: >
-      sh -c "npm install &&
+      sh -c "apk add --no-cache chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont &&
+      npm install &&
       npm run start:dev"
 
     restart: unless-stopped

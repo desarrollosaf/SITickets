@@ -4,6 +4,7 @@ import { API } from './api';
 import type {
   Agenda,
   BienesUsuario,
+  BienTicket,
   CandidatoSaf,
   Catalogos,
   Geo,
@@ -17,6 +18,7 @@ import type {
   Tablero,
   Tecnico,
   Ticket,
+  TicketAtendidoCmp,
   TicketDetalle,
 } from './modelos';
 
@@ -45,6 +47,11 @@ export class TicketsService {
 
   detalle(id: number) {
     return this.http.get<TicketDetalle>(`${API}/tickets/${id}`);
+  }
+
+  /** Equipo de computo elegido por el solicitante (solo servicio CMP). */
+  bienDelTicket(id: number) {
+    return this.http.get<BienTicket>(`${API}/tickets/${id}/bien`);
   }
 
   /* ---------------- alta ---------------- */
@@ -102,6 +109,42 @@ export class TicketsService {
   resolver(id: number, d: { diagnostico: string; solucion: string; refacciones?: string }) {
     return this.accion(id, 'resolver', d);
   }
+
+  /**
+   * Cierre de tickets de Equipo de cómputo: reparado o dado de baja. En baja
+   * el sistema genera el dictamen en pdf a partir de las observaciones y las
+   * fotos son solo evidencia para su anexo fotográfico.
+   */
+  atenderCmp(
+    id: number,
+    d: {
+      resultado: 'reparado' | 'baja';
+      diagnostico?: string;
+      solucion?: string;
+      refacciones?: string;
+      observaciones?: string;
+      fotos?: File[];
+    },
+  ) {
+    const form = new FormData();
+    form.set('resultado', d.resultado);
+    if (d.diagnostico) form.set('diagnostico', d.diagnostico);
+    if (d.solucion) form.set('solucion', d.solucion);
+    if (d.refacciones) form.set('refacciones', d.refacciones);
+    if (d.observaciones) form.set('observaciones', d.observaciones);
+    for (const foto of d.fotos ?? []) form.append('fotos', foto);
+    return this.http.post<TicketAtendidoCmp>(`${API}/tickets/${id}/atender-cmp`, form);
+  }
+
+  /** Descarga el dictamen de baja adjunto a un ticket CMP. */
+  descargarDictamen(id: number) {
+    return this.http.get(`${API}/tickets/${id}/dictamen`, { responseType: 'blob' });
+  }
+
+  /** Reescribe con IA la observación del técnico en formato técnico formal. */
+  mejorarObservaciones(texto: string) {
+    return this.http.post<{ texto: string }>(`${API}/ia/mejorar-observaciones`, { texto });
+  }
   validar(id: number) {
     return this.accion(id, 'validar');
   }
@@ -144,6 +187,10 @@ export class TicketsService {
   /** Resguardos del usuario de la sesion, para el campo «No. de inventario». */
   bienes() {
     return this.http.get<BienesUsuario>(`${API}/bienes/mios`);
+  }
+  /** Igual, pero para EQUIPO DE COMPUTO: un solo equipo, otra API. */
+  bienesCmp() {
+    return this.http.get<BienesUsuario>(`${API}/bienes/mios-cmp`);
   }
   tecnicos() {
     return this.http.get<Tecnico[]>(`${API}/catalogos/tecnicos`);

@@ -13,7 +13,7 @@ import {
   resumenUbicacion,
   ubicacionActual,
 } from '../core/formato';
-import type { Catalogos, Organizacion, Tecnico, TicketDetalle } from '../core/modelos';
+import type { BienTicket, Catalogos, Organizacion, Tecnico, TicketDetalle } from '../core/modelos';
 
 /** Formularios que puede desplegar el cajon. */
 type Formulario =
@@ -21,6 +21,7 @@ type Formulario =
   | 'datos'
   | 'espera'
   | 'resolver'
+  | 'atender-cmp'
   | 'cancelar'
   | 'rechazar'
   | 'reabrir'
@@ -57,8 +58,12 @@ export class DetalleTicket {
   readonly ticket = signal<TicketDetalle | null>(null);
   readonly cargando = signal(false);
   readonly error = signal('');
+  /** Equipo de computo elegido por el solicitante. Solo se pide para servicio CMP. */
+  readonly bienTicket = signal<BienTicket | null>(null);
   readonly formulario = signal<Formulario>(null);
   readonly ocupado = signal(false);
+  /** Aviso si SIASAF no respondio al avisar la asignacion temporal del equipo. */
+  readonly avisoCustodia = signal<string | null>(null);
 
   readonly motivosEspera = MOTIVOS_ESPERA;
   readonly dur = duracion;
@@ -91,6 +96,10 @@ export class DetalleTicket {
   problemaDestino = '';
   prioridadDestino = '';
   dejarEnEspera = true;
+  resultadoCmp: 'reparado' | 'baja' = 'reparado';
+  observacionesBaja = '';
+  fotosBaja: File[] = [];
+  readonly mejorandoRedaccion = signal(false);
 
   constructor() {
     effect(() => {
@@ -122,6 +131,8 @@ export class DetalleTicket {
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),
   );
   readonly relojCorriendo = computed(() => this.ticket()?.sesiones.some((s) => !s.fin) ?? false);
+  /** Equipo de computo: "Atender ticket" reemplaza a "Marcar resuelto". */
+  readonly esCmpTicket = computed(() => this.ticket()?.servicio_clave === 'CMP');
 
   /** Avance contra el objetivo de resolucion, tope 100 %. */
   readonly avance = computed(() => {
@@ -154,10 +165,14 @@ export class DetalleTicket {
   private recargar(id: number) {
     this.cargando.set(true);
     this.error.set('');
+    this.bienTicket.set(null);
     this.api.detalle(id).subscribe({
       next: (t) => {
         this.ticket.set(t);
         this.cargando.set(false);
+        if (t.servicio_clave === 'CMP') {
+          this.api.bienDelTicket(id).subscribe({ next: (b) => this.bienTicket.set(b) });
+        }
       },
       error: (e) => {
         this.error.set(mensajeError(e));
@@ -176,7 +191,11 @@ export class DetalleTicket {
     this.problemaDestino = '';
     this.prioridadDestino = this.ticket()?.prioridad ?? '';
     this.dejarEnEspera = true;
+    this.resultadoCmp = 'reparado';
+    this.observacionesBaja = '';
+    this.fotosBaja = [];
     this.error.set('');
+    this.avisoCustodia.set(null);
     this.formulario.set(f);
   }
 
@@ -295,6 +314,90 @@ export class DetalleTicket {
         refacciones: this.refacciones || undefined,
       })
       .subscribe({ next: (t) => this.aplicar(t), error: (e) => this.falla(e) });
+  }
+
+  /* ---------------- Equipo de computo (CMP) ---------------- */
+
+  /**
+   * "Atender ticket": si el reloj no esta corriendo lo arranca primero (no
+   * hace falta que el tecnico lo inicie a mano antes) y hasta entonces abre
+   * el formulario de cierre.
+   */
+  async abrirAtenderCmp() {
+    if (this.relojCorriendo()) {
+      this.abrirFormulario('atender-cmp');
+      return;
+    }
+    this.ocupado.set(true);
+    const geo = await ubicacionActual();
+    this.api.relojInicio(this.id(), geo).subscribe({
+      next: (t) => {
+        this.aplicar(t);
+        this.abrirFormulario('atender-cmp');
+      },
+      error: (e) => this.falla(e),
+    });
+  }
+
+  /** Fotos evidencia para el anexo fotografico del dictamen; se acumulan entre selecciones. */
+  onFotosSeleccionadas(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.fotosBaja = [...this.fotosBaja, ...Array.from(input.files ?? [])];
+    input.value = '';
+  }
+
+  quitarFotoBaja(i: number) {
+    this.fotosBaja = this.fotosBaja.filter((_, idx) => idx !== i);
+  }
+
+  /** Reescribe con IA lo que el técnico ya escribió; el resultado sigue siendo editable. */
+  mejorarRedaccion() {
+    const texto = this.observacionesBaja.trim();
+    if (texto.length < 10 || this.mejorandoRedaccion()) return;
+    this.mejorandoRedaccion.set(true);
+    this.error.set('');
+    this.api.mejorarObservaciones(texto).subscribe({
+      next: (r) => {
+        this.observacionesBaja = r.texto;
+        this.mejorandoRedaccion.set(false);
+      },
+      error: (e) => {
+        this.mejorandoRedaccion.set(false);
+        this.error.set(mensajeError(e));
+      },
+    });
+  }
+
+  enviarAtenderCmp() {
+    this.ocupado.set(true);
+    this.api
+      .atenderCmp(this.id(), {
+        resultado: this.resultadoCmp,
+        diagnostico: this.resultadoCmp === 'reparado' ? this.diagnostico : undefined,
+        solucion: this.resultadoCmp === 'reparado' ? this.solucion : undefined,
+        refacciones: this.resultadoCmp === 'reparado' ? this.refacciones || undefined : undefined,
+        observaciones: this.resultadoCmp === 'baja' ? this.observacionesBaja : undefined,
+        fotos: this.resultadoCmp === 'baja' ? this.fotosBaja : undefined,
+      })
+      .subscribe({
+        next: (t) => {
+          this.avisoCustodia.set(t.aviso_custodia);
+          this.aplicar(t);
+        },
+        error: (e) => this.falla(e),
+      });
+  }
+
+  /** Abre el dictamen en una pestaña nueva. */
+  descargarDictamen() {
+    this.api.descargarDictamen(this.id()).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
   }
 
   enviarCancelar() {

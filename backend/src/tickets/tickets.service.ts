@@ -3,10 +3,13 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  StreamableFile,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize } from 'sequelize';
+import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   Area,
   CatalogoProblema,
@@ -15,6 +18,8 @@ import {
   ESTATUS_FINALES,
   EstatusClave,
   SDependencia,
+  SDepartamento,
+  SDireccion,
   Sede,
   Servicio,
   SUsuario,
@@ -26,6 +31,8 @@ import {
 } from '../database/models';
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
+import { BienesService } from '../bienes/bienes.service';
+import { DictamenService } from './dictamen.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
@@ -37,6 +44,15 @@ import {
   ReclasificarDto,
   ResolverDto,
 } from './dto/tickets.dto';
+import { AtenderCmpDto } from './dto/atender-cmp.dto';
+
+/**
+ * Carpeta donde se guardan los dictamenes de baja (pdf). Vive dentro de
+ * storage/ porque en produccion (docker-compose.prod.yml) es la unica
+ * carpeta que se monta como volumen persistente; uploads/ se hubiera
+ * perdido en cada redeploy.
+ */
+export const CARPETA_DICTAMENES = join(process.cwd(), 'storage', 'dictamenes');
 
 /** Roles que atienden tickets y por tanto ven solo lo que traen turnado. */
 const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe'];
@@ -66,9 +82,13 @@ export class TicketsService {
     @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
+    @InjectModel(SDireccion, 'saf') private readonly sDirecciones: typeof SDireccion,
+    @InjectModel(SDepartamento, 'saf') private readonly sDepartamentos: typeof SDepartamento,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
     private readonly config: ConfigService,
+    private readonly bienesSrv: BienesService,
+    private readonly dictamenSrv: DictamenService,
   ) {}
 
   /* ==================================================================
@@ -246,6 +266,9 @@ export class TicketsService {
       /** Solo trae valor cuando alguien registro el ticket a nombre de otro. */
       registrado_por: t.registrado_por,
       registrado_por_nombre: t.registrado_por_nombre,
+      /** Solo aplica a servicio CMP: como termino la atencion del equipo. */
+      resultado_cmp: t.resultado_cmp,
+      tiene_dictamen: !!t.dictamen_url,
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
       /* Los ids los usa el formulario de correccion para preseleccionar. */
@@ -723,6 +746,78 @@ export class TicketsService {
     return t;
   }
 
+  /**
+   * rfc de quien solicito el ticket. solicitante_id no vive siempre en el
+   * mismo espacio de ids (ver comentario en el modelo Ticket): primero se
+   * busca como usuario.id local; si no hay fila ahi, se asume que es un
+   * id_Usuario de saf.s_usuario (externo o registrado "a nombre de otro").
+   */
+  private async rfcDelSolicitante(solicitanteId: number): Promise<string | null> {
+    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
+    if (local?.rfc) return local.rfc;
+    const externo = await this.sUsuarios.findByPk(solicitanteId);
+    return externo?.N_Usuario ?? null;
+  }
+
+  /**
+   * Dependencia/direccion/departamento del solicitante, solo para el
+   * dictamen de baja (§ EQUIPO DE COMPUTO): se resuelven al momento desde
+   * saf, no se guardan en ticketsv2. Mismo criterio dual que
+   * rfcDelSolicitante: primero usuario local (por su rfc), si no existe se
+   * asume que solicitante_id ya es un id_Usuario de saf.
+   */
+  private async datosOrganizacionalesDelSolicitante(solicitanteId: number): Promise<{
+    dependencia: string | null;
+    direccion: string | null;
+    departamento: string | null;
+  }> {
+    const vacio = { dependencia: null, direccion: null, departamento: null };
+
+    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
+    const sUsuario = local?.rfc
+      ? await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } })
+      : await this.sUsuarios.findByPk(solicitanteId);
+    if (!sUsuario) return vacio;
+
+    const [dep, dir, depto] = await Promise.all([
+      sUsuario.id_Dependencia ? this.sDependencias.findByPk(sUsuario.id_Dependencia) : null,
+      sUsuario.id_Direccion ? this.sDirecciones.findByPk(sUsuario.id_Direccion) : null,
+      sUsuario.id_Departamento ? this.sDepartamentos.findByPk(sUsuario.id_Departamento) : null,
+    ]);
+    return {
+      dependencia: dep?.Nombre?.trim() ?? null,
+      direccion: dir?.Nombre?.trim() ?? null,
+      departamento: (depto?.nombre_completo ?? depto?.Nombre)?.trim() ?? null,
+    };
+  }
+
+  /**
+   * Equipo de computo asignado al solicitante del ticket, para que el tecnico
+   * sepa exactamente cual reparar. Solo aplica a servicio CMP; para el resto
+   * el numero de inventario ya se ve como texto plano en el detalle.
+   */
+  async bienDelTicket(id: number, usuario: UsuarioToken) {
+    const t = await this.cargar(id, usuario);
+    if (t.servicio?.clave !== 'CMP') {
+      return { bien: null, motivo: 'Este ticket no es de Equipo de cómputo.' };
+    }
+    if (!t.contexto) {
+      return { bien: null, motivo: 'El ticket no tiene un número de inventario capturado.' };
+    }
+
+    const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+    if (!rfc) {
+      return { bien: null, motivo: 'No se pudo identificar el RFC del solicitante.' };
+    }
+
+    const { bienes, motivo } = await this.bienesSrv.porRfcCmp(rfc);
+    const encontrado = bienes.find((b) => b.inventario === t.contexto) ?? null;
+    return {
+      bien: encontrado,
+      motivo: encontrado ? null : (motivo ?? 'Ese número de inventario ya no aparece en el sistema.'),
+    };
+  }
+
   private esTecnicoDe(t: Ticket, usuario: UsuarioToken): boolean {
     return t.tecnico_id === usuario.id;
   }
@@ -754,6 +849,34 @@ export class TicketsService {
     await t.update({ estatus: ESTATUS.EN_ATENCION, f_inicio: t.f_inicio ?? new Date() });
     await this.reglas.anota(t.id, usuario.id, 'Inicio de atencion');
     this.traza.registra('§5', `${t.folio} pasa a EN ATENCION. Se detiene el reloj de primera respuesta.`);
+
+    /*
+     * Equipo de computo: desde que el tecnico empieza a atender, el equipo
+     * queda "en mantenimiento" en el sistema de bienes — asi nadie mas lo
+     * puede elegir al registrar un nuevo ticket mientras se esta revisando.
+     * Se libera al cerrar el ticket (atenderCmp/finalizarMantenimiento).
+     * Best-effort: si falla, el ticket igual avanza.
+     */
+    if (t.servicio?.clave === 'CMP' && t.contexto) {
+      const [tecnicoLocal, rfcSolicitante] = await Promise.all([
+        this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
+        this.rfcDelSolicitante(t.solicitante_id),
+      ]);
+      if (tecnicoLocal?.rfc && rfcSolicitante) {
+        const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
+        const bien = bienes.find((b) => b.inventario === t.contexto);
+        if (bien?.id) {
+          const inicio = await this.bienesSrv.iniciarMantenimiento(bien.id, tecnicoLocal.rfc);
+          if (!inicio.ok) {
+            this.traza.registra(
+              '§5',
+              `${t.folio}: no se pudo marcar el equipo en mantenimiento (${inicio.motivo}).`,
+            );
+          }
+        }
+      }
+    }
+
     return this.detalle(id, usuario);
   }
 
@@ -840,6 +963,152 @@ export class TicketsService {
         `${activo <= objetivo ? 'dentro de tiempo' : 'FUERA DE TIEMPO'}. Notificado al solicitante.`,
     );
     return this.detalle(id, usuario);
+  }
+
+  /* ------------------------------------------------------------------
+     Atencion de EQUIPO DE COMPUTO (CMP): reemplaza a resolver() para este
+     servicio. El tecnico declara si reparo el equipo (mismos campos de
+     siempre) o si lo dio de baja; en ese caso el sistema mismo genera el
+     dictamen tecnico en pdf a partir de las observaciones y fotos que
+     capture. Al cerrar, se avisa a SIASAF que el bien queda asignado
+     temporalmente al tecnico.
+     ------------------------------------------------------------------ */
+
+  async atenderCmp(
+    id: number,
+    dto: AtenderCmpDto,
+    fotos: { buffer: Buffer; mimetype: string }[],
+    usuario: UsuarioToken,
+  ) {
+    const t = await this.cargar(id, usuario);
+    this.exigeTecnico(t, usuario);
+    this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.EN_ESPERA, ESTATUS.ASIGNADO]);
+
+    if (t.servicio?.clave !== 'CMP') {
+      throw new BadRequestException('Esta accion solo aplica a tickets de Equipo de cómputo');
+    }
+    if (dto.resultado === 'baja' && !dto.observaciones?.trim()) {
+      throw new BadRequestException('Captura las observaciones para generar el dictamen de baja');
+    }
+
+    /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
+    const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
+    if (!sesionAbierta) {
+      throw new BadRequestException('Inicia el reloj antes de atender el ticket');
+    }
+
+    const reparado = dto.resultado === 'reparado';
+
+    /*
+     * Cierre del mantenimiento: el "entra a mantenimiento" ya paso en
+     * iniciar(), cuando el tecnico empezo a atender. El equipo siempre
+     * regresa a quien levanto el ticket, sea cual sea el resultado — el
+     * traspaso a almacen y el cierre formal de la baja los genera despues,
+     * aparte, el area de bienes con el dictamen como respaldo. Best-effort —
+     * si algo falla, el ticket igual se finaliza en SITickets; el aviso se
+     * regresa en la respuesta para que el tecnico sepa que debe avisar al
+     * área.
+     */
+    let avisoCustodia: string | null = null;
+    let bienId: number | null = null;
+    if (t.contexto) {
+      const rfcSolicitante = await this.rfcDelSolicitante(t.solicitante_id);
+      if (rfcSolicitante) {
+        const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
+        const bien = bienes.find((b) => b.inventario === t.contexto);
+        bienId = bien?.id ?? null;
+        if (bien?.id) {
+          const cierre = await this.bienesSrv.finalizarMantenimiento(bien.id);
+          if (!cierre.ok) avisoCustodia = cierre.motivo;
+        } else {
+          avisoCustodia = 'No se encontró el equipo en SIASAF para avisar la asignación temporal.';
+        }
+      }
+    }
+
+    /* Dado de baja: el sistema genera el dictamen tecnico en pdf. */
+    let dictamenArchivo: string | null = null;
+    if (!reparado) {
+      const [detalleBien, org] = await Promise.all([
+        bienId ? this.bienesSrv.detalleBien(bienId) : null,
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+      ]);
+
+      const pdf = await this.dictamenSrv.generar({
+        folio: t.folio,
+        solicitanteNombre: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
+        dependencia: org.dependencia,
+        direccion: org.direccion,
+        departamento: org.departamento,
+        servicioNombre: t.servicio?.nombre ?? '—',
+        bien: detalleBien ?? {
+          numero_inventario: t.contexto ?? '—',
+          nombre_bien: '—',
+          material: null,
+          marca: null,
+          modelo: null,
+        },
+        observaciones: dto.observaciones!.trim(),
+        tecnicoNombre: usuario.nombre,
+        fotos,
+      });
+
+      if (!existsSync(CARPETA_DICTAMENES)) mkdirSync(CARPETA_DICTAMENES, { recursive: true });
+      dictamenArchivo = `ticket-${id}-${Date.now()}.pdf`;
+      writeFileSync(join(CARPETA_DICTAMENES, dictamenArchivo), pdf);
+    }
+
+    /* Al resolver se cierra la sesion de reloj que seguia corriendo. */
+    await this.sesiones.update(
+      { fin: new Date(), motivo: 'Servicio concluido' },
+      { where: { ticket_id: t.id, fin: null } },
+    );
+
+    await t.update({
+      estatus: ESTATUS.RESUELTO,
+      f_resolucion: new Date(),
+      f_espera_desde: null,
+      resultado_cmp: dto.resultado,
+      diagnostico: reparado ? dto.diagnostico : null,
+      solucion: reparado ? dto.solucion : null,
+      refacciones: reparado ? dto.refacciones?.trim() || 'Ninguna' : null,
+      dictamen_url: reparado ? null : dictamenArchivo,
+    });
+
+    await this.reglas.anota(
+      t.id,
+      usuario.id,
+      'Resuelto',
+      reparado
+        ? `${dto.diagnostico} → ${dto.solucion}`
+        : 'Equipo dado de baja · dictamen generado',
+    );
+
+    const objetivos = await this.reglas.objetivos();
+    const objetivo = objetivos.get(t.prioridad) ?? 1440;
+    const activo = ReglasService.minutosActivos(t);
+    this.traza.registra(
+      '§10',
+      `${t.folio} ${reparado ? 'reparado' : 'dado de baja'} en ${activo} min (objetivo ${objetivo} min) · ` +
+        `${activo <= objetivo ? 'dentro de tiempo' : 'FUERA DE TIEMPO'}.`,
+    );
+
+    const detalle = await this.detalle(id, usuario);
+    return { ...detalle, aviso_custodia: avisoCustodia };
+  }
+
+  /** Descarga el dictamen de baja de un ticket CMP, si tiene. */
+  async dictamenDelTicket(id: number, usuario: UsuarioToken): Promise<StreamableFile> {
+    const t = await this.cargar(id, usuario);
+    if (!t.dictamen_url) throw new NotFoundException('Este ticket no tiene dictamen adjunto');
+
+    const ruta = join(CARPETA_DICTAMENES, t.dictamen_url);
+    if (!existsSync(ruta)) throw new NotFoundException('El dictamen ya no está disponible');
+
+    return new StreamableFile(createReadStream(ruta), {
+      type: 'application/pdf',
+      disposition: `inline; filename="${t.folio.replace(/\//g, '-')}-dictamen.pdf"`,
+    });
   }
 
   async validar(id: number, usuario: UsuarioToken) {

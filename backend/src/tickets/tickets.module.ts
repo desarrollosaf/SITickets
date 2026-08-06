@@ -8,6 +8,8 @@ import {
   FolioSerie,
   Prioridad,
   SDependencia,
+  SDepartamento,
+  SDireccion,
   Sede,
   Servicio,
   SUsuario,
@@ -23,6 +25,8 @@ import { TicketsService } from './tickets.service';
 import { RelojService } from './reloj.service';
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
+import { DictamenService } from './dictamen.service';
+import { BienesModule } from '../bienes/bienes.module';
 
 @Module({
   imports: [
@@ -42,10 +46,11 @@ import { TrazaService } from './traza.service';
       FolioSerie,
       Prioridad,
     ]),
-    SequelizeModule.forFeature([SUsuario, SDependencia], 'saf'),
+    SequelizeModule.forFeature([SUsuario, SDependencia, SDireccion, SDepartamento], 'saf'),
+    BienesModule,
   ],
   controllers: [TicketsController],
-  providers: [TicketsService, RelojService, ReglasService, TrazaService],
+  providers: [TicketsService, RelojService, ReglasService, TrazaService, DictamenService],
   exports: [TicketsService, ReglasService, TrazaService, SequelizeModule],
 })
 export class TicketsModule {}

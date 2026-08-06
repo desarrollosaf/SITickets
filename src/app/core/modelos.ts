@@ -55,6 +55,9 @@ export interface Ticket {
   /** Solo trae valor cuando un admin/gestor registro el ticket a nombre de otro. */
   registrado_por: number | null;
   registrado_por_nombre: string | null;
+  /** Solo aplica a servicio CMP: como termino la atencion del equipo. */
+  resultado_cmp: 'reparado' | 'baja' | null;
+  tiene_dictamen: boolean;
   dependencia: string;
   area: string;
   dependencia_id: number | null;
@@ -122,6 +125,12 @@ export interface TicketDetalle extends Omit<Ticket, 'sesiones'> {
   min_campo: number;
   equipo: { usuario_id: number; nombre: string; papel: 'responsable' | 'apoyo' }[];
   bitacora: LineaBitacora[];
+}
+
+/** Respuesta de atender-cmp: el detalle del ticket, mas el aviso de la asignacion a SIASAF. */
+export interface TicketAtendidoCmp extends TicketDetalle {
+  /** null si la asignacion temporal en SIASAF salio bien (o no aplicaba). */
+  aviso_custodia: string | null;
 }
 
 export interface Problema {
@@ -192,11 +201,19 @@ export interface Catalogos {
 export interface Bien {
   inventario: string;
   descripcion: string | null;
+  /** true si un tecnico lo trae en este momento: no se puede elegir de nuevo. */
+  en_mantenimiento: boolean;
 }
 
 export interface BienesUsuario {
   bienes: Bien[];
   /** Por que no hay lista: sin RFC, servicio caido… null si la consulta salio bien. */
+  motivo: string | null;
+}
+
+/** Equipo de computo asignado al solicitante de un ticket (solo servicio CMP). */
+export interface BienTicket {
+  bien: Bien | null;
   motivo: string | null;
 }
 
