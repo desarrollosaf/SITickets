@@ -1,7 +1,17 @@
+import { setDefaultResultOrder } from 'node:dns';
 import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+
+/*
+ * fetch() (undici) intenta conectar por IPv6 primero y, si esa ruta no
+ * responde bien en la red del servidor, se cuelga varios segundos antes de
+ * caer a IPv4 — a diferencia de curl, que hace ese fallback casi al
+ * instante. Esto es lo que causaba los "aborted due to timeout" al consultar
+ * SIASAF aunque un curl directo respondiera de inmediato.
+ */
+setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
