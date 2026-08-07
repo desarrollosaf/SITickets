@@ -850,34 +850,37 @@ export class TicketsService {
     await this.reglas.anota(t.id, usuario.id, 'Inicio de atencion');
     this.traza.registra('§5', `${t.folio} pasa a EN ATENCION. Se detiene el reloj de primera respuesta.`);
 
-    /*
-     * Equipo de computo: desde que el tecnico empieza a atender, el equipo
-     * queda "en mantenimiento" en el sistema de bienes — asi nadie mas lo
-     * puede elegir al registrar un nuevo ticket mientras se esta revisando.
-     * Se libera al cerrar el ticket (atenderCmp/finalizarMantenimiento).
-     * Best-effort: si falla, el ticket igual avanza.
-     */
-    if (t.servicio?.clave === 'CMP' && t.contexto) {
-      const [tecnicoLocal, rfcSolicitante] = await Promise.all([
-        this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
-        this.rfcDelSolicitante(t.solicitante_id),
-      ]);
-      if (tecnicoLocal?.rfc && rfcSolicitante) {
-        const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
-        const bien = bienes.find((b) => b.inventario === t.contexto);
-        if (bien?.id) {
-          const inicio = await this.bienesSrv.iniciarMantenimiento(bien.id, tecnicoLocal.rfc);
-          if (!inicio.ok) {
-            this.traza.registra(
-              '§5',
-              `${t.folio}: no se pudo marcar el equipo en mantenimiento (${inicio.motivo}).`,
-            );
-          }
-        }
-      }
-    }
+    await this.marcarCmpEnMantenimiento(t, usuario);
 
     return this.detalle(id, usuario);
+  }
+
+  /**
+   * Equipo de computo: desde que el tecnico empieza a atender (sea por
+   * iniciar() o porque RelojService arranca el reloj y pasa el ticket a EN
+   * ATENCION de una vez), el equipo queda "en mantenimiento" en el sistema
+   * de bienes — asi nadie mas lo puede elegir al registrar un nuevo ticket
+   * mientras se esta revisando. Se libera al cerrar el ticket
+   * (atenderCmp/finalizarMantenimiento). Best-effort: si falla, el ticket
+   * igual avanza. `t.servicio` debe venir cargado (ver cargar()).
+   */
+  async marcarCmpEnMantenimiento(t: Ticket, usuario: UsuarioToken): Promise<void> {
+    if (t.servicio?.clave !== 'CMP' || !t.contexto) return;
+
+    const [tecnicoLocal, rfcSolicitante] = await Promise.all([
+      this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
+      this.rfcDelSolicitante(t.solicitante_id),
+    ]);
+    if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
+
+    const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
+    const bien = bienes.find((b) => b.inventario === t.contexto);
+    if (!bien?.id) return;
+
+    const inicio = await this.bienesSrv.iniciarMantenimiento(bien.id, tecnicoLocal.rfc);
+    if (!inicio.ok) {
+      this.traza.registra('§5', `${t.folio}: no se pudo marcar el equipo en mantenimiento (${inicio.motivo}).`);
+    }
   }
 
   async ponerEnEspera(id: number, motivo: string, usuario: UsuarioToken) {
@@ -1012,13 +1015,19 @@ export class TicketsService {
     let avisoCustodia: string | null = null;
     let bienId: number | null = null;
     if (t.contexto) {
-      const rfcSolicitante = await this.rfcDelSolicitante(t.solicitante_id);
+      const [tecnicoLocal, rfcSolicitante] = await Promise.all([
+        this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
+        this.rfcDelSolicitante(t.solicitante_id),
+      ]);
       if (rfcSolicitante) {
         const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
         const bien = bienes.find((b) => b.inventario === t.contexto);
         bienId = bien?.id ?? null;
-        if (bien?.id) {
-          const cierre = await this.bienesSrv.finalizarMantenimiento(bien.id);
+        if (bien?.id && tecnicoLocal?.rfc) {
+          const cierre = await this.bienesSrv.finalizarMantenimiento(bien.id, tecnicoLocal.rfc, {
+            reparado,
+            observaciones: !reparado ? dto.observaciones!.trim() : undefined,
+          });
           if (!cierre.ok) avisoCustodia = cierre.motivo;
         } else {
           avisoCustodia = 'No se encontró el equipo en SIASAF para avisar la asignación temporal.';

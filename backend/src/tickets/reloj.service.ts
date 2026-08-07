@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize, Transaction } from 'sequelize';
-import { ESTATUS, Sede, Ticket, TicketSesion } from '../database/models';
+import { ESTATUS, Sede, Servicio, Ticket, TicketSesion } from '../database/models';
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import { TicketsService } from './tickets.service';
@@ -60,6 +60,11 @@ export class RelojService {
     if ([ESTATUS.CERRADO, ESTATUS.CANCELADO, ESTATUS.RESUELTO].includes(t.estatus as never)) {
       throw new BadRequestException('El ticket ya no admite salidas a sitio');
     }
+    /* Primera vez que se atiende: si el ticket pasa por aqui en vez de por
+       TicketsService.iniciar() (el boton "Atender ticket" arranca el reloj
+       solo si no estaba corriendo), el aviso a bienes de todos modos tiene
+       que salir. */
+    const primeraAtencion = t.estatus === ESTATUS.ASIGNADO;
 
     const geo = geoDe(dto);
 
@@ -131,6 +136,15 @@ export class RelojService {
       );
       this.traza.registra('§16', `Reloj activo en ${t.folio} · ${usuario.nombre}. ${ubic.texto}`);
     });
+
+    /* Fuera de la transaccion: implica una llamada HTTP a SIASAF, no debe
+       tener una conexion de base de datos detenida esperandola. */
+    if (primeraAtencion) {
+      const conServicio = await this.tickets.findByPk(t.id, {
+        include: [{ model: Servicio, as: 'servicio' }],
+      });
+      if (conServicio) await this.ticketsSrv.marcarCmpEnMantenimiento(conServicio, usuario);
+    }
 
     return this.ticketsSrv.detalle(id, usuario);
   }
