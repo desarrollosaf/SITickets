@@ -113,7 +113,7 @@ export class BienesService {
   }
 
   private esperaMs(): number {
-    return Number(this.config.get('BIENES_API_TIMEOUT_MS', 6000));
+    return Number(this.config.get('BIENES_API_TIMEOUT_MS', 15000));
   }
 
   /**
