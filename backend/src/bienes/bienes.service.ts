@@ -1,12 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/sequelize';
-import {
-  BienMueble,
-  ServidorBien,
-  SUsuario,
-  Usuario,
-} from '../database/models';
+import { SUsuario, Usuario } from '../database/models';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 export interface Bien {
@@ -35,27 +30,28 @@ export interface RespuestaBienes {
 const URL_POR_OMISION = 'https://siasaf.gob.mx/bienes/api/getbienes';
 
 /**
- * Ruta del sistema de bienes para EQUIPO DE COMPUTO. Se le pega /{rfc}/1 al
- * consultar (el 1 filtra por el tipo de bien "computo" del lado de SIASAF).
+ * API real de SIASAF para el servicio EQUIPO DE COMPUTO (CMP): consulta de
+ * resguardo, movimiento de mantenimiento y ficha tecnica de un bien. Mismos
+ * tres endpoints que usa el sistema anterior (TicketController::getBienes,
+ * TicketTecnicoController::atenderTecnico/finalizarTecnico).
  */
-const URL_CMP_POR_OMISION = 'https://siasaf.gob.mx/bienes/api/bienes';
+const BASE_CMP_POR_OMISION = 'https://siasaf.gob.mx/bienes/api';
+
+/** Tipo de bien = Equipo de computo (bien_muebles.tipo_bien_id / segmento de la URL de consulta). */
+const TIPO_SERVICIO_CMP = 1;
 
 /**
- * Catalogo `bienes.estatus_biens` (1=Asignado, 2=Mantenimiento, 3=Baja,
- * 4=Baja definitiva). Mismos valores y mismo flujo que usa el metodo real
- * `solicitudMantenimiento` del sistema de bienes (SIASAF): al entrar a
- * mantenimiento el resguardo activo y el del tecnico quedan ambos en
- * ESTATUS_MANTENIMIENTO; al cerrar, uno de los dos regresa a ESTATUS_ASIGNADO
- * (el original si se reparo, uno de los rfc de "almacen de bajas" si no) y el
- * otro pasa a ESTATUS_BAJA.
+ * Catalogo `bienes.estatus_biens` (1=Asignado, 2=Mantenimiento, 3=Baja). Solo
+ * se usa aqui para leer el estatus que ya trae la respuesta de SIASAF y
+ * decidir `en_mantenimiento`; el movimiento en si (quien queda con el bien)
+ * lo resuelve el propio SIASAF al recibir tipo_movimiento.
  */
-const ESTATUS_ASIGNADO = 1;
 const ESTATUS_MANTENIMIENTO = 2;
-const ESTATUS_BAJA = 3;
 
 /**
- * El padron de bienes cambia por resguardos, no por minuto. Cinco minutos de
- * cache evitan una llamada a SIASAF cada vez que alguien abre el formulario.
+ * El padron de bienes (servicio generico, no CMP) cambia por resguardos, no
+ * por minuto. Cinco minutos de cache evitan una llamada a SIASAF cada vez
+ * que alguien abre el formulario.
  */
 const VIGENCIA_CACHE_MS = 5 * 60_000;
 
@@ -75,13 +71,7 @@ const LLAVES_INVENTARIO = [
   'no_inv',
   'clave',
 ];
-const LLAVES_DESCRIPCION = [
-  'descripcion',
-  'descripcion_bien',
-  'bien',
-  'nombre',
-  'articulo',
-];
+const LLAVES_DESCRIPCION = ['descripcion', 'descripcion_bien', 'bien', 'nombre', 'articulo'];
 
 /** La respuesta puede venir como arreglo suelto o envuelta en un objeto. */
 function aLista(cuerpo: unknown): Record<string, unknown>[] {
@@ -98,10 +88,7 @@ function aLista(cuerpo: unknown): Record<string, unknown>[] {
   return [];
 }
 
-function primerTexto(
-  fila: Record<string, unknown>,
-  llaves: string[],
-): string | null {
+function primerTexto(fila: Record<string, unknown>, llaves: string[]): string | null {
   for (const llave of llaves) {
     const v = fila[llave];
     if (typeof v === 'string' && v.trim()) return v.trim();
@@ -119,11 +106,15 @@ export class BienesService {
     private readonly config: ConfigService,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
-    @InjectModel(ServidorBien, 'bienes')
-    private readonly servidorBienes: typeof ServidorBien,
-    @InjectModel(BienMueble, 'bienes')
-    private readonly bienMuebles: typeof BienMueble,
   ) {}
+
+  private baseCmp(): string {
+    return this.config.get<string>('BIENES_API_BASE_URL', BASE_CMP_POR_OMISION).replace(/\/+$/, '');
+  }
+
+  private esperaMs(): number {
+    return Number(this.config.get('BIENES_API_TIMEOUT_MS', 6000));
+  }
 
   /**
    * rfc de la sesion. Si es un usuario local (staff, o solicitante ya
@@ -133,9 +124,7 @@ export class BienesService {
    */
   private async rfcDe(usuario: UsuarioToken): Promise<string | null> {
     if (!usuario.externo) {
-      const local = await this.usuarios.findByPk(usuario.id, {
-        attributes: ['rfc'],
-      });
+      const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
       return local?.rfc ?? null;
     }
     const sUsuario = await this.sUsuarios.findByPk(usuario.id);
@@ -153,32 +142,20 @@ export class BienesService {
     if (!rfc) {
       return {
         bienes: [],
-        motivo:
-          'Tu cuenta no tiene RFC registrado, asi que no se pueden consultar tus resguardos.',
+        motivo: 'Tu cuenta no tiene RFC registrado, asi que no se pueden consultar tus resguardos.',
       };
     }
     if (!RE_RFC.test(rfc)) {
-      this.log.warn(
-        `RFC con formato invalido en el usuario ${usuarioToken.id}: no se consulta.`,
-      );
-      return {
-        bienes: [],
-        motivo: 'El RFC registrado en tu cuenta no tiene un formato valido.',
-      };
+      this.log.warn(`RFC con formato invalido en el usuario ${usuarioToken.id}: no se consulta.`);
+      return { bienes: [], motivo: 'El RFC registrado en tu cuenta no tiene un formato valido.' };
     }
 
     const enCache = this.cache.get(rfc);
-    if (enCache && enCache.hasta > Date.now())
-      return { bienes: enCache.bienes, motivo: null };
+    if (enCache && enCache.hasta > Date.now()) return { bienes: enCache.bienes, motivo: null };
 
-    const base = this.config
-      .get<string>('BIENES_API_URL', URL_POR_OMISION)
-      .trim();
+    const base = this.config.get<string>('BIENES_API_URL', URL_POR_OMISION).trim();
     if (!base) {
-      return {
-        bienes: [],
-        motivo: 'La consulta al sistema de bienes no esta configurada.',
-      };
+      return { bienes: [], motivo: 'La consulta al sistema de bienes no esta configurada.' };
     }
 
     try {
@@ -187,13 +164,10 @@ export class BienesService {
       return { bienes, motivo: null };
     } catch (e) {
       /* El detalle se queda en el log: al solicitante no le sirve de nada. */
-      this.log.warn(
-        `No se pudo consultar bienes de ${rfc}: ${(e as Error).message}`,
-      );
+      this.log.warn(`No se pudo consultar bienes de ${rfc}: ${(e as Error).message}`);
       return {
         bienes: [],
-        motivo:
-          'El sistema de bienes no respondio. Captura el numero de inventario a mano.',
+        motivo: 'El sistema de bienes no respondio. Captura el numero de inventario a mano.',
       };
     }
   }
@@ -201,14 +175,13 @@ export class BienesService {
   private async consulta(base: string, rfc: string): Promise<Bien[]> {
     const url = `${base.replace(/\/+$/, '')}/${encodeURIComponent(rfc)}`;
     const token = this.config.get<string>('BIENES_API_TOKEN');
-    const espera = Number(this.config.get('BIENES_API_TIMEOUT_MS', 6000));
 
     const respuesta = await fetch(url, {
       headers: {
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      signal: AbortSignal.timeout(espera),
+      signal: AbortSignal.timeout(this.esperaMs()),
     });
     if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
 
@@ -241,8 +214,7 @@ export class BienesService {
     if (!rfc) {
       return {
         bienes: [],
-        motivo:
-          'Tu cuenta no tiene RFC registrado, asi que no se puede consultar tu equipo.',
+        motivo: 'Tu cuenta no tiene RFC registrado, asi que no se puede consultar tu equipo.',
       };
     }
     return this.porRfcCmp(rfc);
@@ -254,19 +226,14 @@ export class BienesService {
    * eligio el solicitante al atender el ticket (rfc del solicitante,
    * resuelto en TicketsService). Nunca lanza, mismo criterio que delUsuario.
    *
-   * Sin cache, a diferencia de delUsuario/consulta: el estatus de
-   * mantenimiento tiene que verse al instante — un cache de minutos haria
-   * que un equipo ya tomado por un tecnico se siguiera viendo disponible.
+   * Sin cache: el estatus de mantenimiento tiene que verse al instante — un
+   * cache de minutos haria que un equipo ya tomado por un tecnico se siguiera
+   * viendo disponible.
    */
-  async porRfcCmp(
-    rfcCrudo: string | null | undefined,
-  ): Promise<RespuestaBienes> {
+  async porRfcCmp(rfcCrudo: string | null | undefined): Promise<RespuestaBienes> {
     const rfc = (rfcCrudo ?? '').trim().toUpperCase();
     if (!rfc) {
-      return {
-        bienes: [],
-        motivo: 'No hay un RFC valido para consultar el equipo.',
-      };
+      return { bienes: [], motivo: 'No hay un RFC valido para consultar el equipo.' };
     }
     if (!RE_RFC.test(rfc)) {
       this.log.warn(`RFC con formato invalido: no se consulta (CMP).`);
@@ -277,82 +244,56 @@ export class BienesService {
       const bienes = await this.consultaCmp(rfc);
       return { bienes, motivo: null };
     } catch (e) {
-      this.log.warn(
-        `No se pudo consultar bienes CMP de ${rfc}: ${(e as Error).message}`,
-      );
+      this.log.warn(`No se pudo consultar bienes CMP de ${rfc}: ${(e as Error).message}`);
       return {
         bienes: [],
-        motivo:
-          'El sistema de bienes no respondio. Captura el numero de inventario a mano.',
+        motivo: 'El sistema de bienes no respondio. Captura el numero de inventario a mano.',
       };
     }
   }
 
   /**
-   * API remota de SIASAF para equipo de computo: bienes/api/bienes/{rfc}/1
-   * (el 1 filtra por el tipo de bien "computo" del lado de SIASAF). Regresa
-   * `{ data: [{ bien_mueble_id, estatus_bien_id, bien: { id,
-   * numero_inventario, nombre_bien, tipo_bien_id }, estatus: {...} }] }`.
-   *
-   * Solo trae Asignado/Mantenimiento por bien_mueble_id (SIASAF ya deja de
-   * listar los renglones dados de baja), pero se filtra igual por si acaso.
-   * Se incluye Mantenimiento (no solo Asignado) para poder marcar en
-   * pantalla que ese equipo esta en atencion y no se puede elegir de nuevo.
+   * GET {base}/bienes/{rfc}/1 — mismo endpoint que usa TicketController::getBienes
+   * (alta) y TicketTecnicoController (atender) en el sistema anterior. Cada
+   * renglon trae el bien anidado y su estatus_bien_id actual; se incluyen
+   * tanto los Asignados como los que estan en Mantenimiento con un tecnico,
+   * para poder marcar en pantalla que ese equipo esta en atencion.
    */
   private async consultaCmp(rfc: string): Promise<Bien[]> {
-    const base = this.config
-      .get<string>('BIENES_API_CMP_URL', URL_CMP_POR_OMISION)
-      .trim();
-    const url = `${base.replace(/\/+$/, '')}/${encodeURIComponent(rfc)}/1`;
-    const token = this.config.get<string>('BIENES_API_TOKEN');
-    const espera = Number(this.config.get('BIENES_API_TIMEOUT_MS', 6000));
-
+    const url = `${this.baseCmp()}/bienes/${encodeURIComponent(rfc)}/${TIPO_SERVICIO_CMP}`;
     const respuesta = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      signal: AbortSignal.timeout(espera),
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.esperaMs()),
     });
     if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
 
-    const cuerpo: unknown = await respuesta.json();
-    const filas =
-      typeof cuerpo === 'object' &&
-      cuerpo !== null &&
-      Array.isArray((cuerpo as { data?: unknown }).data)
-        ? ((cuerpo as { data: unknown[] }).data as Record<string, unknown>[])
-        : [];
+    const cuerpo = (await respuesta.json()) as { data?: unknown[] };
+    const filas = Array.isArray(cuerpo?.data) ? cuerpo.data : [];
 
     const vistos = new Set<string>();
     const bienes: Bien[] = [];
-    for (const fila of filas) {
-      const estatusBienId = Number(fila.estatus_bien_id);
-      if (
-        estatusBienId !== ESTATUS_ASIGNADO &&
-        estatusBienId !== ESTATUS_MANTENIMIENTO
-      )
-        continue;
-
-      const bien = fila.bien as Record<string, unknown> | undefined;
-      const inventario = primerTexto(bien ?? {}, ['numero_inventario']);
+    for (const filaRaw of filas) {
+      const fila = filaRaw as {
+        estatus_bien_id?: number;
+        bien?: { id?: number; numero_inventario?: string; nombre_bien?: string };
+      };
+      const inventario = fila.bien?.numero_inventario?.trim();
       if (!inventario || vistos.has(inventario)) continue;
       vistos.add(inventario);
-
-      const idCrudo = bien?.id;
       bienes.push({
         inventario,
-        descripcion: primerTexto(bien ?? {}, ['nombre_bien']),
-        id: typeof idCrudo === 'number' ? idCrudo : null,
-        en_mantenimiento: estatusBienId === ESTATUS_MANTENIMIENTO,
+        descripcion: fila.bien?.nombre_bien?.trim() ?? null,
+        id: fila.bien?.id ?? null,
+        en_mantenimiento: fila.estatus_bien_id === ESTATUS_MANTENIMIENTO,
       });
     }
     return bienes;
   }
 
   /**
-   * Ficha tecnica del bien para el dictamen de baja (grupo/marca/modelo,
-   * ademas de lo que ya trae Bien). null si el id no existe.
+   * GET {base}/bienesinfo/{id} — ficha tecnica del bien para el dictamen de
+   * baja (grupo/marca/modelo, ademas de lo que ya trae Bien). null si no se
+   * pudo consultar; nunca lanza.
    */
   async detalleBien(bienId: number): Promise<{
     numero_inventario: string;
@@ -361,25 +302,53 @@ export class BienesService {
     marca: string | null;
     modelo: string | null;
   } | null> {
-    const bien = await this.bienMuebles.findByPk(bienId);
-    if (!bien) return null;
-    return {
-      numero_inventario: bien.numero_inventario,
-      nombre_bien: bien.nombre_bien,
-      material: bien.material,
-      marca: bien.marca,
-      modelo: bien.modelo,
-    };
+    try {
+      const url = `${this.baseCmp()}/bienesinfo/${bienId}`;
+      const respuesta = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(this.esperaMs()),
+      });
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+
+      const cuerpo = (await respuesta.json()) as {
+        numero_inventario?: string;
+        nombre_bien?: string;
+        material?: string | null;
+        marca?: string | null;
+        modelo?: string | null;
+      };
+      if (!cuerpo?.numero_inventario) return null;
+
+      return {
+        numero_inventario: cuerpo.numero_inventario,
+        nombre_bien: cuerpo.nombre_bien ?? '',
+        material: cuerpo.material ?? null,
+        marca: cuerpo.marca ?? null,
+        modelo: cuerpo.modelo ?? null,
+      };
+    } catch (e) {
+      this.log.warn(`No se pudo consultar la ficha tecnica del bien ${bienId}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  /** POST {base}/bienes/mantenimiento — unico endpoint para los dos movimientos (toma/regreso). */
+  private async postMantenimiento(cuerpo: Record<string, unknown>): Promise<void> {
+    const url = `${this.baseCmp()}/bienes/mantenimiento`;
+    const respuesta = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: AbortSignal.timeout(this.esperaMs()),
+    });
+    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
   }
 
   /**
    * Paso 1 de la atencion: el equipo entra a mantenimiento con el tecnico.
-   * Reproduce, en la base local `bienes`, el mismo movimiento que hace
-   * solicitudMantenimiento($request->tipo_movimiento = false) en SIASAF: el
-   * resguardo activo (ESTATUS_ASIGNADO) pasa a ESTATUS_MANTENIMIENTO y se
-   * crea un renglon nuevo, tambien en ESTATUS_MANTENIMIENTO, a nombre del
-   * tecnico — ninguno de los dos queda "Asignado" mientras dura el servicio.
-   * Nunca lanza: si algo falla, el ticket igual se finaliza en SITickets.
+   * Mismo movimiento que TicketTecnicoController::update() en el sistema
+   * anterior: tipo_movimiento = 0 (toma de custodia). Nunca lanza: si algo
+   * falla, el ticket igual se finaliza en SITickets.
    */
   async iniciarMantenimiento(
     bienId: number,
@@ -387,103 +356,62 @@ export class BienesService {
   ): Promise<{ ok: boolean; motivo: string | null }> {
     const rfc = rfcTecnico.trim().toUpperCase();
     if (!RE_RFC.test(rfc)) {
-      return {
-        ok: false,
-        motivo: 'El RFC del tecnico no tiene un formato valido.',
-      };
+      return { ok: false, motivo: 'El RFC del tecnico no tiene un formato valido.' };
     }
 
     try {
-      const activo = await this.servidorBienes.findOne({
-        where: { bien_mueble_id: bienId, estatus_bien_id: ESTATUS_ASIGNADO },
-        order: [['id', 'DESC']],
-      });
-      if (!activo) {
-        return {
-          ok: false,
-          motivo: 'No se encontró el resguardo activo de ese equipo.',
-        };
-      }
-
-      await this.servidorBienes.sequelize!.transaction(async (tx) => {
-        await activo.update(
-          { estatus_bien_id: ESTATUS_MANTENIMIENTO },
-          { transaction: tx },
-        );
-        await this.servidorBienes.create(
-          {
-            rfc,
-            bien_mueble_id: bienId,
-            estatus_bien_id: ESTATUS_MANTENIMIENTO,
-            fecha_asignacion: new Date(),
-          },
-          { transaction: tx },
-        );
-      });
+      await this.postMantenimiento({ rfc, tipo_movimiento: 0, bien_id: bienId });
       return { ok: true, motivo: null };
     } catch (e) {
-      this.log.warn(
-        `No se pudo iniciar mantenimiento del bien ${bienId} con ${rfc}: ${(e as Error).message}`,
-      );
+      this.log.warn(`No se pudo iniciar mantenimiento del bien ${bienId} con ${rfc}: ${(e as Error).message}`);
       return {
         ok: false,
-        motivo:
-          'No se pudo registrar que el equipo queda contigo. Avisa al área si hace falta.',
+        motivo: 'No se pudo registrar en SIASAF que el equipo queda contigo. Avisa al área si hace falta.',
       };
     }
   }
 
   /**
-   * Paso 2: cierra el mantenimiento. El equipo siempre regresa a quien
-   * levanto el ticket (el resguardo original vuelve a ESTATUS_ASIGNADO; el
-   * renglon del tecnico pasa a ESTATUS_BAJA) — tanto si se reparo como si se
-   * dio de baja: aqui termina el proceso de SITickets. El traspaso a
-   * "almacen" y el cierre formal de la baja los genera despues, aparte, el
-   * area de bienes (usando el dictamen como respaldo); SITickets no lo hace
-   * de forma automatica.
+   * Paso 2: cierra el mantenimiento. Mismo movimiento que
+   * TicketTecnicoController::finalizarTecnico(): tipo_movimiento = 1
+   * (regresa el bien). SIASAF decide del lado suyo a quien regresa la
+   * custodia; aqui solo se manda el resultado:
+   * - estado 0 = reparado, 1 = inservible (baja).
+   * - baja siempre 0 — asi lo manda tambien el sistema anterior; el traspaso
+   *   a "almacen" y el cierre formal de la baja los hace despues, aparte, el
+   *   area de bienes con el dictamen como respaldo.
+   * - observaciones solo se manda cuando el resultado es baja (el texto del
+   *   dictamen).
    *
    * Nunca lanza: si algo falla, el ticket igual se finaliza en SITickets.
    */
   async finalizarMantenimiento(
     bienId: number,
+    rfcTecnico: string,
+    opciones: { reparado: boolean; observaciones?: string },
   ): Promise<{ ok: boolean; motivo: string | null }> {
-    try {
-      const ultimos = await this.servidorBienes.findAll({
-        where: {
-          bien_mueble_id: bienId,
-          estatus_bien_id: ESTATUS_MANTENIMIENTO,
-        },
-        order: [['id', 'DESC']],
-        limit: 2,
-      });
-      if (ultimos.length < 2) {
-        return {
-          ok: false,
-          motivo:
-            'No se encontraron los registros de mantenimiento de ese equipo.',
-        };
-      }
-      const [delTecnico, original] = ultimos;
+    const rfc = rfcTecnico.trim().toUpperCase();
+    if (!RE_RFC.test(rfc)) {
+      return { ok: false, motivo: 'El RFC del tecnico no tiene un formato valido.' };
+    }
 
-      await this.servidorBienes.sequelize!.transaction(async (tx) => {
-        await original.update(
-          { estatus_bien_id: ESTATUS_ASIGNADO },
-          { transaction: tx },
-        );
-        await delTecnico.update(
-          { estatus_bien_id: ESTATUS_BAJA },
-          { transaction: tx },
-        );
-      });
+    try {
+      const cuerpo: Record<string, unknown> = {
+        rfc,
+        tipo_movimiento: 1,
+        bien_id: bienId,
+        baja: 0,
+        estado: opciones.reparado ? 0 : 1,
+      };
+      if (!opciones.reparado) cuerpo.observaciones = opciones.observaciones ?? '';
+
+      await this.postMantenimiento(cuerpo);
       return { ok: true, motivo: null };
     } catch (e) {
-      this.log.warn(
-        `No se pudo finalizar mantenimiento del bien ${bienId}: ${(e as Error).message}`,
-      );
+      this.log.warn(`No se pudo finalizar mantenimiento del bien ${bienId}: ${(e as Error).message}`);
       return {
         ok: false,
-        motivo:
-          'No se pudo cerrar el registro de mantenimiento del equipo. Avisa al área si hace falta.',
+        motivo: 'No se pudo cerrar en SIASAF el registro de mantenimiento del equipo. Avisa al área si hace falta.',
       };
     }
   }
