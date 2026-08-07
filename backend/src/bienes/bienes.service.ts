@@ -244,10 +244,11 @@ export class BienesService {
       const bienes = await this.consultaCmp(rfc);
       return { bienes, motivo: null };
     } catch (e) {
-      this.log.warn(`No se pudo consultar bienes CMP de ${rfc}: ${(e as Error).message}`);
+      const detalle = (e as Error).message;
+      this.log.warn(`No se pudo consultar bienes CMP de ${rfc}: ${detalle}`);
       return {
         bienes: [],
-        motivo: 'El sistema de bienes no respondio. Captura el numero de inventario a mano.',
+        motivo: `El sistema de bienes no respondio (${detalle}). Captura el numero de inventario a mano.`,
       };
     }
   }
