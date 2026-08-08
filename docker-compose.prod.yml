@@ -17,7 +17,6 @@ services:
       context: ./backend
       dockerfile: DockerFile
     container_name: sitickets-backend
-    network_mode: "host"
     ports:
       - "3032:3050"
     env_file:
