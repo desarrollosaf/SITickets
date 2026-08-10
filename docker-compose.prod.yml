@@ -24,6 +24,5 @@ services:
     volumes:
       - ./backend/storage:/app/storage
     restart: always
-
-  extra_hosts:
+    extra_hosts:
       - "siasaf.gob.mx:192.168.36.54"
