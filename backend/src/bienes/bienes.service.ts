@@ -376,7 +376,7 @@ export class BienesService {
    */
   private async postMantenimiento(cuerpo: Record<string, unknown>): Promise<void> {
     const url = `${this.baseCmp()}/bienes/mantenimiento`;
-    const intentos = 3;
+    const intentos = 5;
 
     for (let intento = 1; intento <= intentos; intento++) {
       const respuesta = await fetch(url, {
