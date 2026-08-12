@@ -49,6 +49,19 @@ const TIPO_SERVICIO_CMP = 1;
 const ESTATUS_MANTENIMIENTO = 2;
 
 /**
+ * Algunos servidores (visto en produccion con el IIS/Laravel de SIASAF)
+ * responden distinto o rechazan la peticion cuando no hay User-Agent —
+ * fetch(), a diferencia de curl, no manda uno por defecto.
+ */
+const USER_AGENT_CMP = 'SITickets-Backend/1.0';
+
+/** Cuerpo de la respuesta (recortado) para que el log diga algo mas util que solo el codigo HTTP. */
+async function errorDeRespuesta(respuesta: Response): Promise<Error> {
+  const detalle = await respuesta.text().catch(() => '');
+  return new Error(`HTTP ${respuesta.status}${detalle ? `: ${detalle.slice(0, 300)}` : ''}`);
+}
+
+/**
  * El padron de bienes (servicio generico, no CMP) cambia por resguardos, no
  * por minuto. Cinco minutos de cache evitan una llamada a SIASAF cada vez
  * que alguien abre el formulario.
@@ -179,6 +192,7 @@ export class BienesService {
     const respuesta = await fetch(url, {
       headers: {
         Accept: 'application/json',
+        'User-Agent': USER_AGENT_CMP,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(this.esperaMs()),
@@ -263,10 +277,10 @@ export class BienesService {
   private async consultaCmp(rfc: string): Promise<Bien[]> {
     const url = `${this.baseCmp()}/bienes/${encodeURIComponent(rfc)}/${TIPO_SERVICIO_CMP}`;
     const respuesta = await fetch(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
       signal: AbortSignal.timeout(this.esperaMs()),
     });
-    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+    if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
     const cuerpo = (await respuesta.json()) as { data?: unknown[] };
     const filas = Array.isArray(cuerpo?.data) ? cuerpo.data : [];
@@ -306,10 +320,10 @@ export class BienesService {
     try {
       const url = `${this.baseCmp()}/bienesinfo/${bienId}`;
       const respuesta = await fetch(url, {
-        headers: { Accept: 'application/json' },
+        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
         signal: AbortSignal.timeout(this.esperaMs()),
       });
-      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+      if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
       const cuerpo = (await respuesta.json()) as {
         numero_inventario?: string;
@@ -338,11 +352,15 @@ export class BienesService {
     const url = `${this.baseCmp()}/bienes/mantenimiento`;
     const respuesta = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': USER_AGENT_CMP,
+      },
       body: JSON.stringify(cuerpo),
       signal: AbortSignal.timeout(this.esperaMs()),
     });
-    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+    if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
   }
 
   /**
