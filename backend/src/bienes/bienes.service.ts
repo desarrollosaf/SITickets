@@ -379,6 +379,11 @@ export class BienesService {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           'User-Agent': USER_AGENT_CMP,
+          /* Sin esto, los reintentos pueden reusar la misma conexion TCP
+             (keep-alive) que ya esta "pegada" al nodo del balanceador que
+             esta redirigiendo mal — Connection: close obliga a abrir una
+             conexion nueva en cada intento, con chance de caer en otro nodo. */
+          Connection: 'close',
         },
         body: JSON.stringify(cuerpo),
         signal: AbortSignal.timeout(this.esperaMs()),
@@ -392,7 +397,9 @@ export class BienesService {
       this.log.warn(
         `Redireccion intermitente de SIASAF en mantenimiento (intento ${intento}/${intentos}), reintentando...`,
       );
-      await new Promise((r) => setTimeout(r, 400));
+      /* Separado a proposito: si fuera un debounce anti-doble-envio del lado
+         de SIASAF, reintentar de inmediato caeria en el mismo bloqueo. */
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
 
