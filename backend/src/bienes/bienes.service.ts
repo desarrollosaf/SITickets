@@ -361,21 +361,39 @@ export class BienesService {
     }
   }
 
-  /** POST {base}/bienes/mantenimiento — unico endpoint para los dos movimientos (toma/regreso). */
+  /**
+   * POST {base}/bienes/mantenimiento — unico endpoint para los dos
+   * movimientos (toma/regreso). El balanceador de SIASAF manda de vez en
+   * cuando una redireccion "a si mismo" (ver SIN_REDIRECCION), de forma
+   * intermitente — un reintento casi siempre la resuelve, asi que solo en
+   * ese caso se reintenta un par de veces antes de darse por vencido.
+   */
   private async postMantenimiento(cuerpo: Record<string, unknown>): Promise<void> {
     const url = `${this.baseCmp()}/bienes/mantenimiento`;
-    const respuesta = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'User-Agent': USER_AGENT_CMP,
-      },
-      body: JSON.stringify(cuerpo),
-      signal: AbortSignal.timeout(this.esperaMs()),
-      redirect: SIN_REDIRECCION,
-    });
-    if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
+    const intentos = 3;
+
+    for (let intento = 1; intento <= intentos; intento++) {
+      const respuesta = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'User-Agent': USER_AGENT_CMP,
+        },
+        body: JSON.stringify(cuerpo),
+        signal: AbortSignal.timeout(this.esperaMs()),
+        redirect: SIN_REDIRECCION,
+      });
+      if (respuesta.ok) return;
+
+      const esRedireccion = respuesta.status >= 300 && respuesta.status < 400;
+      if (!esRedireccion || intento === intentos) throw await errorDeRespuesta(respuesta);
+
+      this.log.warn(
+        `Redireccion intermitente de SIASAF en mantenimiento (intento ${intento}/${intentos}), reintentando...`,
+      );
+      await new Promise((r) => setTimeout(r, 400));
+    }
   }
 
   /**
