@@ -56,13 +56,13 @@ const ESTATUS_MANTENIMIENTO = 2;
 const USER_AGENT_CMP = 'SITickets-Backend/1.0';
 
 /**
- * El balanceador de SIASAF a veces responde con una redireccion (301/302).
- * fetch() la sigue solo por default y, por compatibilidad historica del
- * estandar, convierte POST en GET al seguir una — eso hacia que Laravel
- * recibiera un GET en una ruta que solo acepta POST, con un error confuso
- * ("GET method not supported"). redirect: 'manual' evita que eso pase
- * callado: si llega una redireccion se ve aqui como error, no como un
- * movimiento silenciosamente corrompido.
+ * El balanceador de SIASAF a veces responde con una redireccion (301/302) en
+ * la ruta de mantenimiento. fetch() la sigue sola por default y, por
+ * compatibilidad historica del estandar, convierte POST en GET al seguirla
+ * — eso hacia que Laravel recibiera un GET en una ruta que solo acepta POST,
+ * con un error confuso ("GET method not supported"). Se usa solo en el POST
+ * (postMantenimiento): en un GET seguir la redireccion es inofensivo, asi
+ * que los otros metodos de consulta la siguen normal.
  */
 const SIN_REDIRECCION = 'manual' as const;
 
@@ -210,7 +210,6 @@ export class BienesService {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(this.esperaMs()),
-      redirect: SIN_REDIRECCION,
     });
     if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
@@ -294,7 +293,6 @@ export class BienesService {
     const respuesta = await fetch(url, {
       headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
       signal: AbortSignal.timeout(this.esperaMs()),
-      redirect: SIN_REDIRECCION,
     });
     if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
@@ -338,7 +336,6 @@ export class BienesService {
       const respuesta = await fetch(url, {
         headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
         signal: AbortSignal.timeout(this.esperaMs()),
-        redirect: SIN_REDIRECCION,
       });
       if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
