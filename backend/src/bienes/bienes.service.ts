@@ -55,8 +55,22 @@ const ESTATUS_MANTENIMIENTO = 2;
  */
 const USER_AGENT_CMP = 'SITickets-Backend/1.0';
 
+/**
+ * El balanceador de SIASAF a veces responde con una redireccion (301/302).
+ * fetch() la sigue solo por default y, por compatibilidad historica del
+ * estandar, convierte POST en GET al seguir una — eso hacia que Laravel
+ * recibiera un GET en una ruta que solo acepta POST, con un error confuso
+ * ("GET method not supported"). redirect: 'manual' evita que eso pase
+ * callado: si llega una redireccion se ve aqui como error, no como un
+ * movimiento silenciosamente corrompido.
+ */
+const SIN_REDIRECCION = 'manual' as const;
+
 /** Cuerpo de la respuesta (recortado) para que el log diga algo mas util que solo el codigo HTTP. */
 async function errorDeRespuesta(respuesta: Response): Promise<Error> {
+  if (respuesta.status >= 300 && respuesta.status < 400) {
+    return new Error(`HTTP ${respuesta.status} (redireccion) a ${respuesta.headers.get('location')}`);
+  }
   const detalle = await respuesta.text().catch(() => '');
   return new Error(`HTTP ${respuesta.status}${detalle ? `: ${detalle.slice(0, 300)}` : ''}`);
 }
@@ -196,8 +210,9 @@ export class BienesService {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(this.esperaMs()),
+      redirect: SIN_REDIRECCION,
     });
-    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+    if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
     const cuerpo: unknown = await respuesta.json();
     const vistos = new Set<string>();
@@ -279,6 +294,7 @@ export class BienesService {
     const respuesta = await fetch(url, {
       headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
       signal: AbortSignal.timeout(this.esperaMs()),
+      redirect: SIN_REDIRECCION,
     });
     if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
@@ -322,6 +338,7 @@ export class BienesService {
       const respuesta = await fetch(url, {
         headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
         signal: AbortSignal.timeout(this.esperaMs()),
+        redirect: SIN_REDIRECCION,
       });
       if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
 
@@ -359,6 +376,7 @@ export class BienesService {
       },
       body: JSON.stringify(cuerpo),
       signal: AbortSignal.timeout(this.esperaMs()),
+      redirect: SIN_REDIRECCION,
     });
     if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
   }
