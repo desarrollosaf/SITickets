@@ -49,11 +49,16 @@ const TIPO_SERVICIO_CMP = 1;
 const ESTATUS_MANTENIMIENTO = 2;
 
 /**
- * Algunos servidores (visto en produccion con el IIS/Laravel de SIASAF)
- * responden distinto o rechazan la peticion cuando no hay User-Agent —
- * fetch(), a diferencia de curl, no manda uno por defecto.
+ * Cabeceras "como curl" para el IIS/Laravel de SIASAF en produccion: sin
+ * ellas la respuesta cambiaba (o el proxy interno la manejaba distinto).
+ * fetch(), a diferencia de curl, manda User-Agent vacio y pide compresion
+ * (gzip/br) por default — eso bastaba para que el POST de mantenimiento
+ * devolviera una respuesta distinta a la esperada, aunque el estatus fuera
+ * 200. Igualando ambas cabeceras a lo que manda curl (sin comprimir, con
+ * un User-Agent explicito) la respuesta vuelve a ser la correcta.
  */
 const USER_AGENT_CMP = 'SITickets-Backend/1.0';
+const SIN_COMPRESION = 'identity';
 
 /**
  * El balanceador de SIASAF a veces responde con una redireccion (301/302) en
@@ -207,6 +212,7 @@ export class BienesService {
       headers: {
         Accept: 'application/json',
         'User-Agent': USER_AGENT_CMP,
+        'Accept-Encoding': SIN_COMPRESION,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(this.esperaMs()),
@@ -291,7 +297,7 @@ export class BienesService {
   private async consultaCmp(rfc: string): Promise<Bien[]> {
     const url = `${this.baseCmp()}/bienes/${encodeURIComponent(rfc)}/${TIPO_SERVICIO_CMP}`;
     const respuesta = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
+      headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP, 'Accept-Encoding': SIN_COMPRESION },
       signal: AbortSignal.timeout(this.esperaMs()),
     });
     if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
@@ -334,7 +340,7 @@ export class BienesService {
     try {
       const url = `${this.baseCmp()}/bienesinfo/${bienId}`;
       const respuesta = await fetch(url, {
-        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP },
+        headers: { Accept: 'application/json', 'User-Agent': USER_AGENT_CMP, 'Accept-Encoding': SIN_COMPRESION },
         signal: AbortSignal.timeout(this.esperaMs()),
       });
       if (!respuesta.ok) throw await errorDeRespuesta(respuesta);
@@ -370,7 +376,7 @@ export class BienesService {
    */
   private async postMantenimiento(cuerpo: Record<string, unknown>): Promise<void> {
     const url = `${this.baseCmp()}/bienes/mantenimiento`;
-    const intentos = 3;
+    const intentos = 5;
 
     for (let intento = 1; intento <= intentos; intento++) {
       const respuesta = await fetch(url, {
@@ -379,6 +385,7 @@ export class BienesService {
           'Content-Type': 'application/json',
           Accept: 'application/json',
           'User-Agent': USER_AGENT_CMP,
+          'Accept-Encoding': SIN_COMPRESION,
           /* Sin esto, los reintentos pueden reusar la misma conexion TCP
              (keep-alive) que ya esta "pegada" al nodo del balanceador que
              esta redirigiendo mal — Connection: close obliga a abrir una
