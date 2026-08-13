@@ -374,68 +374,67 @@ export class BienesService {
    * intermitente — un reintento casi siempre la resuelve, asi que solo en
    * ese caso se reintenta un par de veces antes de darse por vencido.
    */
-  private async postMantenimiento(cuerpo: Record<string, unknown>): Promise<void> {
-    const url = `${this.baseCmp()}/bienes/mantenimiento`;
-    const intentos = 5;
+  private async postMantenimiento(
+  cuerpo: Record<string, unknown>,
+): Promise<void> {
+  const url = `${this.baseCmp()}/bienes/mantenimiento`;
+  const intentos = 5;
 
-    for (let intento = 1; intento <= intentos; intento++) {
-      const respuesta = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          'User-Agent': USER_AGENT_CMP,
-          'Accept-Encoding': SIN_COMPRESION,
-          /* Sin esto, los reintentos pueden reusar la misma conexion TCP
-             (keep-alive) que ya esta "pegada" al nodo del balanceador que
-             esta redirigiendo mal — Connection: close obliga a abrir una
-             conexion nueva en cada intento, con chance de caer en otro nodo. */
-          Connection: 'close',
-        },
-        body: JSON.stringify(cuerpo),
-        signal: AbortSignal.timeout(this.esperaMs()),
-        redirect: SIN_REDIRECCION,
-      });
-      if (respuesta.ok) return;
+  for (let intento = 1; intento <= intentos; intento++) {
+    this.log.warn(
+      `[SIASAF REQUEST] intento=${intento}/${intentos} ` +
+      `url=${url} ` +
+      `body=${JSON.stringify(cuerpo)}`,
+    );
 
-      const esRedireccion = respuesta.status >= 300 && respuesta.status < 400;
-      if (!esRedireccion || intento === intentos) throw await errorDeRespuesta(respuesta);
+    const inicio = Date.now();
 
-      this.log.warn(
-        `Redireccion intermitente de SIASAF en mantenimiento (intento ${intento}/${intentos}), reintentando...`,
-      );
-      /* Separado a proposito: si fuera un debounce anti-doble-envio del lado
-         de SIASAF, reintentar de inmediato caeria en el mismo bloqueo. */
-      await new Promise((r) => setTimeout(r, 1500));
+    const respuesta = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': USER_AGENT_CMP,
+        'Accept-Encoding': SIN_COMPRESION,
+        Connection: 'close',
+      },
+      body: JSON.stringify(cuerpo),
+      signal: AbortSignal.timeout(this.esperaMs()),
+      redirect: SIN_REDIRECCION,
+    });
+
+    const bodyRespuesta = await respuesta.clone().text().catch(() => '');
+
+    this.log.warn(
+      `[SIASAF RESPONSE] intento=${intento}/${intentos} ` +
+      `tiempo=${Date.now() - inicio}ms ` +
+      `status=${respuesta.status} ` +
+      `url=${respuesta.url} ` +
+      `location=${respuesta.headers.get('location')} ` +
+      `server=${respuesta.headers.get('server')} ` +
+      `contentType=${respuesta.headers.get('content-type')} ` +
+      `body=${bodyRespuesta.slice(0, 1000)}`,
+    );
+
+    if (respuesta.ok) {
+      return;
     }
+
+    const esRedireccion =
+      respuesta.status >= 300 && respuesta.status < 400;
+
+    if (!esRedireccion || intento === intentos) {
+      throw await errorDeRespuesta(respuesta);
+    }
+
+    this.log.warn(
+      `Redireccion de SIASAF en mantenimiento ` +
+      `(intento ${intento}/${intentos}), reintentando...`,
+    );
+
+    await new Promise((r) => setTimeout(r, 1500));
   }
-
-  /**
-   * Paso 1 de la atencion: el equipo entra a mantenimiento con el tecnico.
-   * Mismo movimiento que TicketTecnicoController::update() en el sistema
-   * anterior: tipo_movimiento = 0 (toma de custodia). Nunca lanza: si algo
-   * falla, el ticket igual se finaliza en SITickets.
-   */
-  async iniciarMantenimiento(
-    bienId: number,
-    rfcTecnico: string,
-  ): Promise<{ ok: boolean; motivo: string | null }> {
-    const rfc = rfcTecnico.trim().toUpperCase();
-    if (!RE_RFC.test(rfc)) {
-      return { ok: false, motivo: 'El RFC del tecnico no tiene un formato valido.' };
-    }
-
-    try {
-      await this.postMantenimiento({ rfc, tipo_movimiento: 0, bien_id: bienId });
-      return { ok: true, motivo: null };
-    } catch (e) {
-      this.log.warn(`No se pudo iniciar mantenimiento del bien ${bienId} con ${rfc}: ${(e as Error).message}`);
-      return {
-        ok: false,
-        motivo: 'No se pudo registrar en SIASAF que el equipo queda contigo. Avisa al área si hace falta.',
-      };
-    }
-  }
+}
 
   /**
    * Paso 2: cierra el mantenimiento. Mismo movimiento que
