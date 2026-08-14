@@ -19,12 +19,14 @@ export const routes: Routes = [
       },
       {
         path: 'nuevo',
-        canActivate: [guardRol('solicitante', 'admin', 'operador', 'gestor')],
+        canActivate: [
+          guardRol('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor'),
+        ],
         loadComponent: () => import('./paginas/solicitante/nuevo').then((m) => m.Nuevo),
       },
       {
         path: 'mis-tickets',
-        canActivate: [guardRol('solicitante', 'admin', 'gestor')],
+        canActivate: [guardRol('solicitante', 'admin', 'gestor', 'tecnico', 'jefe', 'proveedor')],
         loadComponent: () => import('./paginas/solicitante/mis-tickets').then((m) => m.MisTickets),
       },
       {

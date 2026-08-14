@@ -35,6 +35,7 @@ const MOTIVOS_ESPERA = [
   'En espera de visita del proveedor',
   'Usuario ausente o sin acceso al área',
   'En espera de autorización',
+  'Retirar el equipo del lugar para su revisión',
 ];
 
 @Component({
@@ -317,27 +318,6 @@ export class DetalleTicket {
   }
 
   /* ---------------- Equipo de computo (CMP) ---------------- */
-
-  /**
-   * "Atender ticket": si el reloj no esta corriendo lo arranca primero (no
-   * hace falta que el tecnico lo inicie a mano antes) y hasta entonces abre
-   * el formulario de cierre.
-   */
-  async abrirAtenderCmp() {
-    if (this.relojCorriendo()) {
-      this.abrirFormulario('atender-cmp');
-      return;
-    }
-    this.ocupado.set(true);
-    const geo = await ubicacionActual();
-    this.api.relojInicio(this.id(), geo).subscribe({
-      next: (t) => {
-        this.aplicar(t);
-        this.abrirFormulario('atender-cmp');
-      },
-      error: (e) => this.falla(e),
-    });
-  }
 
   /** Fotos evidencia para el anexo fotografico del dictamen; se acumulan entre selecciones. */
   onFotosSeleccionadas(event: Event) {

@@ -69,7 +69,7 @@ export class TicketsController {
     return this.tickets.bienDelTicket(id, usuario);
   }
 
-  @Roles('solicitante', 'admin', 'operador', 'gestor')
+  @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.crear(dto, usuario);
