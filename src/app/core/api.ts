@@ -5,4 +5,4 @@
 export const API =
   typeof window !== 'undefined' && window.location.port === '4200'
     ? 'http://localhost:3050/api'
-    : '/api';
+    : '/sitickets/backend/api/';

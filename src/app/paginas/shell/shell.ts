@@ -24,13 +24,23 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/prioridades', etiqueta: 'Prioridades', icono: 'bi-speedometer2' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
   ],
-  tecnico: [{ ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' }],
-  proveedor: [{ ruta: '/bandeja', etiqueta: 'Tickets turnados', icono: 'bi-clipboard-check' }],
+  tecnico: [
+    { ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' },
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+  ],
+  proveedor: [
+    { ruta: '/bandeja', etiqueta: 'Tickets turnados', icono: 'bi-clipboard-check' },
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+  ],
   jefe: [
     { ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' },
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
     { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
   ],
   solicitante: [
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },

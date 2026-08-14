@@ -100,7 +100,7 @@ export class TicketsService {
    * cualquiera podia pedir cualquier ticket porque el identificador venia del
    * navegador. Aqui el alcance sale del token y no se puede ampliar por URL.
    */
-  private alcance(usuario: UsuarioToken): Record<string, unknown> {
+  private async alcance(usuario: UsuarioToken): Promise<Record<string, unknown>> {
     /** El operador ve todo, igual que el administrador, pero no administra catalogos. */
     if (usuario.rol === 'admin' || usuario.rol === 'operador') return {};
     if (usuario.rol === 'solicitante') return { solicitante_id: usuario.id };
@@ -115,9 +115,25 @@ export class TicketsService {
       };
     }
     if (ROLES_TECNICOS.includes(usuario.rol)) {
+      /*
+       * Un tecnico puede tener historico como solicitante en dos espacios de
+       * id distintos: los tickets que registro directo desde su cuenta de
+       * tecnico (solicitante_id = usuario.id local) y los que registro antes
+       * como solicitante externo (solicitante_id = su id en saf.s_usuario),
+       * que solo se puede encontrar cruzando por rfc.
+       */
+      const solicitanteIds: number[] = [usuario.id];
+      if (!usuario.externo) {
+        const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+        if (local?.rfc) {
+          const sUsuario = await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } });
+          if (sUsuario) solicitanteIds.push(sUsuario.id_Usuario);
+        }
+      }
       return {
         [Op.or]: [
           { tecnico_id: usuario.id },
+          { solicitante_id: { [Op.in]: solicitanteIds } },
           {
             id: {
               [Op.in]: Sequelize.literal(
@@ -132,7 +148,7 @@ export class TicketsService {
   }
 
   async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
-    const where: Record<string, unknown> = { ...this.alcance(usuario) };
+    const where: Record<string, unknown> = { ...(await this.alcance(usuario)) };
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;
@@ -157,7 +173,7 @@ export class TicketsService {
 
   async detalle(id: number, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
-      where: { id, ...this.alcance(usuario) },
+      where: { id, ...(await this.alcance(usuario)) },
       include: INCLUDES,
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
@@ -563,7 +579,7 @@ export class TicketsService {
 
   async actualizarDatos(id: number, dto: DatosGeneralesDto, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
-      where: { id, ...this.alcance(usuario) },
+      where: { id, ...(await this.alcance(usuario)) },
       include: INCLUDES,
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
@@ -739,7 +755,7 @@ export class TicketsService {
   /** Carga el ticket verificando que el rol pueda siquiera verlo. */
   private async cargar(id: number, usuario: UsuarioToken): Promise<Ticket> {
     const t = await this.tickets.findOne({
-      where: { id, ...this.alcance(usuario) },
+      where: { id, ...(await this.alcance(usuario)) },
       include: [{ model: Servicio, as: 'servicio' }],
     });
     if (!t) throw new NotFoundException('El ticket no existe o no esta a tu alcance');

@@ -192,6 +192,13 @@ export class TicketsService {
   bienesCmp() {
     return this.http.get<BienesUsuario>(`${API}/bienes/mios-cmp`);
   }
+  /** Resguardos de otro usuario de saf (admin/operador/gestor, al registrar «a nombre de»). */
+  bienesDe(idUsuarioSaf: number) {
+    return this.http.get<BienesUsuario>(`${API}/bienes/de/${idUsuarioSaf}`);
+  }
+  bienesCmpDe(idUsuarioSaf: number) {
+    return this.http.get<BienesUsuario>(`${API}/bienes/de/${idUsuarioSaf}/cmp`);
+  }
   tecnicos() {
     return this.http.get<Tecnico[]>(`${API}/catalogos/tecnicos`);
   }

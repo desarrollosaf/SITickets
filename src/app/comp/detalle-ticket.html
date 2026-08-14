@@ -55,8 +55,9 @@
             }
             @if (t.estatus === 'EN_ATENCION') {
               @if (esCmpTicket()) {
-                <button class="btn btn-sm btn-success" [disabled]="ocupado()"
-                        (click)="abrirAtenderCmp()">
+                <button class="btn btn-sm btn-success" [disabled]="!relojCorriendo()"
+                        [title]="relojCorriendo() ? '' : 'Inicia el reloj para poder atender el ticket'"
+                        (click)="abrirFormulario('atender-cmp')">
                   Atender ticket
                 </button>
               } @else {
@@ -69,9 +70,10 @@
               <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('espera')">
                 Poner en espera
               </button>
-              @if (!relojCorriendo() && !esCmpTicket()) {
+              @if (!relojCorriendo()) {
                 <div class="w-100 small sub mt-1">
-                  <i class="bi bi-info-circle"></i> Inicia el reloj para poder marcar resuelto el ticket.
+                  <i class="bi bi-info-circle"></i>
+                  Inicia el reloj para poder {{ esCmpTicket() ? 'atender' : 'marcar resuelto' }} el ticket.
                 </div>
               }
             }

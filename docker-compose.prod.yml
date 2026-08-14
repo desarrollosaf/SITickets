@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: DockerFile
       args:
         BASE_HREF: /sitickets/
     container_name: sitickets-frontend
@@ -15,7 +15,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: DockerFile
     container_name: sitickets-backend
     ports:
       - "3032:3050"
@@ -23,6 +23,6 @@ services:
       - ./backend/.env
     volumes:
       - ./backend/storage:/app/storage
+    restart: always
     extra_hosts:
       - "siasaf.gob.mx:192.168.36.54"
-    restart: always
