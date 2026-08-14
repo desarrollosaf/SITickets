@@ -145,10 +145,25 @@ export class Nuevo {
     this.usuarioElegido.set(c);
     this.busquedaUsuario = '';
     this.resultadosUsuario.set([]);
+    this.reiniciaBienes();
   }
 
   quitarUsuario() {
     this.usuarioElegido.set(null);
+    this.reiniciaBienes();
+  }
+
+  /**
+   * Los resguardos son de a quien se le va a registrar el ticket, no de quien
+   * lo esta armando: si cambia el usuario elegido (o se quita), hay que
+   * volver a pedirlos —el inventario que ya se hubiera mostrado era de otra
+   * persona—.
+   */
+  private reiniciaBienes() {
+    this.bienesPedidos = false;
+    this.bienes.set([]);
+    this.seleccion.set([]);
+    if (this.esInventario()) this.cargaBienes();
   }
 
   constructor() {
@@ -179,7 +194,14 @@ export class Nuevo {
   private cargaBienes() {
     this.bienesPedidos = true;
     this.cargandoBienes.set(true);
-    const peticion = this.esCmp() ? this.api.bienesCmp() : this.api.bienes();
+    const deOtro = this.usuarioElegido()?.id_usuario_saf;
+    const peticion = deOtro
+      ? this.esCmp()
+        ? this.api.bienesCmpDe(deOtro)
+        : this.api.bienesDe(deOtro)
+      : this.esCmp()
+        ? this.api.bienesCmp()
+        : this.api.bienes();
     peticion.subscribe({
       next: (r) => {
         this.cargandoBienes.set(false);

@@ -255,7 +255,7 @@ export class BienesService {
   }
 
   /**
-   * Consulta genérica de bienes.
+   * Consulta genérica de bienes del usuario de la sesion.
    */
   async delUsuario(
     usuarioToken: UsuarioToken,
@@ -276,15 +276,46 @@ export class BienesService {
       };
     }
 
+    return this.porRfc(rfc);
+  }
+
+  /**
+   * Bienes (catalogo generico) de un usuario de saf cualquiera, dado su
+   * id_Usuario. Se usa cuando admin/operador/gestor registran un ticket «a
+   * nombre de otro»: ahi hay que consultar los resguardos de esa persona, no
+   * los de quien esta armando el ticket. El controlador es quien restringe
+   * esto a esos roles — aqui no se vuelve a validar.
+   */
+  async deSaf(idUsuarioSaf: number): Promise<RespuestaBienes> {
+    const sUsuario = await this.sUsuarios.findByPk(idUsuarioSaf);
+    if (!sUsuario?.N_Usuario) {
+      return { bienes: [], motivo: 'Ese usuario no tiene RFC registrado en saf.' };
+    }
+    return this.porRfc(sUsuario.N_Usuario);
+  }
+
+  /** Igual que deSaf, pero para EQUIPO DE COMPUTO (otra API, ver porRfcCmp). */
+  async deSafCmp(idUsuarioSaf: number): Promise<RespuestaBienes> {
+    const sUsuario = await this.sUsuarios.findByPk(idUsuarioSaf);
+    if (!sUsuario?.N_Usuario) {
+      return { bienes: [], motivo: 'Ese usuario no tiene RFC registrado en saf.' };
+    }
+    return this.porRfcCmp(sUsuario.N_Usuario);
+  }
+
+  /** Nunca lanza: si el sistema de bienes no responde, la pantalla debe poder seguir con captura manual. */
+  private async porRfc(rfcCrudo: string): Promise<RespuestaBienes> {
+    const rfc = rfcCrudo.trim().toUpperCase();
+
     if (!RE_RFC.test(rfc)) {
       this.log.warn(
-        `RFC con formato invalido en el usuario ${usuarioToken.id}: no se consulta.`,
+        `RFC con formato invalido: no se consulta.`,
       );
 
       return {
         bienes: [],
         motivo:
-          'El RFC registrado en tu cuenta no tiene un formato valido.',
+          'El RFC no tiene un formato valido.',
       };
     }
 
