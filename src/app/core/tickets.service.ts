@@ -54,6 +54,11 @@ export class TicketsService {
     return this.http.get<BienTicket>(`${API}/tickets/${id}/bien`);
   }
 
+  /** Bienes del solicitante para elegir al corregir el inventario (ticket en espera). */
+  bienesParaCorregir(id: number) {
+    return this.http.get<BienesUsuario>(`${API}/tickets/${id}/bienes-para-corregir`);
+  }
+
   /* ---------------- alta ---------------- */
 
   crear(datos: {
@@ -84,10 +89,7 @@ export class TicketsService {
    * Corrige los datos generales del reporte. El ticket en si —problema,
    * prioridad, tecnico— no se toca por aqui.
    */
-  datos(
-    id: number,
-    d: { contexto?: string; extension?: string; dependencia?: number; area?: number | null },
-  ) {
+  datos(id: number, d: { contexto?: string; extension?: string }) {
     return this.http.post<TicketDetalle>(`${API}/tickets/${id}/datos`, d);
   }
 

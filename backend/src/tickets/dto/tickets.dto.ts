@@ -66,17 +66,6 @@ export class DatosGeneralesDto {
   @IsString()
   @MaxLength(10)
   extension?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  dependencia?: number;
-
-  /** null deja el ticket sin area. */
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  area?: number | null;
 }
 
 export class CrearInternoDto {

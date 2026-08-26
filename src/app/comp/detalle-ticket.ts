@@ -6,6 +6,7 @@ import {
   banderas,
   cronometro,
   duracion,
+  esCampoInventario,
   etiquetaEstatus,
   fecha,
   mensajeError,
@@ -13,7 +14,7 @@ import {
   resumenUbicacion,
   ubicacionActual,
 } from '../core/formato';
-import type { BienTicket, Catalogos, Organizacion, Tecnico, TicketDetalle } from '../core/modelos';
+import type { Bien, BienTicket, Catalogos, Tecnico, TicketDetalle } from '../core/modelos';
 
 /** Formularios que puede desplegar el cajon. */
 type Formulario =
@@ -76,15 +77,21 @@ export class DetalleTicket {
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
 
   /* --- correccion de datos generales --- */
-  readonly organizacion = signal<Organizacion>({ dependencias: [], areas: [] });
   readonly dContexto = signal('');
   readonly dExtension = signal('');
-  readonly dDependencia = signal<number | null>(null);
-  readonly dArea = signal<number | null>(null);
 
-  /** Areas de la dependencia elegida: el backend rechaza las de otra. */
-  readonly areasDeDependencia = computed(() =>
-    this.organizacion().areas.filter((a) => a.dependencia_id === this.dDependencia()),
+  /* --- correccion del numero de inventario: mismo mecanismo que al registrar --- */
+  readonly esInventarioTicket = computed(() => esCampoInventario(this.ticket()?.campo_adicional));
+  readonly dBienes = signal<Bien[]>([]);
+  readonly dCargandoBienes = signal(false);
+  /** Explica por que no hay lista; con eso se ofrece captura manual. */
+  readonly dMotivoBienes = signal('');
+  /** Inventarios elegidos al corregir. Con la lista disponible, esto es lo que se manda. */
+  readonly dSeleccion = signal<string[]>([]);
+  readonly dContextoFinal = computed(() =>
+    this.esInventarioTicket() && this.dBienes().length
+      ? this.dSeleccion().join(', ')
+      : this.dContexto().trim(),
   );
 
   /* --- campos de los formularios --- */
@@ -148,10 +155,13 @@ export class DetalleTicket {
 
   /**
    * Quien puede corregir los datos generales: quien levanto el reporte y el
-   * administrador, mientras el ticket siga abierto. El backend lo vuelve a
-   * revisar; esto solo decide si se ofrece el boton.
+   * administrador. El boton solo se habilita, ademas, mientras el tecnico
+   * tiene el ticket EN ESPERA (ver enEspera) — asi no se pisa un cambio de
+   * bien mientras se atiende activamente. El backend vuelve a revisar todo
+   * esto; aqui solo se decide que se ofrece.
    */
-  readonly puedeCorregir = computed(() => (this.esMiSolicitud() || this.esAdmin()) && this.abierto());
+  readonly puedeCorregir = computed(() => this.esMiSolicitud() || this.esAdmin());
+  readonly enEspera = computed(() => this.ticket()?.estatus === 'EN_ESPERA');
 
   /** Opciones de reclasificacion: servicios de usuario distintos al actual. */
   readonly problemasReclasificacion = computed(() => {
@@ -205,25 +215,42 @@ export class DetalleTicket {
     const t = this.ticket();
     if (!t) return;
     this.dContexto.set(t.contexto ?? '');
+    this.dSeleccion.set(t.contexto ? t.contexto.split(',').map((s) => s.trim()).filter(Boolean) : []);
     this.dExtension.set(t.extension ?? '');
-    this.dDependencia.set(t.dependencia_id);
-    this.dArea.set(t.area_id);
     this.error.set('');
     this.formulario.set('datos');
+    this.dBienes.set([]);
+    this.dMotivoBienes.set('');
 
-    /* El padron de dependencias y areas solo hace falta al corregir. */
-    if (!this.organizacion().dependencias.length) {
-      this.api.organizacion().subscribe({
-        next: (o) => this.organizacion.set(o),
-        error: (e) => this.error.set(mensajeError(e)),
+    /* Igual que al registrar: si el campo pide inventario, se elige de una lista. */
+    if (this.esInventarioTicket()) {
+      this.dCargandoBienes.set(true);
+      this.api.bienesParaCorregir(t.id).subscribe({
+        next: (r) => {
+          this.dCargandoBienes.set(false);
+          this.dBienes.set(r.bienes);
+          this.dMotivoBienes.set(r.bienes.length ? '' : (r.motivo ?? 'No tiene bienes resguardados.'));
+        },
+        error: (e) => {
+          this.dCargandoBienes.set(false);
+          this.dBienes.set([]);
+          this.dMotivoBienes.set(mensajeError(e));
+        },
       });
     }
   }
 
-  /** Al cambiar de dependencia el area anterior deja de ser valida. */
-  cambiaDependenciaDatos(valor: string) {
-    this.dDependencia.set(valor ? Number(valor) : null);
-    this.dArea.set(null);
+  /** Equipo de computo: un solo equipo por ticket. */
+  dElegirBienUnico(inventario: string) {
+    this.dSeleccion.set([inventario]);
+  }
+
+  /** Resto de servicios con inventario: un reporte puede abarcar varios bienes. */
+  dAlternaBien(inventario: string) {
+    const actual = this.dSeleccion();
+    this.dSeleccion.set(
+      actual.includes(inventario) ? actual.filter((i) => i !== inventario) : [...actual, inventario],
+    );
   }
 
   enviarDatos() {
@@ -231,14 +258,7 @@ export class DetalleTicket {
     if (!t) return;
     this.ocupado.set(true);
     this.api
-      .datos(t.id, {
-        contexto: this.dContexto().trim(),
-        extension: this.dExtension().trim(),
-        /* Un ticket interno no tiene dependencia del solicitante que corregir. */
-        ...(t.interno
-          ? {}
-          : { dependencia: this.dDependencia() ?? undefined, area: this.dArea() }),
-      })
+      .datos(t.id, { contexto: this.dContextoFinal(), extension: this.dExtension().trim() })
       .subscribe({ next: (r) => this.aplicar(r), error: (e) => this.falla(e) });
   }
 

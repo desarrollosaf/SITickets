@@ -203,8 +203,18 @@ export class TicketsService {
       0,
     );
 
+    /*
+     * Organizacion real del solicitante, tal como vive en saf (no el
+     * dependencia_id/area_id local del ticket): es solo informativa, nunca
+     * se corrige a mano. Mismo dato que ya usa el dictamen de baja.
+     */
+    const orgSaf = await this.datosOrganizacionalesDelSolicitante(ticket.solicitante_id);
+
     return {
       ...this.resumen(ticket, objetivos, sesiones.length),
+      dependencia_saf: orgSaf.dependencia,
+      direccion_saf: orgSaf.direccion,
+      departamento_saf: orgSaf.departamento,
       texto_libre: ticket.texto_libre,
       diagnostico: ticket.diagnostico,
       solucion: ticket.solucion,
@@ -591,6 +601,13 @@ export class TicketsService {
     if (ESTATUS_FINALES.includes(ticket.estatus)) {
       throw new BadRequestException('El ticket ya esta cerrado o cancelado: sus datos no se tocan');
     }
+    /*
+     * Solo se corrige mientras el tecnico tiene el ticket en espera: evita
+     * pisar un cambio de bien mientras se esta atendiendo activamente.
+     */
+    if (ticket.estatus !== ESTATUS.EN_ESPERA) {
+      throw new BadRequestException('El ticket debe estar en espera para corregir sus datos');
+    }
 
     /* Cada cambio se anota por separado: la bitacora guarda antes y despues. */
     const cambios: { campo: string; antes: string; nuevo: string }[] = [];
@@ -623,36 +640,11 @@ export class TicketsService {
       }
     }
 
-    /*
-     * Dependencia y area viajan juntas: el area tiene que pertenecer a la
-     * dependencia, y la sede esperada del §16 se recalcula a partir del area.
-     */
-    if (dto.dependencia !== undefined || dto.area !== undefined) {
-      const depId = dto.dependencia ?? ticket.dependencia_id;
-      const dependencia = depId ? await this.dependencias.findByPk(depId) : null;
-      if (depId && !dependencia) throw new BadRequestException('La dependencia no existe');
-
-      const areaId = dto.area === undefined ? ticket.area_id : dto.area;
-      const area = areaId ? await this.areas.findByPk(areaId) : null;
-      if (areaId && !area) throw new BadRequestException('El area no existe');
-      if (area && area.dependencia_id !== depId) {
-        throw new BadRequestException('El area elegida no pertenece a esa dependencia');
-      }
-
-      if (depId !== ticket.dependencia_id) {
-        anota('Dependencia', ticket.dependencia?.nombre, dependencia?.nombre);
-        nuevos.dependencia_id = depId;
-      }
-      if (areaId !== ticket.area_id) {
-        anota('Area', ticket.area?.nombre, area?.nombre);
-        nuevos.area_id = areaId;
-        /* La sede no se captura: sale del area, igual que en el alta. */
-        const sede = area?.sede_id ?? null;
-        if (sede !== ticket.sede_id) nuevos.sede_id = sede;
-      }
-    }
 
     if (!cambios.length) throw new BadRequestException('No hay ningun cambio que guardar');
+
+    /* Antes de que ticket.update() lo pise, para el traspaso de custodia de abajo. */
+    const contextoAnterior = ticket.contexto;
 
     await this.db.transaction(async (tx) => {
       await ticket.update(nuevos, { transaction: tx });
@@ -670,7 +662,63 @@ export class TicketsService {
       '§9',
       `${ticket.folio}: ${usuario.nombre} corrigio ${cambios.map((c) => c.campo).join(', ')}.`,
     );
+
+    /*
+     * Equipo de computo: si se cambio el numero de inventario y el tecnico ya
+     * habia tomado el equipo anterior (esta EN ESPERA, asi que solo pudo pasar
+     * si arranco el reloj antes de pausar), hay que regresarlo y tomar el
+     * nuevo en su lugar — si no, el anterior se queda "atorado" en
+     * mantenimiento en SIASAF y el nuevo nunca se marca como en atencion.
+     */
+    if (typeof nuevos.contexto === 'string' && ticket.servicio?.clave === 'CMP' && ticket.tecnico_id) {
+      await this.traspasaCustodiaCmp(ticket, contextoAnterior, nuevos.contexto);
+    }
+
     return this.detalle(ticket.id, usuario);
+  }
+
+  /**
+   * Regresa (si estaba en mantenimiento) el equipo anterior y toma el nuevo
+   * en su lugar, a nombre del mismo tecnico — mismo mecanismo que
+   * marcarCmpEnMantenimiento/atenderCmp. Best-effort: si algo falla, la
+   * correccion de datos ya quedo guardada igual; solo se avisa en la traza.
+   */
+  private async traspasaCustodiaCmp(
+    ticket: Ticket,
+    contextoAnterior: string | null,
+    contextoNuevo: string,
+  ): Promise<void> {
+    const [tecnicoLocal, rfcSolicitante] = await Promise.all([
+      this.usuarios.findByPk(ticket.tecnico_id!, { attributes: ['rfc'] }),
+      this.rfcDelSolicitante(ticket.solicitante_id),
+    ]);
+    if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
+
+    const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
+
+    const anterior = contextoAnterior ? bienes.find((b) => b.inventario === contextoAnterior) : null;
+    if (anterior?.id && anterior.en_mantenimiento) {
+      const cierre = await this.bienesSrv.finalizarMantenimiento(anterior.id, tecnicoLocal.rfc, anterior.esBc, {
+        reparado: true,
+      });
+      if (!cierre.ok) {
+        this.traza.registra(
+          '§9',
+          `${ticket.folio}: no se pudo regresar el equipo anterior (${contextoAnterior}) en SIASAF (${cierre.motivo}).`,
+        );
+      }
+    }
+
+    const nuevo = bienes.find((b) => b.inventario === contextoNuevo);
+    if (nuevo?.id) {
+      const inicio = await this.bienesSrv.iniciarMantenimiento(nuevo.id, tecnicoLocal.rfc, nuevo.esBc);
+      if (!inicio.ok) {
+        this.traza.registra(
+          '§9',
+          `${ticket.folio}: no se pudo marcar el nuevo equipo (${contextoNuevo}) en mantenimiento (${inicio.motivo}).`,
+        );
+      }
+    }
   }
 
   /* ==================================================================
@@ -834,6 +882,44 @@ export class TicketsService {
     };
   }
 
+  /**
+   * Lista de bienes para elegir al corregir el numero de inventario de un
+   * ticket ya registrado — mismo mecanismo que al darlo de alta (CMP: un
+   * solo equipo; el resto de servicios con inventario: varios), pero sobre
+   * el resguardo del SOLICITANTE del ticket, no de quien esta corrigiendo.
+   * Mismas reglas que actualizarDatos: solo el solicitante o el admin, y
+   * solo con el ticket en espera.
+   */
+  async bienesParaCorregir(id: number, usuario: UsuarioToken) {
+    const ticket = await this.tickets.findOne({
+      where: { id, ...(await this.alcance(usuario)) },
+      include: INCLUDES,
+    });
+    if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
+
+    const suyo = ticket.solicitante_id === usuario.id;
+    if (!suyo && usuario.rol !== 'admin') {
+      throw new ForbiddenException('Solo quien levanto el reporte o el administrador lo corrigen');
+    }
+    if (ticket.estatus !== ESTATUS.EN_ESPERA) {
+      throw new BadRequestException('El ticket debe estar en espera para corregir el número de inventario');
+    }
+
+    const campo = (ticket.problema?.campo_adicional ?? '').toLowerCase();
+    if (!campo.includes('inventario')) {
+      return { bienes: [], motivo: 'Este ticket no captura número de inventario.' };
+    }
+
+    const rfc = await this.rfcDelSolicitante(ticket.solicitante_id);
+    if (!rfc) {
+      return { bienes: [], motivo: 'No se pudo identificar el RFC del solicitante.' };
+    }
+
+    return ticket.servicio?.clave === 'CMP'
+      ? this.bienesSrv.porRfcCmp(rfc)
+      : this.bienesSrv.porRfc(rfc);
+  }
+
   private esTecnicoDe(t: Ticket, usuario: UsuarioToken): boolean {
     return t.tecnico_id === usuario.id;
   }
@@ -893,7 +979,7 @@ export class TicketsService {
     const bien = bienes.find((b) => b.inventario === t.contexto);
     if (!bien?.id) return;
 
-    const inicio = await this.bienesSrv.iniciarMantenimiento(bien.id, tecnicoLocal.rfc);
+    const inicio = await this.bienesSrv.iniciarMantenimiento(bien.id, tecnicoLocal.rfc, bien.esBc);
     if (!inicio.ok) {
       this.traza.registra('§5', `${t.folio}: no se pudo marcar el equipo en mantenimiento (${inicio.motivo}).`);
     }
@@ -1030,6 +1116,7 @@ export class TicketsService {
      */
     let avisoCustodia: string | null = null;
     let bienId: number | null = null;
+    let bienEsBc = false;
     if (t.contexto) {
       const [tecnicoLocal, rfcSolicitante] = await Promise.all([
         this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
@@ -1039,8 +1126,9 @@ export class TicketsService {
         const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
         const bien = bienes.find((b) => b.inventario === t.contexto);
         bienId = bien?.id ?? null;
+        bienEsBc = bien?.esBc ?? false;
         if (bien?.id && tecnicoLocal?.rfc) {
-          const cierre = await this.bienesSrv.finalizarMantenimiento(bien.id, tecnicoLocal.rfc, {
+          const cierre = await this.bienesSrv.finalizarMantenimiento(bien.id, tecnicoLocal.rfc, bien.esBc, {
             reparado,
             observaciones: !reparado ? dto.observaciones!.trim() : undefined,
           });
@@ -1055,7 +1143,7 @@ export class TicketsService {
     let dictamenArchivo: string | null = null;
     if (!reparado) {
       const [detalleBien, org] = await Promise.all([
-        bienId ? this.bienesSrv.detalleBien(bienId) : null,
+        bienId ? this.bienesSrv.detalleBien(bienId, bienEsBc) : null,
         this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
       ]);
 
