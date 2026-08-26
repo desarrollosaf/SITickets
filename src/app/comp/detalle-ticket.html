@@ -31,7 +31,9 @@
         <div class="d-flex flex-wrap gap-2 mt-3 no-imprimir">
           <!-- Corrección de datos generales: no cambia el ticket, solo sus datos -->
           @if (puedeCorregir()) {
-            <button class="btn btn-sm btn-outline-secondary" (click)="abrirDatos()">
+            <button class="btn btn-sm btn-outline-secondary" [disabled]="!enEspera()"
+                    [title]="enEspera() ? '' : 'El ticket debe estar en espera para poder corregir sus datos'"
+                    (click)="abrirDatos()">
               <i class="bi bi-pencil"></i> Corregir datos
             </button>
           }
@@ -159,31 +161,83 @@
 
               @if (t.campo_adicional) {
                 <label class="form-label small fw-semibold" for="fm-ctx">{{ t.campo_adicional }}</label>
-                <input id="fm-ctx" class="form-control form-control-sm mb-2" [(ngModel)]="dContexto"
-                       name="dContexto" />
+
+                @if (esInventarioTicket()) {
+                  @if (dCargandoBienes()) {
+                    <div class="form-text mb-2">
+                      <span class="spinner-border spinner-border-sm me-2"></span>
+                      Consultando los bienes resguardados…
+                    </div>
+                  } @else if (dBienes().length) {
+                    @if (esCmpTicket()) {
+                      <!-- Un solo equipo: es el que se va a reparar. -->
+                      <div class="border rounded p-2 mb-2" style="max-height: 220px; overflow-y: auto">
+                        @for (b of dBienes(); track b.inventario) {
+                          <div class="form-check">
+                            <input class="form-check-input" type="radio" name="dBienCmp"
+                                   [id]="'d-bien-' + b.inventario" [disabled]="b.en_mantenimiento"
+                                   [checked]="dSeleccion()[0] === b.inventario"
+                                   (change)="dElegirBienUnico(b.inventario)" />
+                            <label class="form-check-label small" [class.text-muted]="b.en_mantenimiento"
+                                   [for]="'d-bien-' + b.inventario">
+                              <b>{{ b.inventario }}</b>
+                              @if (b.descripcion) {
+                                <span class="sub"> · {{ b.descripcion }}</span>
+                              }
+                              @if (b.en_mantenimiento) {
+                                <span class="chip chip-bandera ms-1">En atención</span>
+                              }
+                            </label>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
+                      <div class="border rounded p-2 mb-2" style="max-height: 220px; overflow-y: auto">
+                        @for (b of dBienes(); track b.inventario) {
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" [id]="'d-bien-' + b.inventario"
+                                   [checked]="dSeleccion().includes(b.inventario)"
+                                   (change)="dAlternaBien(b.inventario)" />
+                            <label class="form-check-label small" [for]="'d-bien-' + b.inventario">
+                              <b>{{ b.inventario }}</b>
+                              @if (b.descripcion) {
+                                <span class="sub"> · {{ b.descripcion }}</span>
+                              }
+                            </label>
+                          </div>
+                        }
+                      </div>
+                    }
+                    <div class="form-text mb-2">
+                      @if (dSeleccion().length) {
+                        Elegido: {{ dContextoFinal() }}
+                      } @else {
+                        Elige de la lista; solo aparece lo que tiene asignado.
+                      }
+                    </div>
+                  } @else {
+                    <input id="fm-ctx" class="form-control form-control-sm mb-2" [(ngModel)]="dContexto"
+                           name="dContexto" />
+                    <div class="form-text mb-2">
+                      {{ dMotivoBienes() || 'Captura el número de inventario a mano.' }}
+                    </div>
+                  }
+                } @else {
+                  <input id="fm-ctx" class="form-control form-control-sm mb-2" [(ngModel)]="dContexto"
+                         name="dContexto" />
+                }
               }
 
               @if (!t.interno) {
-                <label class="form-label small fw-semibold" for="fm-dep">Dependencia</label>
-                <select id="fm-dep" class="form-select form-select-sm mb-2"
-                        (change)="cambiaDependenciaDatos($any($event.target).value)">
-                  <option value="">Selecciona…</option>
-                  @for (d of organizacion().dependencias; track d.id) {
-                    <option [value]="d.id" [selected]="d.id === dDependencia()">{{ d.nombre }}</option>
-                  }
-                </select>
-
-                <label class="form-label small fw-semibold" for="fm-area">Área</label>
-                <select id="fm-area" class="form-select form-select-sm mb-2"
-                        [disabled]="!dDependencia()"
-                        (change)="dArea.set($any($event.target).value ? +$any($event.target).value : null)">
-                  <option value="">Sin área</option>
-                  @for (a of areasDeDependencia(); track a.id) {
-                    <option [value]="a.id" [selected]="a.id === dArea()">{{ a.nombre }}</option>
-                  }
-                </select>
+                <label class="form-label small fw-semibold mb-1">Organización (SAF)</label>
                 <div class="form-text mb-2">
-                  La sede esperada se recalcula a partir del área: no se captura aparte.
+                  Dependencia: {{ t.dependencia_saf || '—' }}<br />
+                  Dirección: {{ t.direccion_saf || '—' }}<br />
+                  Departamento: {{ t.departamento_saf || '—' }}
+                  <div>
+                    <i class="bi bi-info-circle"></i> Es solo informativa: sale del padrón de saf y no se corrige aquí.
+                  </div>
                 </div>
 
                 <label class="form-label small fw-semibold" for="fm-ext">Extensión</label>
@@ -543,9 +597,11 @@
 
             @if (!t.interno) {
               <dt class="col-5 sub fw-normal">Dependencia</dt>
-              <dd class="col-7">{{ t.dependencia }}</dd>
-              <dt class="col-5 sub fw-normal">Área</dt>
-              <dd class="col-7">{{ t.area }}</dd>
+              <dd class="col-7">{{ t.dependencia_saf || '—' }}</dd>
+              <dt class="col-5 sub fw-normal">Dirección</dt>
+              <dd class="col-7">{{ t.direccion_saf || '—' }}</dd>
+              <dt class="col-5 sub fw-normal">Departamento</dt>
+              <dd class="col-7">{{ t.departamento_saf || '—' }}</dd>
               <dt class="col-5 sub fw-normal">Extensión</dt>
               <dd class="col-7">{{ t.extension || '—' }}</dd>
               <dt class="col-5 sub fw-normal">Sede esperada</dt>

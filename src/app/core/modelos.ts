@@ -109,6 +109,10 @@ export interface LineaBitacora {
 
 export interface TicketDetalle extends Omit<Ticket, 'sesiones'> {
   sesiones: SesionReloj[];
+  /** Organizacion real del solicitante en saf; informativa, no se corrige a mano. */
+  dependencia_saf: string | null;
+  direccion_saf: string | null;
+  departamento_saf: string | null;
   texto_libre: string | null;
   diagnostico: string | null;
   solucion: string | null;

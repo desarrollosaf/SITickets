@@ -69,6 +69,12 @@ export class TicketsController {
     return this.tickets.bienDelTicket(id, usuario);
   }
 
+  /** Lista para elegir al corregir el numero de inventario (ticket en espera). */
+  @Get(':id/bienes-para-corregir')
+  bienesParaCorregir(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.bienesParaCorregir(id, usuario);
+  }
+
   @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {

@@ -61,4 +61,14 @@ export class Monitor implements OnDestroy {
     const el = document.getElementById('tablero-monitor');
     if (el) void el.requestFullscreen?.();
   }
+
+  /** De "atendiendo ahora", cuantos tiene el tecnico pausados (EN_ESPERA). */
+  enEspera(atencion: DatosMonitor['atencion']): number {
+    return atencion.filter((a) => a.estatus === 'EN_ESPERA').length;
+  }
+
+  /** De "atendiendo ahora", cuantos siguen activos (todo lo que no esta en espera). */
+  enCurso(atencion: DatosMonitor['atencion']): number {
+    return atencion.filter((a) => a.estatus !== 'EN_ESPERA').length;
+  }
 }

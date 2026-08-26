@@ -9,9 +9,19 @@ export interface Bien {
   descripcion: string | null;
 
   /**
-   * id crudo del bien en SIASAF (campo `bien.id` de la API de CMP).
+   * id crudo del bien en SIASAF (campo `bien.id` de la API de CMP). OJO: no
+   * es un espacio de ids unico — un bien normal y un BNI pueden compartir el
+   * mismo numero (son tablas distintas del lado de SIASAF), por eso siempre
+   * hay que acompañarlo de `esBc` al usarlo contra otro endpoint.
    */
   id: number | null;
+
+  /**
+   * true si el bien viene del arreglo "bienesbc" (nomenclatura BNI, bienes
+   * de bajo costo) en vez del arreglo "data" (bien normal). Determina que
+   * variante de endpoint usar despues (bienesinfo/bienesinfobc, tipob 1/2).
+   */
+  esBc: boolean;
 
   /**
    * true si actualmente está en mantenimiento.
@@ -304,7 +314,7 @@ export class BienesService {
   }
 
   /** Nunca lanza: si el sistema de bienes no responde, la pantalla debe poder seguir con captura manual. */
-  private async porRfc(rfcCrudo: string): Promise<RespuestaBienes> {
+  async porRfc(rfcCrudo: string): Promise<RespuestaBienes> {
     const rfc = rfcCrudo.trim().toUpperCase();
 
     if (!RE_RFC.test(rfc)) {
@@ -457,6 +467,8 @@ export class BienesService {
 
         id: null,
 
+        esBc: false,
+
         en_mantenimiento:
           false,
       });
@@ -590,21 +602,30 @@ export class BienesService {
     const cuerpo =
       (await respuesta.json()) as {
         data?: unknown[];
+        bienesbc?: unknown[];
       };
 
-    const filas =
-      Array.isArray(
-        cuerpo?.data,
-      )
-        ? cuerpo.data
-        : [];
+    /*
+     * "bienesbc" son los bienes con nomenclatura BNI (otra categoria,
+     * fuera del inventario normal "A..."): SIASAF los manda en un arreglo
+     * aparte, con la misma forma salvo que la llave del renglon es
+     * bien_mueble_b_c_id en vez de bien_mueble_id — el objeto "bien"
+     * anidado (id/numero_inventario/nombre_bien) es igual en los dos, asi
+     * que se procesan juntos con el mismo mapeo. Se marca `esBc` desde aqui
+     * (el arreglo de donde salio cada renglon) porque `bien.id` por si solo
+     * NO alcanza para saberlo: se traslapa con el id de un bien normal.
+     */
+    const filas = [
+      ...(Array.isArray(cuerpo?.data) ? cuerpo.data : []).map((f) => ({ fila: f, esBc: false })),
+      ...(Array.isArray(cuerpo?.bienesbc) ? cuerpo.bienesbc : []).map((f) => ({ fila: f, esBc: true })),
+    ];
 
     const vistos =
       new Set<string>();
 
     const bienes: Bien[] = [];
 
-    for (const filaRaw of filas) {
+    for (const { fila: filaRaw, esBc } of filas) {
       const fila =
         filaRaw as {
           estatus_bien_id?:
@@ -647,6 +668,8 @@ export class BienesService {
           fila.bien?.id ??
           null,
 
+        esBc,
+
         en_mantenimiento:
           fila.estatus_bien_id ===
           ESTATUS_MANTENIMIENTO,
@@ -657,10 +680,13 @@ export class BienesService {
   }
 
   /**
-   * GET {base}/bienesinfo/{id}
+   * GET {base}/bienesinfo/{id} (bien normal) o {base}/bienesinfobc/{id}
+   * (BNI) — el mismo `id` numerico existe en las dos tablas y NO refiere lo
+   * mismo, asi que `esBc` es obligatorio para pegarle a la ruta correcta.
    */
   async detalleBien(
     bienId: number,
+    esBc: boolean,
   ): Promise<{
     numero_inventario: string;
     nombre_bien: string;
@@ -671,7 +697,7 @@ export class BienesService {
     try {
       const url =
         `${this.baseCmp()}/` +
-        `bienesinfo/${bienId}`;
+        `${esBc ? 'bienesinfobc' : 'bienesinfo'}/${bienId}`;
 
       const respuesta =
         await fetch(url, {
@@ -878,6 +904,7 @@ export class BienesService {
   async iniciarMantenimiento(
     bienId: number,
     rfcTecnico: string,
+    esBc: boolean,
   ): Promise<{
     ok: boolean;
     motivo: string | null;
@@ -905,6 +932,11 @@ export class BienesService {
             0,
 
           bien_id: bienId,
+
+          /* 1 = bien normal, 2 = BNI (bajo costo) — el mismo bien_id existe
+             en las dos tablas del lado de SIASAF, tipob es lo que le dice
+             cual de las dos usar. */
+          tipob: esBc ? 2 : 1,
         },
       );
 
@@ -940,6 +972,7 @@ export class BienesService {
   async finalizarMantenimiento(
     bienId: number,
     rfcTecnico: string,
+    esBc: boolean,
     opciones: {
       reparado: boolean;
       observaciones?: string;
@@ -974,6 +1007,9 @@ export class BienesService {
 
         bien_id:
           bienId,
+
+        /* 1 = bien normal, 2 = BNI (bajo costo); ver iniciarMantenimiento. */
+        tipob: esBc ? 2 : 1,
 
         baja: 0,
 
