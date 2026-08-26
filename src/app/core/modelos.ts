@@ -30,6 +30,8 @@ export interface UsuarioSesion {
   area: string | null;
   dependencia_id: number | null;
   area_id: number | null;
+  /** true: nunca ve "registrar a nombre de otro", sin importar su rol o el servicio. */
+  siempreANombrePropio: boolean;
 }
 
 export interface Sesion {
@@ -173,6 +175,10 @@ export interface Servicio {
   origen: 'usuario' | 'administrador';
   externo: boolean;
   multi_tecnico: boolean;
+  /** false solo en la excepcion puntual de RESTRICCION_SERVICIO: tu perfil no puede registrarlo. */
+  puedeRegistrar: boolean;
+  /** true si este servicio tiene lista de gente puntual: ahi nadie registra "a nombre de otro". */
+  restringido: boolean;
 }
 
 export interface Prioridad {
@@ -269,7 +275,8 @@ export interface Monitor {
     prioridad: string;
     en_cola: boolean;
     servicio: string;
-    dependencia: string;
+    /** Departamento del solicitante en saf, no el catalogo local del ticket. */
+    departamento: string;
     tecnico: string | null;
     min_espera: number;
   }[];

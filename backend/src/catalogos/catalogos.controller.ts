@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { CatalogosService } from './catalogos.service';
 import { Publico, Roles } from '../common/roles.decorator';
+import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decorator';
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { CrearServicioDto } from './dto/servicio.dto';
@@ -22,8 +23,8 @@ export class CatalogosController {
 
   /** Todo el catalogo operativo en una sola llamada. */
   @Get()
-  todo() {
-    return this.catalogos.todo();
+  todo(@UsuarioActual() usuario: UsuarioToken) {
+    return this.catalogos.todo(usuario);
   }
 
   @Get('problemas')

@@ -80,9 +80,13 @@ export class Nuevo {
 
   readonly excedeLargo = computed(() => this.contextoFinal().length > LARGO_CONTEXTO);
 
-  /** Solo los servicios que puede reportar un usuario (§3). */
+  /** Solo los servicios que puede reportar un usuario (§3) y que su perfil puede elegir. */
   readonly servicios = computed(() =>
-    (this.catalogos()?.servicios ?? []).filter((s) => s.origen === 'usuario'),
+    (this.catalogos()?.servicios ?? []).filter((s) => s.origen === 'usuario' && s.puedeRegistrar),
+  );
+
+  readonly servicioActual = computed(
+    () => this.servicios().find((s) => s.id === this.servicioId()) ?? null,
   );
 
   readonly problemas = computed(() =>
@@ -108,9 +112,19 @@ export class Nuevo {
 
   /** Solo el admin ve el tiempo objetivo de resolucion; no aplica a operador/gestor. */
   readonly esAdmin = computed(() => this.auth.rol() === 'admin');
-  /** Admin, operador y gestor pueden elegir a nombre de quien registran el ticket. */
-  readonly puedeElegirUsuario = computed(() =>
-    ['admin', 'operador', 'gestor'].includes(this.auth.rol() ?? ''),
+  /**
+   * Admin, operador y gestor pueden elegir a nombre de quien registran el
+   * ticket — excepto en un servicio restringido a gente puntual (ver
+   * RESTRICCION_SERVICIO en el backend): ahi el ticket siempre queda a
+   * nombre de quien esta en sesion, sin excepcion salvo el admin. Tambien
+   * queda descartado, sin importar el servicio, para quien trae marcado
+   * siempreANombrePropio (ver RFC_SIEMPRE_A_NOMBRE_PROPIO en el backend).
+   */
+  readonly puedeElegirUsuario = computed(
+    () =>
+      ['admin', 'operador', 'gestor'].includes(this.auth.rol() ?? '') &&
+      !this.auth.usuario()?.siempreANombrePropio &&
+      (this.esAdmin() || !this.servicioActual()?.restringido),
   );
 
   busquedaUsuario = '';
@@ -178,6 +192,8 @@ export class Nuevo {
     this.servicioId.set(valor ? Number(valor) : null);
     this.claveProblema.set('');
     this.limpiar();
+    /* Un servicio restringido (ver puedeElegirUsuario) siempre es a nombre propio. */
+    if (!this.puedeElegirUsuario()) this.usuarioElegido.set(null);
   }
 
   /**

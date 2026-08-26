@@ -33,6 +33,7 @@ import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import { BienesService } from '../bienes/bienes.service';
 import { DictamenService } from './dictamen.service';
+import { RESTRICCION_SERVICIO, RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
@@ -457,6 +458,23 @@ export class TicketsService {
     if (problema.servicio.origen !== 'usuario') {
       throw new ForbiddenException('Ese tipo de trabajo solo lo genera el administrador');
     }
+
+    /*
+     * Excepcion puntual (ver RESTRICCION_SERVICIO): un par de servicios solo
+     * los puede registrar la gente listada ahi, mas el administrador.
+     */
+    const permitidos = RESTRICCION_SERVICIO[problema.servicio.clave];
+    if (permitidos && usuario.rol !== 'admin') {
+      const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+      if (!local?.rfc || !permitidos.includes(local.rfc)) {
+        throw new ForbiddenException('Tu perfil no puede registrar tickets de ese servicio');
+      }
+      /* Aunque su rfc este en la lista, ahi nunca se registra a nombre de otro. */
+      if (dto.a_nombre_de) {
+        throw new ForbiddenException('Ese servicio no se puede registrar a nombre de otro usuario');
+      }
+    }
+
     if (problema.requiere_texto && !dto.texto?.trim()) {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
@@ -498,6 +516,12 @@ export class TicketsService {
         throw new ForbiddenException(
           'Tu perfil no puede registrar un ticket a nombre de otro usuario',
         );
+      }
+      if (usuario.rol !== 'admin') {
+        const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+        if (local?.rfc && RFC_SIEMPRE_A_NOMBRE_PROPIO.includes(local.rfc)) {
+          throw new ForbiddenException('Tu perfil siempre registra el ticket a tu propio nombre');
+        }
       }
       const datos = await this.datosSaf(dto.a_nombre_de);
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
@@ -830,7 +854,8 @@ export class TicketsService {
    * rfcDelSolicitante: primero usuario local (por su rfc), si no existe se
    * asume que solicitante_id ya es un id_Usuario de saf.
    */
-  private async datosOrganizacionalesDelSolicitante(solicitanteId: number): Promise<{
+  /** Publico: tambien lo usa MonitorService para la cola de "en turno". */
+  async datosOrganizacionalesDelSolicitante(solicitanteId: number): Promise<{
     dependencia: string | null;
     direccion: string | null;
     departamento: string | null;
