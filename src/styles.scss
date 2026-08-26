@@ -185,6 +185,12 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
 }
 .monitor .turno.p1 { border-left: 4px solid #ff8c7f; }
 .monitor .turno.p2 { border-left: 4px solid #f0b45c; }
+.monitor .turno.p3 { border-left: 4px solid #7fb2e3; }
+.monitor .turno.p4 { border-left: 4px solid #7f92ae; }
+.monitor .turno.p1 .mono { color: #ff8c7f; }
+.monitor .turno.p2 .mono { color: #f0b45c; }
+.monitor .turno.p3 .mono { color: #7fb2e3; }
+.monitor .turno.p4 .mono { color: #7f92ae; }
 .monitor .turno .no {
   font-size: 1.3rem;
   font-weight: 700;
@@ -197,7 +203,6 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   padding: 0.8rem;
   border-left: 4px solid #7fe3c6;
 }
-.monitor .atendiendo.pausa { border-left-color: #f0b45c; }
 
 /* --------------------------------------------------------------------
    Calendario de disponibilidad (§8)

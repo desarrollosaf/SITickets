@@ -18,6 +18,25 @@ import {
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { CrearServicioDto } from './dto/servicio.dto';
+import type { UsuarioToken } from '../common/usuario-actual.decorator';
+
+/**
+ * Excepcion puntual, no un mecanismo general: estos dos servicios solo los
+ * puede registrar la gente listada aqui (mas el administrador, siempre). Si
+ * en el futuro se necesita esto para mas servicios vale la pena convertirlo
+ * en una tabla; por ahora son casos unicos y esta lista basta.
+ */
+export const RESTRICCION_SERVICIO: Record<string, string[]> = {
+  'CAM-01': ['TOMJ820727', 'NATL830315'],
+  SIS: ['CACX680312'],
+};
+
+/**
+ * Otra excepcion puntual: esta gente nunca registra "a nombre de otro" sin
+ * importar el servicio — el ticket siempre queda a su propio nombre, aunque
+ * su rol (gestor, en este caso) normalmente si tendria esa opcion.
+ */
+export const RFC_SIEMPRE_A_NOMBRE_PROPIO = ['TOMJ820727', 'NATL830315', 'CACX680312'];
 
 @Injectable()
 export class CatalogosService {
@@ -50,7 +69,7 @@ export class CatalogosService {
     return { dependencias, areas };
   }
 
-  async todo() {
+  async todo(usuario: UsuarioToken) {
     const [servicios, problemas, prioridades, estatus, motivos, sedes] = await Promise.all([
       this.servicios.findAll({
         where: { activo: true },
@@ -71,7 +90,35 @@ export class CatalogosService {
      * lo cambia basta reiniciar el API: el front no se recompila.
      */
     const correo_dominio = dominioInstitucional(this.config.get('CORREO_DOMINIO'));
-    return { servicios, problemas, prioridades, estatus, motivos, sedes, correo_dominio };
+
+    /*
+     * puedeRegistrar: solo importa para los pocos servicios en
+     * RESTRICCION_SERVICIO (ver arriba); el resto siempre viene en true. No
+     * se ocultan del catalogo (otras pantallas, como el filtro de "Todos los
+     * tickets", siguen necesitando verlos todos) — solo el formulario de
+     * alta lo usa para no ofrecerlos a quien no puede elegirlos.
+     */
+    const rfc =
+      usuario.rol === 'admin'
+        ? null
+        : ((await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }))?.rfc ?? null);
+    const serviciosConPermiso = servicios.map((s) => {
+      const permitidos = RESTRICCION_SERVICIO[s.clave];
+      const puedeRegistrar = !permitidos || usuario.rol === 'admin' || (!!rfc && permitidos.includes(rfc));
+      /* restringido: el formulario de alta lo usa para saber que, aqui, ni
+         admin/operador/gestor pueden registrar "a nombre de otro". */
+      return { ...s.toJSON(), puedeRegistrar, restringido: !!permitidos };
+    });
+
+    return {
+      servicios: serviciosConPermiso,
+      problemas,
+      prioridades,
+      estatus,
+      motivos,
+      sedes,
+      correo_dominio,
+    };
   }
 
   async problemas(origen?: 'usuario' | 'administrador') {

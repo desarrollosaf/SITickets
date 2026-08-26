@@ -62,13 +62,13 @@ export class Monitor implements OnDestroy {
     if (el) void el.requestFullscreen?.();
   }
 
-  /** De "atendiendo ahora", cuantos tiene el tecnico pausados (EN_ESPERA). */
+  /** De "atendiendo ahora", cuantos tiene el tecnico pausados (EN_ESPERA). Se cuentan, no se listan. */
   enEspera(atencion: DatosMonitor['atencion']): number {
     return atencion.filter((a) => a.estatus === 'EN_ESPERA').length;
   }
 
-  /** De "atendiendo ahora", cuantos siguen activos (todo lo que no esta en espera). */
-  enCurso(atencion: DatosMonitor['atencion']): number {
-    return atencion.filter((a) => a.estatus !== 'EN_ESPERA').length;
+  /** Los que si se listan: todo lo que no esta en espera. */
+  enCurso(atencion: DatosMonitor['atencion']): DatosMonitor['atencion'] {
+    return atencion.filter((a) => a.estatus !== 'EN_ESPERA');
   }
 }

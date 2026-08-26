@@ -4,7 +4,6 @@ import { Op, QueryTypes } from 'sequelize';
 import {
   CalendarioTecnico,
   CatalogoProblema,
-  Dependencia,
   ESTATUS,
   ESTATUS_ABIERTOS,
   ESTATUS_FINALES,
@@ -15,6 +14,7 @@ import {
   Usuario,
 } from '../database/models';
 import { ReglasService } from '../tickets/reglas.service';
+import { TicketsService } from '../tickets/tickets.service';
 
 const ORDEN_PRI: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
 
@@ -34,6 +34,7 @@ export class MonitorService {
     @InjectModel(TecnicoServicio) private readonly especialidades: typeof TecnicoServicio,
     @InjectModel(CalendarioTecnico) private readonly calendario: typeof CalendarioTecnico,
     private readonly reglas: ReglasService,
+    private readonly ticketsSrv: TicketsService,
   ) {}
 
   /* ==================================================================
@@ -106,28 +107,34 @@ export class MonitorService {
       where: { [Op.or]: [{ estatus: ESTATUS.ASIGNADO }, { en_cola: true }] },
       include: [
         { model: Servicio, as: 'servicio' },
-        { model: Dependencia },
         { model: Usuario, as: 'tecnico', attributes: ['nombre'] },
       ],
     });
 
-    const cola = enTurno
-      .sort((a, b) => {
-        const d = ORDEN_PRI[a.prioridad] - ORDEN_PRI[b.prioridad];
-        if (d !== 0) return d;
-        return new Date(a.f_registro).getTime() - new Date(b.f_registro).getTime();
-      })
-      .map((t, i) => ({
-        turno: i + 1,
-        id: t.id,
-        folio: t.folio,
-        prioridad: t.prioridad,
-        en_cola: t.en_cola,
-        servicio: t.servicio?.nombre ?? '—',
-        dependencia: t.dependencia?.nombre ?? '—',
-        tecnico: t.tecnico?.nombre ?? null,
-        min_espera: Math.round((Date.now() - new Date(t.f_registro).getTime()) / 60_000),
-      }));
+    const cola = await Promise.all(
+      enTurno
+        .sort((a, b) => {
+          const d = ORDEN_PRI[a.prioridad] - ORDEN_PRI[b.prioridad];
+          if (d !== 0) return d;
+          return new Date(a.f_registro).getTime() - new Date(b.f_registro).getTime();
+        })
+        .map(async (t, i) => {
+          /* Departamento del solicitante en saf, no el dependencia_id local
+             del ticket: ese catalogo a veces sale vacio o desactualizado. */
+          const org = await this.ticketsSrv.datosOrganizacionalesDelSolicitante(t.solicitante_id);
+          return {
+            turno: i + 1,
+            id: t.id,
+            folio: t.folio,
+            prioridad: t.prioridad,
+            en_cola: t.en_cola,
+            servicio: t.servicio?.nombre ?? '—',
+            departamento: org.departamento ?? '—',
+            tecnico: t.tecnico?.nombre ?? null,
+            min_espera: Math.round((Date.now() - new Date(t.f_registro).getTime()) / 60_000),
+          };
+        }),
+    );
 
     return {
       atencion,

@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { Area, Dependencia, SUsuario, Usuario, UserSaf } from '../database/models';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
+import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import { CambiarPasswordDto, LoginDto } from './dto/auth.dto';
 
 /** Coste de bcrypt. 12 es el punto razonable hoy entre seguridad y latencia. */
@@ -21,6 +22,8 @@ export interface SesionRespuesta {
     area: string | null;
     dependencia_id: number | null;
     area_id: number | null;
+    /** true: nunca ve "registrar a nombre de otro", sin importar su rol o el servicio. */
+    siempreANombrePropio: boolean;
   };
 }
 
@@ -92,6 +95,7 @@ export class AuthService {
         area: null,
         dependencia_id: null,
         area_id: null,
+        siempreANombrePropio: false,
       },
     };
   }
@@ -123,6 +127,7 @@ export class AuthService {
         area: null,
         dependencia_id: null,
         area_id: null,
+        siempreANombrePropio: false,
       };
     }
 
@@ -145,6 +150,7 @@ export class AuthService {
       area: usuario.area?.nombre ?? null,
       dependencia_id: usuario.dependencia_id,
       area_id: usuario.area_id,
+      siempreANombrePropio: !!usuario.rfc && RFC_SIEMPRE_A_NOMBRE_PROPIO.includes(usuario.rfc),
     };
   }
 }
