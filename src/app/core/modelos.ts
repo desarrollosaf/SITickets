@@ -175,10 +175,20 @@ export interface Servicio {
   origen: 'usuario' | 'administrador';
   externo: boolean;
   multi_tecnico: boolean;
-  /** false solo en la excepcion puntual de RESTRICCION_SERVICIO: tu perfil no puede registrarlo. */
-  puedeRegistrar: boolean;
-  /** true si este servicio tiene lista de gente puntual: ahi nadie registra "a nombre de otro". */
+  /** Alta/baja logica: false lo oculta del formulario de tickets sin borrarlo. */
+  activo: boolean;
+  /** true: solo la gente en su lista de usuarios permitidos (mas el admin) lo registra. */
   restringido: boolean;
+  /** false cuando restringido=true y tu perfil no esta en esa lista (ni eres admin). */
+  puedeRegistrar: boolean;
+}
+
+/** Fila de la lista de acceso de un servicio con restringido=true. */
+export interface UsuarioPermitido {
+  id: number;
+  rfc: string;
+  nombre: string;
+  creado_en: string;
 }
 
 export interface Prioridad {

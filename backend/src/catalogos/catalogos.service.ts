@@ -12,24 +12,15 @@ import {
   Prioridad,
   Sede,
   Servicio,
+  ServicioUsuarioPermitido,
+  SUsuario,
   TecnicoServicio,
   Usuario,
 } from '../database/models';
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
-import { CrearServicioDto } from './dto/servicio.dto';
+import { AgregarUsuarioPermitidoDto, ActualizarServicioDto, CrearServicioDto } from './dto/servicio.dto';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
-
-/**
- * Excepcion puntual, no un mecanismo general: estos dos servicios solo los
- * puede registrar la gente listada aqui (mas el administrador, siempre). Si
- * en el futuro se necesita esto para mas servicios vale la pena convertirlo
- * en una tabla; por ahora son casos unicos y esta lista basta.
- */
-export const RESTRICCION_SERVICIO: Record<string, string[]> = {
-  'CAM-01': ['TOMJ820727', 'NATL830315'],
-  SIS: ['CACX680312'],
-};
 
 /**
  * Otra excepcion puntual: esta gente nunca registra "a nombre de otro" sin
@@ -50,6 +41,9 @@ export class CatalogosService {
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
+    @InjectModel(ServicioUsuarioPermitido)
+    private readonly permitidos: typeof ServicioUsuarioPermitido,
+    @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     private readonly config: ConfigService,
   ) {}
 
@@ -92,22 +86,31 @@ export class CatalogosService {
     const correo_dominio = dominioInstitucional(this.config.get('CORREO_DOMINIO'));
 
     /*
-     * puedeRegistrar: solo importa para los pocos servicios en
-     * RESTRICCION_SERVICIO (ver arriba); el resto siempre viene en true. No
-     * se ocultan del catalogo (otras pantallas, como el filtro de "Todos los
+     * puedeRegistrar: solo importa para los servicios con restringido=true
+     * (ver ServicioUsuarioPermitido); el resto siempre viene en true. No se
+     * ocultan del catalogo (otras pantallas, como el filtro de "Todos los
      * tickets", siguen necesitando verlos todos) — solo el formulario de
      * alta lo usa para no ofrecerlos a quien no puede elegirlos.
      */
-    const rfc =
-      usuario.rol === 'admin'
-        ? null
-        : ((await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }))?.rfc ?? null);
+    const restringidos = servicios.filter((s) => s.restringido);
+    const rfc = await this.rfcDe(usuario);
+    const permitidosPorServicio = restringidos.length
+      ? await this.permitidos.findAll({
+          where: { servicio_id: restringidos.map((s) => s.id) },
+          attributes: ['servicio_id', 'rfc'],
+        })
+      : [];
+    const mapaPermitidos = new Map<number, Set<string>>();
+    for (const p of permitidosPorServicio) {
+      if (!mapaPermitidos.has(p.servicio_id)) mapaPermitidos.set(p.servicio_id, new Set());
+      mapaPermitidos.get(p.servicio_id)!.add(p.rfc);
+    }
     const serviciosConPermiso = servicios.map((s) => {
-      const permitidos = RESTRICCION_SERVICIO[s.clave];
-      const puedeRegistrar = !permitidos || usuario.rol === 'admin' || (!!rfc && permitidos.includes(rfc));
-      /* restringido: el formulario de alta lo usa para saber que, aqui, ni
-         admin/operador/gestor pueden registrar "a nombre de otro". */
-      return { ...s.toJSON(), puedeRegistrar, restringido: !!permitidos };
+      const puedeRegistrar =
+        !s.restringido ||
+        usuario.rol === 'admin' ||
+        (!!rfc && !!mapaPermitidos.get(s.id)?.has(rfc));
+      return { ...s.toJSON(), puedeRegistrar };
     });
 
     return {
@@ -210,6 +213,86 @@ export class CatalogosService {
       }
       throw e;
     }
+  }
+
+  /**
+   * Edicion de un servicio ya existente. La clave queda fuera: varios lugares
+   * del backend la usan como identificador fijo (CMP, CAM-01, SIS...), asi
+   * que cambiarla ahi rompe esos flujos sin que nada lo avise.
+   */
+  async actualizarServicio(id: number, dto: ActualizarServicioDto) {
+    const servicio = await this.servicios.findByPk(id);
+    if (!servicio) throw new NotFoundException('El servicio no existe');
+
+    try {
+      await servicio.update({
+        ...(dto.nombre !== undefined && { nombre: dto.nombre.trim() }),
+        ...(dto.prefijo_folio !== undefined && {
+          prefijo_folio: dto.prefijo_folio.trim().toUpperCase(),
+        }),
+        ...(dto.origen !== undefined && { origen: dto.origen }),
+        ...(dto.externo !== undefined && { externo: dto.externo }),
+        ...(dto.multi_tecnico !== undefined && { multi_tecnico: dto.multi_tecnico }),
+        ...(dto.restringido !== undefined && { restringido: dto.restringido }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un servicio con esos datos');
+      }
+      throw e;
+    }
+    return servicio;
+  }
+
+  /** Quien puede registrar tickets de un servicio con restringido=true. */
+  async usuariosPermitidos(servicioId: number) {
+    const servicio = await this.servicios.findByPk(servicioId);
+    if (!servicio) throw new NotFoundException('El servicio no existe');
+    return this.permitidos.findAll({
+      where: { servicio_id: servicioId },
+      order: [['nombre', 'ASC']],
+    });
+  }
+
+  /** Se busca en saf (mismo padron que "a nombre de otro") y se guarda su rfc y nombre tal cual. */
+  async agregarUsuarioPermitido(servicioId: number, dto: AgregarUsuarioPermitidoDto) {
+    const servicio = await this.servicios.findByPk(servicioId);
+    if (!servicio) throw new NotFoundException('El servicio no existe');
+
+    const sUsuario = await this.sUsuarios.findByPk(dto.id_usuario_saf);
+    if (!sUsuario || sUsuario.Estado !== 1) {
+      throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
+    }
+
+    try {
+      return await this.permitidos.create({
+        servicio_id: servicioId,
+        rfc: sUsuario.N_Usuario,
+        nombre: sUsuario.Nombre,
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ese usuario ya esta en la lista de este servicio');
+      }
+      throw e;
+    }
+  }
+
+  async quitarUsuarioPermitido(servicioId: number, id: number) {
+    const fila = await this.permitidos.findOne({ where: { id, servicio_id: servicioId } });
+    if (!fila) throw new NotFoundException('Ese registro no existe');
+    await fila.destroy();
+    return { ok: true };
+  }
+
+  /** Rfc de quien llama, sea personal local o solicitante externo (saf); null si no aplica. */
+  private async rfcDe(usuario: UsuarioToken): Promise<string | null> {
+    if (usuario.rol === 'admin') return null;
+    const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+    if (local?.rfc) return local.rfc;
+    const externo = await this.sUsuarios.findByPk(usuario.id);
+    return externo?.N_Usuario ?? null;
   }
 
   async actualizarProblema(id: number, dto: ActualizarProblemaDto) {

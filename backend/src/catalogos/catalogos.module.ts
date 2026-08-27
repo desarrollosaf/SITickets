@@ -9,6 +9,8 @@ import {
   Prioridad,
   Sede,
   Servicio,
+  ServicioUsuarioPermitido,
+  SUsuario,
   TecnicoServicio,
   Usuario,
 } from '../database/models';
@@ -19,6 +21,7 @@ import { CatalogosService } from './catalogos.service';
   imports: [
     SequelizeModule.forFeature([
       Servicio,
+      ServicioUsuarioPermitido,
       CatalogoProblema,
       Prioridad,
       Estatus,
@@ -29,6 +32,7 @@ import { CatalogosService } from './catalogos.service';
       Usuario,
       TecnicoServicio,
     ]),
+    SequelizeModule.forFeature([SUsuario], 'saf'),
   ],
   controllers: [CatalogosController],
   providers: [CatalogosService],

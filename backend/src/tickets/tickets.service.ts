@@ -22,6 +22,7 @@ import {
   SDireccion,
   Sede,
   Servicio,
+  ServicioUsuarioPermitido,
   SUsuario,
   Ticket,
   TicketBitacora,
@@ -33,7 +34,7 @@ import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import { BienesService } from '../bienes/bienes.service';
 import { DictamenService } from './dictamen.service';
-import { RESTRICCION_SERVICIO, RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
+import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
@@ -81,6 +82,8 @@ export class TicketsService {
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
+    @InjectModel(ServicioUsuarioPermitido)
+    private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     @InjectModel(SDireccion, 'saf') private readonly sDirecciones: typeof SDireccion,
@@ -460,16 +463,20 @@ export class TicketsService {
     }
 
     /*
-     * Excepcion puntual (ver RESTRICCION_SERVICIO): un par de servicios solo
-     * los puede registrar la gente listada ahi, mas el administrador.
+     * Servicio restringido (ver ServicioUsuarioPermitido, administrable desde
+     * el catalogo): solo la gente en esa lista, mas el administrador.
      */
-    const permitidos = RESTRICCION_SERVICIO[problema.servicio.clave];
-    if (permitidos && usuario.rol !== 'admin') {
-      const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
-      if (!local?.rfc || !permitidos.includes(local.rfc)) {
+    if (problema.servicio.restringido && usuario.rol !== 'admin') {
+      const rfc = await this.rfcDelSolicitante(usuario.id);
+      const permitido = rfc
+        ? await this.permitidosServicio.findOne({
+            where: { servicio_id: problema.servicio_id, rfc },
+          })
+        : null;
+      if (!permitido) {
         throw new ForbiddenException('Tu perfil no puede registrar tickets de ese servicio');
       }
-      /* Aunque su rfc este en la lista, ahi nunca se registra a nombre de otro. */
+      /* Aunque este en la lista, ahi nunca se registra a nombre de otro. */
       if (dto.a_nombre_de) {
         throw new ForbiddenException('Ese servicio no se puede registrar a nombre de otro usuario');
       }
@@ -675,10 +682,15 @@ export class TicketsService {
       for (const c of cambios) {
         /* El detalle nombra el campo; el antes y el despues van en su columna,
            que es como la pantalla de bitacora los presenta. */
-        await this.reglas.anota(ticket.id, usuario.id, 'Correccion de datos', c.campo, tx, {
-          antes: c.antes.slice(0, 80),
-          nuevo: c.nuevo.slice(0, 80),
-        });
+        await this.reglas.anota(
+          ticket.id,
+          usuario.id,
+          'Correccion de datos',
+          c.campo,
+          tx,
+          { antes: c.antes.slice(0, 80), nuevo: c.nuevo.slice(0, 80) },
+          usuario.nombre,
+        );
       }
     });
 

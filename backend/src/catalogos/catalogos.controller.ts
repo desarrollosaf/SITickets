@@ -1,10 +1,24 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { CatalogosService } from './catalogos.service';
 import { Publico, Roles } from '../common/roles.decorator';
 import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decorator';
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
-import { CrearServicioDto } from './dto/servicio.dto';
+import {
+  ActualizarServicioDto,
+  AgregarUsuarioPermitidoDto,
+  CrearServicioDto,
+} from './dto/servicio.dto';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -50,6 +64,37 @@ export class CatalogosController {
   @Post('servicios')
   crearServicio(@Body() dto: CrearServicioDto) {
     return this.catalogos.crearServicio(dto);
+  }
+
+  @Roles('admin')
+  @Patch('servicios/:id')
+  actualizarServicio(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarServicioDto) {
+    return this.catalogos.actualizarServicio(id, dto);
+  }
+
+  /** Lista de quien puede registrar tickets de un servicio con restringido=true. */
+  @Roles('admin')
+  @Get('servicios/:id/usuarios-permitidos')
+  usuariosPermitidos(@Param('id', ParseIntPipe) id: number) {
+    return this.catalogos.usuariosPermitidos(id);
+  }
+
+  @Roles('admin')
+  @Post('servicios/:id/usuarios-permitidos')
+  agregarUsuarioPermitido(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AgregarUsuarioPermitidoDto,
+  ) {
+    return this.catalogos.agregarUsuarioPermitido(id, dto);
+  }
+
+  @Roles('admin')
+  @Delete('servicios/:id/usuarios-permitidos/:permId')
+  quitarUsuarioPermitido(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('permId', ParseIntPipe) permId: number,
+  ) {
+    return this.catalogos.quitarUsuarioPermitido(id, permId);
   }
 
   @Roles('admin')
