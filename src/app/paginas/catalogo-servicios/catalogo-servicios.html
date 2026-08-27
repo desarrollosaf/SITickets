@@ -1,0 +1,204 @@
+<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Catálogo de servicios</h1>
+    <p class="sub mb-0">
+      Los tipos de servicio que el sistema atiende. Cada uno define su folio, su origen y —cuando
+      hace falta— a quien se le permite registrar tickets ahí.
+    </p>
+  </div>
+  <button class="btn btn-primary btn-sm" (click)="abrirNuevoServicio()">
+    <i class="bi bi-plus-lg"></i> Nuevo servicio
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
+}
+
+<div class="tarjeta mb-3 overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr class="sub">
+          <th style="width: 90px">Clave</th>
+          <th>Nombre</th>
+          <th style="width: 90px">Folio</th>
+          <th style="width: 140px">Origen</th>
+          <th style="width: 90px">Estado</th>
+          <th style="width: 220px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of servicios(); track s.id) {
+          <tr [class.text-muted]="!s.activo">
+            <td class="mono sub">{{ s.clave }}</td>
+            <td>
+              {{ s.nombre }}
+              @if (s.restringido) {
+                <span class="chip chip-bandera ms-1">acceso restringido</span>
+              }
+            </td>
+            <td class="sub">{{ s.prefijo_folio }}</td>
+            <td class="sub">{{ s.origen }}</td>
+            <td>
+              @if (s.activo) {
+                <span class="badge text-bg-success-subtle text-success-emphasis">Activo</span>
+              } @else {
+                <span class="badge text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+              }
+            </td>
+            <td class="text-end">
+              @if (s.restringido) {
+                <button class="btn btn-outline-secondary btn-sm" (click)="abrirPermitidos(s)">
+                  Usuarios permitidos
+                </button>
+              }
+              <button class="btn btn-outline-secondary btn-sm ms-1" (click)="abrirEditarServicio(s)">
+                Editar
+              </button>
+              <button class="btn btn-sm ms-1"
+                      [class.btn-outline-danger]="s.activo"
+                      [class.btn-outline-success]="!s.activo"
+                      (click)="alternarActivoServicio(s)">
+                {{ s.activo ? 'Dar de baja' : 'Reactivar' }}
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (mostrarFormServicio()) {
+  <div class="cajon-fondo" (click)="cancelarServicio()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(520px, 94vw)">
+    <h2 class="h6 mb-3">{{ editandoServicioId() ? 'Editar servicio' : 'Nuevo servicio' }}</h2>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold" for="sv-clave">Clave</label>
+        <input id="sv-clave" class="form-control" [(ngModel)]="svClave" name="svClave" maxlength="20"
+               [disabled]="!!editandoServicioId()" />
+        @if (editandoServicioId()) {
+          <div class="form-text">La clave no se puede cambiar: varias reglas del sistema la usan tal cual.</div>
+        }
+      </div>
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold" for="sv-nombre">Nombre</label>
+        <input id="sv-nombre" class="form-control" [(ngModel)]="svNombre" name="svNombre" maxlength="80" />
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold" for="sv-prefijo">Prefijo de folio</label>
+        <input id="sv-prefijo" class="form-control" [(ngModel)]="svPrefijo" name="svPrefijo"
+               maxlength="10" placeholder="Ej. NET" />
+      </div>
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold" for="sv-origen">Origen</label>
+        <select id="sv-origen" class="form-select" [(ngModel)]="svOrigen" name="svOrigen">
+          <option value="usuario">Usuario (lo reporta el solicitante)</option>
+          <option value="administrador">Administrador (trabajo interno del área)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="d-flex gap-4 mb-3 flex-wrap">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="sv-externo" [(ngModel)]="svExterno"
+               name="svExterno" />
+        <label class="form-check-label small" for="sv-externo">Lo atiende un proveedor externo</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="sv-multi" [(ngModel)]="svMultiTecnico"
+               name="svMultiTecnico" />
+        <label class="form-check-label small" for="sv-multi">Admite varios técnicos por ticket</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="sv-restringido" [(ngModel)]="svRestringido"
+               name="svRestringido" />
+        <label class="form-check-label small" for="sv-restringido">
+          Acceso restringido (solo usuarios permitidos)
+        </label>
+      </div>
+    </div>
+
+    @if (errorFormServicio()) {
+      <div class="alert alert-danger py-2 small">{{ errorFormServicio() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelarServicio()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardandoServicio()" (click)="guardarServicio()">
+        @if (guardandoServicio()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar
+      </button>
+    </div>
+  </div>
+}
+
+@if (mostrarPermitidos()) {
+  <div class="cajon-fondo" (click)="cerrarPermitidos()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(560px, 94vw); max-height: 90vh; overflow-y: auto">
+    <h2 class="h6 mb-1">Usuarios permitidos</h2>
+    <p class="sub small mb-3">
+      Solo esta gente (y el administrador) puede registrar tickets de
+      «{{ servicioPermitidos()?.nombre }}».
+    </p>
+
+    <div class="position-relative mb-3">
+      <label class="form-label small fw-semibold" for="perm-buscar">Agregar usuario</label>
+      <input id="perm-buscar" class="form-control" [(ngModel)]="busquedaPermitido" name="busquedaPermitido"
+             placeholder="Busca por nombre…" (ngModelChange)="onBuscarPermitido()" autocomplete="off" />
+      @if (buscandoPermitido()) {
+        <div class="form-text">Buscando…</div>
+      }
+      @if (resultadosPermitido().length) {
+        <div class="list-group position-absolute w-100 shadow-sm" style="z-index: 1060; max-height: 220px; overflow-y: auto">
+          @for (c of resultadosPermitido(); track c.id_usuario_saf) {
+            <button type="button" class="list-group-item list-group-item-action small"
+                    (click)="agregarPermitido(c)">
+              {{ c.nombre }}
+              <span class="sub"> · {{ c.rfc }}</span>
+              @if (c.dependencia) {
+                <span class="sub"> · {{ c.dependencia }}</span>
+              }
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    @if (errorPermitidos()) {
+      <div class="alert alert-danger py-2 small">{{ errorPermitidos() }}</div>
+    }
+
+    @if (cargandoPermitidos()) {
+      <div class="sub small">Cargando…</div>
+    } @else if (!listaPermitidos().length) {
+      <div class="sub small">Todavía no hay nadie en la lista.</div>
+    } @else {
+      <ul class="list-group">
+        @for (p of listaPermitidos(); track p.id) {
+          <li class="list-group-item d-flex align-items-center justify-content-between">
+            <div>
+              {{ p.nombre }}
+              <span class="sub"> · {{ p.rfc }}</span>
+            </div>
+            <button class="btn btn-outline-danger btn-sm" (click)="quitarPermitido(p)">Quitar</button>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="d-flex justify-content-end mt-3">
+      <button class="btn btn-outline-secondary" (click)="cerrarPermitidos()">Cerrar</button>
+    </div>
+  </div>
+}

@@ -56,9 +56,20 @@ export const routes: Routes = [
         loadComponent: () => import('./paginas/internos/internos').then((m) => m.Internos),
       },
       {
-        path: 'catalogo',
+        path: 'catalogo-servicios',
         canActivate: [guardRol('admin')],
-        loadComponent: () => import('./paginas/catalogo/catalogo').then((m) => m.Catalogo),
+        loadComponent: () =>
+          import('./paginas/catalogo-servicios/catalogo-servicios').then(
+            (m) => m.CatalogoServicios,
+          ),
+      },
+      {
+        path: 'catalogo-problemas',
+        canActivate: [guardRol('admin')],
+        loadComponent: () =>
+          import('./paginas/catalogo-problemas/catalogo-problemas').then(
+            (m) => m.CatalogoProblemas,
+          ),
       },
       {
         path: 'usuarios',

@@ -205,8 +205,53 @@ export class Servicio extends Model {
   @Column(DataType.BOOLEAN)
   declare activo: boolean;
 
+  /** 1 = solo la gente en ServicioUsuarioPermitido (mas el admin) lo registra. */
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare restringido: boolean;
+
   @HasMany(() => CatalogoProblema)
   declare problemas: CatalogoProblema[];
+
+  @HasMany(() => ServicioUsuarioPermitido)
+  declare permitidos: ServicioUsuarioPermitido[];
+}
+
+/**
+ * Excepcion de acceso: cuando servicio.restringido = true, solo estos rfc
+ * (mas el admin, siempre) pueden registrar tickets de ese servicio. rfc y
+ * nombre viven aqui tal cual saf los entrego al agregarse, sin llave foranea
+ * a saf.s_usuario (es otra base) ni a usuario (puede ser gente sin fila local,
+ * un solicitante externo).
+ */
+@Table({ tableName: 'servicio_usuario_permitido', timestamps: false })
+export class ServicioUsuarioPermitido extends Model {
+  @PrimaryKey
+  @AutoIncrement
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare id: number;
+
+  @ForeignKey(() => Servicio)
+  @AllowNull(false)
+  @Unique('uq_servicio_rfc')
+  @Column(DataType.SMALLINT.UNSIGNED)
+  declare servicio_id: number;
+
+  @AllowNull(false)
+  @Unique('uq_servicio_rfc')
+  @Column(DataType.STRING(20))
+  declare rfc: string;
+
+  @AllowNull(false)
+  @Column(DataType.STRING(120))
+  declare nombre: string;
+
+  @Default(DataType.NOW)
+  @Column(DataType.DATE)
+  declare creado_en: Date;
+
+  @BelongsTo(() => Servicio)
+  declare servicio: Servicio;
 }
 
 /** §7 · especialidad del tecnico. */

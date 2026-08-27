@@ -13,11 +13,11 @@ interface Grupo {
 
 /** §2 · Es lo que ve el usuario en el segundo select. Administrable sin tocar código. */
 @Component({
-  selector: 'app-catalogo',
+  selector: 'app-catalogo-problemas',
   imports: [FormsModule],
-  templateUrl: './catalogo.html',
+  templateUrl: './catalogo-problemas.html',
 })
-export class Catalogo {
+export class CatalogoProblemas {
   private readonly api = inject(TicketsService);
 
   readonly problemas = signal<Problema[]>([]);
@@ -61,19 +61,6 @@ export class Catalogo {
   campoAdicional = '';
   requiereTexto = false;
   orden = 0;
-
-  /* ---------------- alta de un nuevo tipo de servicio ---------------- */
-
-  readonly mostrarFormServicio = signal(false);
-  readonly guardandoServicio = signal(false);
-  readonly errorFormServicio = signal('');
-
-  svClave = '';
-  svNombre = '';
-  svPrefijo = '';
-  svOrigen: 'usuario' | 'administrador' = 'usuario';
-  svExterno = false;
-  svMultiTecnico = false;
 
   constructor() {
     this.cargar();
@@ -164,56 +151,5 @@ export class Catalogo {
       next: () => this.cargar(),
       error: (e) => this.error.set(mensajeError(e)),
     });
-  }
-
-  /* ---------------- alta de un nuevo tipo de servicio ---------------- */
-
-  abrirNuevoServicio() {
-    this.svClave = '';
-    this.svNombre = '';
-    this.svPrefijo = '';
-    this.svOrigen = 'usuario';
-    this.svExterno = false;
-    this.svMultiTecnico = false;
-    this.errorFormServicio.set('');
-    this.mostrarFormServicio.set(true);
-  }
-
-  cancelarServicio() {
-    this.mostrarFormServicio.set(false);
-  }
-
-  guardarServicio() {
-    if (this.svClave.trim().length < 2 || this.svNombre.trim().length < 2) {
-      this.errorFormServicio.set('Captura clave y nombre.');
-      return;
-    }
-    if (!this.svPrefijo.trim()) {
-      this.errorFormServicio.set('Captura el prefijo del folio.');
-      return;
-    }
-
-    this.guardandoServicio.set(true);
-    this.errorFormServicio.set('');
-    this.api
-      .crearServicio({
-        clave: this.svClave.trim(),
-        nombre: this.svNombre.trim(),
-        prefijo_folio: this.svPrefijo.trim(),
-        origen: this.svOrigen,
-        externo: this.svExterno,
-        multi_tecnico: this.svMultiTecnico,
-      })
-      .subscribe({
-        next: () => {
-          this.guardandoServicio.set(false);
-          this.mostrarFormServicio.set(false);
-          this.cargar();
-        },
-        error: (e) => {
-          this.guardandoServicio.set(false);
-          this.errorFormServicio.set(mensajeError(e));
-        },
-      });
   }
 }

@@ -8,6 +8,7 @@ import {
   Prioridad,
   Sede,
   Servicio,
+  ServicioUsuarioPermitido,
   TecnicoServicio,
   Usuario,
 } from './catalogos.model';
@@ -35,6 +36,7 @@ export const MODELOS = [
   Area,
   Usuario,
   Servicio,
+  ServicioUsuarioPermitido,
   TecnicoServicio,
   Prioridad,
   Estatus,

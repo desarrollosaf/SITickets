@@ -20,6 +20,7 @@ import type {
   Ticket,
   TicketAtendidoCmp,
   TicketDetalle,
+  UsuarioPermitido,
 } from './modelos';
 
 export interface FiltrosTicket {
@@ -225,6 +226,37 @@ export class TicketsService {
     multi_tecnico?: boolean;
   }) {
     return this.http.post<Servicio>(`${API}/catalogos/servicios`, datos);
+  }
+  actualizarServicio(
+    id: number,
+    datos: Partial<{
+      nombre: string;
+      prefijo_folio: string;
+      origen: 'usuario' | 'administrador';
+      externo: boolean;
+      multi_tecnico: boolean;
+      restringido: boolean;
+      activo: boolean;
+    }>,
+  ) {
+    return this.http.patch<Servicio>(`${API}/catalogos/servicios/${id}`, datos);
+  }
+  /** Solo aplica a servicios con restringido=true: quien puede registrar tickets ahi. */
+  usuariosPermitidos(servicioId: number) {
+    return this.http.get<UsuarioPermitido[]>(
+      `${API}/catalogos/servicios/${servicioId}/usuarios-permitidos`,
+    );
+  }
+  agregarUsuarioPermitido(servicioId: number, idUsuarioSaf: number) {
+    return this.http.post<UsuarioPermitido>(
+      `${API}/catalogos/servicios/${servicioId}/usuarios-permitidos`,
+      { id_usuario_saf: idUsuarioSaf },
+    );
+  }
+  quitarUsuarioPermitido(servicioId: number, id: number) {
+    return this.http.delete<{ ok: true }>(
+      `${API}/catalogos/servicios/${servicioId}/usuarios-permitidos/${id}`,
+    );
   }
 
   actualizarPrioridad(

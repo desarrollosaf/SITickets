@@ -1,21 +1,16 @@
-<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
-  <div>
-    <h1 class="h5 mb-1">Catálogo de problemas</h1>
-    <p class="sub mb-0">
-      Sustituye al campo de texto libre. Cada opción trae su prioridad y el dato de contexto que se
-      pide al elegirla.
-    </p>
-  </div>
-  <button class="btn btn-primary btn-sm" (click)="abrirNuevoServicio()">
-    <i class="bi bi-plus-lg"></i> Nuevo servicio
-  </button>
+<div class="mb-1">
+  <h1 class="h5 mb-1">Catálogo de problemas</h1>
+  <p class="sub mb-0">
+    Sustituye al campo de texto libre. Cada opción trae su prioridad y el dato de contexto que se
+    pide al elegirla.
+  </p>
 </div>
 
 @if (error()) {
   <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
 }
 
-<div class="mb-3" style="max-width: 340px">
+<div class="mb-3 mt-3" style="max-width: 340px">
   <label class="form-label small fw-semibold" for="filtro-srv">Filtrar por tipo de servicio</label>
   <select id="filtro-srv" class="form-select" [(ngModel)]="filtroServicioId" name="filtroServicio">
     <option [ngValue]="null">Selecciona…</option>
@@ -90,67 +85,6 @@
       <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
       <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
         @if (guardando()) {
-          <span class="spinner-border spinner-border-sm me-2"></span>
-        }
-        Guardar
-      </button>
-    </div>
-  </div>
-}
-
-@if (mostrarFormServicio()) {
-  <div class="cajon-fondo" (click)="cancelarServicio()"></div>
-  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
-       style="z-index: 1050; width: min(520px, 94vw)">
-    <h2 class="h6 mb-3">Nuevo servicio</h2>
-
-    <div class="row g-3 mb-3">
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold" for="sv-clave">Clave</label>
-        <input id="sv-clave" class="form-control" [(ngModel)]="svClave" name="svClave" maxlength="20" />
-      </div>
-      <div class="col-md-8">
-        <label class="form-label small fw-semibold" for="sv-nombre">Nombre</label>
-        <input id="sv-nombre" class="form-control" [(ngModel)]="svNombre" name="svNombre" maxlength="80" />
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold" for="sv-prefijo">Prefijo de folio</label>
-        <input id="sv-prefijo" class="form-control" [(ngModel)]="svPrefijo" name="svPrefijo"
-               maxlength="10" placeholder="Ej. NET" />
-      </div>
-      <div class="col-md-8">
-        <label class="form-label small fw-semibold" for="sv-origen">Origen</label>
-        <select id="sv-origen" class="form-select" [(ngModel)]="svOrigen" name="svOrigen">
-          <option value="usuario">Usuario (lo reporta el solicitante)</option>
-          <option value="administrador">Administrador (trabajo interno del área)</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="d-flex gap-4 mb-3">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="sv-externo" [(ngModel)]="svExterno"
-               name="svExterno" />
-        <label class="form-check-label small" for="sv-externo">Lo atiende un proveedor externo</label>
-      </div>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="sv-multi" [(ngModel)]="svMultiTecnico"
-               name="svMultiTecnico" />
-        <label class="form-check-label small" for="sv-multi">Admite varios técnicos por ticket</label>
-      </div>
-    </div>
-
-    @if (errorFormServicio()) {
-      <div class="alert alert-danger py-2 small">{{ errorFormServicio() }}</div>
-    }
-
-    <div class="d-flex gap-2 justify-content-end">
-      <button class="btn btn-outline-secondary" (click)="cancelarServicio()">Cancelar</button>
-      <button class="btn btn-primary" [disabled]="guardandoServicio()" (click)="guardarServicio()">
-        @if (guardandoServicio()) {
           <span class="spinner-border spinner-border-sm me-2"></span>
         }
         Guardar

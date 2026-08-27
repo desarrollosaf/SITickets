@@ -114,11 +114,12 @@ export class Nuevo {
   readonly esAdmin = computed(() => this.auth.rol() === 'admin');
   /**
    * Admin, operador y gestor pueden elegir a nombre de quien registran el
-   * ticket — excepto en un servicio restringido a gente puntual (ver
-   * RESTRICCION_SERVICIO en el backend): ahi el ticket siempre queda a
-   * nombre de quien esta en sesion, sin excepcion salvo el admin. Tambien
-   * queda descartado, sin importar el servicio, para quien trae marcado
-   * siempreANombrePropio (ver RFC_SIEMPRE_A_NOMBRE_PROPIO en el backend).
+   * ticket — excepto en un servicio restringido (administrable desde el
+   * catalogo, ver ServicioUsuarioPermitido en el backend): ahi el ticket
+   * siempre queda a nombre de quien esta en sesion, sin excepcion salvo el
+   * admin. Tambien queda descartado, sin importar el servicio, para quien
+   * trae marcado siempreANombrePropio (ver RFC_SIEMPRE_A_NOMBRE_PROPIO en
+   * el backend).
    */
   readonly puedeElegirUsuario = computed(
     () =>

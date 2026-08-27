@@ -230,14 +230,10 @@
               }
 
               @if (!t.interno) {
-                <label class="form-label small fw-semibold mb-1">Organización (SAF)</label>
                 <div class="form-text mb-2">
                   Dependencia: {{ t.dependencia_saf || '—' }}<br />
                   Dirección: {{ t.direccion_saf || '—' }}<br />
                   Departamento: {{ t.departamento_saf || '—' }}
-                  <div>
-                    <i class="bi bi-info-circle"></i> Es solo informativa: sale del padrón de saf y no se corrige aquí.
-                  </div>
                 </div>
 
                 <label class="form-label small fw-semibold" for="fm-ext">Extensión</label>
