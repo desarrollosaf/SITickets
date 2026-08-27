@@ -23,6 +23,8 @@ import {
   Sede,
   Servicio,
   ServicioUsuarioPermitido,
+  SUbicacion,
+  SUbicacionDepartamento,
   SUsuario,
   Ticket,
   TicketBitacora,
@@ -34,6 +36,7 @@ import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import { BienesService } from '../bienes/bienes.service';
 import { DictamenService } from './dictamen.service';
+import { CedulaCustodiaService } from './cedula-custodia.service';
 import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
@@ -55,6 +58,16 @@ import { AtenderCmpDto } from './dto/atender-cmp.dto';
  * perdido en cada redeploy.
  */
 export const CARPETA_DICTAMENES = join(process.cwd(), 'storage', 'dictamenes');
+
+/** Mismo criterio que CARPETA_DICTAMENES: dentro de storage/ para sobrevivir un redeploy. */
+export const CARPETA_CEDULAS = join(process.cwd(), 'storage', 'cedulas');
+
+/**
+ * Motivo exacto de pausa (ver MOTIVOS_ESPERA en el frontend) que dispara la
+ * cedula de salida: el tecnico se lleva el equipo del edificio del
+ * solicitante para revisarlo, y la cedula documenta esa custodia temporal.
+ */
+const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
 
 /** Roles que atienden tickets y por tanto ven solo lo que traen turnado. */
 const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe'];
@@ -88,11 +101,15 @@ export class TicketsService {
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     @InjectModel(SDireccion, 'saf') private readonly sDirecciones: typeof SDireccion,
     @InjectModel(SDepartamento, 'saf') private readonly sDepartamentos: typeof SDepartamento,
+    @InjectModel(SUbicacion, 'saf') private readonly sUbicaciones: typeof SUbicacion,
+    @InjectModel(SUbicacionDepartamento, 'saf')
+    private readonly sUbicacionesDepartamento: typeof SUbicacionDepartamento,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
     private readonly config: ConfigService,
     private readonly bienesSrv: BienesService,
     private readonly dictamenSrv: DictamenService,
+    private readonly cedulaCustodiaSrv: CedulaCustodiaService,
   ) {}
 
   /* ==================================================================
@@ -299,6 +316,8 @@ export class TicketsService {
       /** Solo aplica a servicio CMP: como termino la atencion del equipo. */
       resultado_cmp: t.resultado_cmp,
       tiene_dictamen: !!t.dictamen_url,
+      tiene_cedula_salida: !!t.cedula_salida_url,
+      tiene_cedula_entrada: !!t.cedula_entrada_url,
       dependencia: t.dependencia?.nombre ?? '—',
       area: t.area?.nombre ?? '—',
       /* Los ids los usa el formulario de correccion para preseleccionar. */
@@ -871,8 +890,10 @@ export class TicketsService {
     dependencia: string | null;
     direccion: string | null;
     departamento: string | null;
+    /** Domicilio fisico del edificio del departamento (saf.t_ubicacion), solo para la cedula de retiro. */
+    edificio: string | null;
   }> {
-    const vacio = { dependencia: null, direccion: null, departamento: null };
+    const vacio = { dependencia: null, direccion: null, departamento: null, edificio: null };
 
     const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
     const sUsuario = local?.rfc
@@ -880,15 +901,24 @@ export class TicketsService {
       : await this.sUsuarios.findByPk(solicitanteId);
     if (!sUsuario) return vacio;
 
-    const [dep, dir, depto] = await Promise.all([
+    const [dep, dir, depto, ubicacionDepto] = await Promise.all([
       sUsuario.id_Dependencia ? this.sDependencias.findByPk(sUsuario.id_Dependencia) : null,
       sUsuario.id_Direccion ? this.sDirecciones.findByPk(sUsuario.id_Direccion) : null,
       sUsuario.id_Departamento ? this.sDepartamentos.findByPk(sUsuario.id_Departamento) : null,
+      sUsuario.id_Departamento
+        ? this.sUbicacionesDepartamento.findOne({
+            where: { departamento_id: sUsuario.id_Departamento },
+          })
+        : null,
     ]);
+    const ubicacion = ubicacionDepto
+      ? await this.sUbicaciones.findByPk(ubicacionDepto.ubicacion_id)
+      : null;
     return {
       dependencia: dep?.Nombre?.trim() ?? null,
       direccion: dir?.Nombre?.trim() ?? null,
       departamento: (depto?.nombre_completo ?? depto?.Nombre)?.trim() ?? null,
+      edificio: ubicacion?.valor?.trim() ?? null,
     };
   }
 
@@ -1034,7 +1064,65 @@ export class TicketsService {
     });
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
+
+    if (t.servicio?.clave === 'CMP' && motivo === MOTIVO_RETIRO_EQUIPO) {
+      await this.generarCedulaSalida(t, usuario);
+    }
+
     return this.detalle(id, usuario);
+  }
+
+  /**
+   * Cedula de salida: documenta que el tecnico se lleva el equipo del
+   * edificio del solicitante para revisarlo (el solicitante entrega, el
+   * tecnico recibe). Best-effort: si algo falla (SIASAF caido, sin numero de
+   * inventario…) el ticket ya quedo en espera igual; solo se avisa en la
+   * traza, no se le regresa error al tecnico por esto.
+   */
+  private async generarCedulaSalida(t: Ticket, usuario: UsuarioToken): Promise<void> {
+    try {
+      if (!t.contexto) return;
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+      if (!rfc) return;
+
+      const [{ bienes }, org] = await Promise.all([
+        this.bienesSrv.porRfcCmp(rfc),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+      ]);
+      const bien = bienes.find((b) => b.inventario === t.contexto);
+      const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
+      const resguardatario = t.solicitante_nombre ?? t.solicitante?.nombre ?? '—';
+
+      const pdf = await this.cedulaCustodiaSrv.generar({
+        folio: t.folio,
+        resguardatarioNombre: resguardatario,
+        areaAdscripcion: org.departamento,
+        edificio: org.edificio,
+        telefonoExtension: t.extension,
+        bien: detalleBien ?? {
+          numero_inventario: t.contexto,
+          nombre_bien: '—',
+          marca: null,
+          modelo: null,
+          numero_serie: null,
+          color: null,
+          material: null,
+        },
+        entregaNombre: resguardatario,
+        recibeNombre: usuario.nombre,
+      });
+
+      if (!existsSync(CARPETA_CEDULAS)) mkdirSync(CARPETA_CEDULAS, { recursive: true });
+      const archivo = `ticket-${t.id}-salida-${Date.now()}.pdf`;
+      writeFileSync(join(CARPETA_CEDULAS, archivo), pdf);
+      await t.update({ cedula_salida_url: archivo });
+      this.traza.registra('§5', `${t.folio}: cédula de salida generada (${archivo}).`);
+    } catch (e) {
+      this.traza.registra(
+        '§5',
+        `${t.folio}: no se pudo generar la cédula de salida (${(e as Error).message}).`,
+      );
+    }
   }
 
   async reanudar(id: number, usuario: UsuarioToken) {
@@ -1045,6 +1133,8 @@ export class TicketsService {
     const pausaSeg = t.f_espera_desde
       ? Math.round((Date.now() - new Date(t.f_espera_desde).getTime()) / 1000)
       : 0;
+
+    const veniaDeRetiroEquipo = t.servicio?.clave === 'CMP' && t.motivo_espera === MOTIVO_RETIRO_EQUIPO;
 
     await t.update({
       espera_acum_seg: t.espera_acum_seg + pausaSeg,
@@ -1061,7 +1151,66 @@ export class TicketsService {
       '§5',
       `${t.folio} reanudado. Se descontaron ${Math.round(pausaSeg / 60)} min del tiempo de resolucion.`,
     );
+
+    /* Regresa con el equipo: se documenta la entrada (ver generarCedulaEntrada). */
+    if (veniaDeRetiroEquipo && t.cedula_salida_url) {
+      await this.generarCedulaEntrada(t, usuario);
+    }
+
     return this.detalle(id, usuario);
+  }
+
+  /**
+   * Cedula de entrada: documenta que el tecnico regresa el equipo al
+   * solicitante (el tecnico entrega, el solicitante recibe) — se dispara al
+   * reanudar un ticket que se habia pausado para retirar el equipo. Mismos
+   * datos que la cedula de salida, ENTREGA/RECIBE invertidos. Best-effort:
+   * si falla, el ticket igual se reanuda.
+   */
+  private async generarCedulaEntrada(t: Ticket, usuario: UsuarioToken): Promise<void> {
+    try {
+      if (!t.contexto) return;
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+      if (!rfc) return;
+
+      const [{ bienes }, org] = await Promise.all([
+        this.bienesSrv.porRfcCmp(rfc),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+      ]);
+      const bien = bienes.find((b) => b.inventario === t.contexto);
+      const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
+      const resguardatario = t.solicitante_nombre ?? t.solicitante?.nombre ?? '—';
+
+      const pdf = await this.cedulaCustodiaSrv.generar({
+        folio: t.folio,
+        resguardatarioNombre: resguardatario,
+        areaAdscripcion: org.departamento,
+        edificio: org.edificio,
+        telefonoExtension: t.extension,
+        bien: detalleBien ?? {
+          numero_inventario: t.contexto,
+          nombre_bien: '—',
+          marca: null,
+          modelo: null,
+          numero_serie: null,
+          color: null,
+          material: null,
+        },
+        entregaNombre: usuario.nombre,
+        recibeNombre: resguardatario,
+      });
+
+      if (!existsSync(CARPETA_CEDULAS)) mkdirSync(CARPETA_CEDULAS, { recursive: true });
+      const archivo = `ticket-${t.id}-entrada-${Date.now()}.pdf`;
+      writeFileSync(join(CARPETA_CEDULAS, archivo), pdf);
+      await t.update({ cedula_entrada_url: archivo });
+      this.traza.registra('§5', `${t.folio}: cédula de entrada generada (${archivo}).`);
+    } catch (e) {
+      this.traza.registra(
+        '§5',
+        `${t.folio}: no se pudo generar la cédula de entrada (${(e as Error).message}).`,
+      );
+    }
   }
 
   async resolver(id: number, dto: ResolverDto, usuario: UsuarioToken) {
@@ -1258,6 +1407,38 @@ export class TicketsService {
     return new StreamableFile(createReadStream(ruta), {
       type: 'application/pdf',
       disposition: `inline; filename="${t.folio.replace(/\//g, '-')}-dictamen.pdf"`,
+    });
+  }
+
+  /** Descarga la cédula de salida (el técnico se llevó el equipo) de un ticket CMP, si tiene. */
+  async cedulaSalidaDelTicket(id: number, usuario: UsuarioToken): Promise<StreamableFile> {
+    const t = await this.cargar(id, usuario);
+    if (!t.cedula_salida_url) {
+      throw new NotFoundException('Este ticket no tiene cédula de salida adjunta');
+    }
+
+    const ruta = join(CARPETA_CEDULAS, t.cedula_salida_url);
+    if (!existsSync(ruta)) throw new NotFoundException('La cédula ya no está disponible');
+
+    return new StreamableFile(createReadStream(ruta), {
+      type: 'application/pdf',
+      disposition: `inline; filename="${t.folio.replace(/\//g, '-')}-cedula-salida.pdf"`,
+    });
+  }
+
+  /** Descarga la cédula de entrada (el equipo regresó al solicitante) de un ticket CMP, si tiene. */
+  async cedulaEntradaDelTicket(id: number, usuario: UsuarioToken): Promise<StreamableFile> {
+    const t = await this.cargar(id, usuario);
+    if (!t.cedula_entrada_url) {
+      throw new NotFoundException('Este ticket no tiene cédula de entrada adjunta');
+    }
+
+    const ruta = join(CARPETA_CEDULAS, t.cedula_entrada_url);
+    if (!existsSync(ruta)) throw new NotFoundException('La cédula ya no está disponible');
+
+    return new StreamableFile(createReadStream(ruta), {
+      type: 'application/pdf',
+      disposition: `inline; filename="${t.folio.replace(/\//g, '-')}-cedula-entrada.pdf"`,
     });
   }
 

@@ -604,6 +604,24 @@
               <dd class="col-7">{{ t.sede || 'Sin sede registrada' }}</dd>
             }
 
+            @if (t.tiene_cedula_salida || t.tiene_cedula_entrada) {
+              <dt class="col-5 sub fw-normal">Cédulas de custodia</dt>
+              <dd class="col-7 d-flex gap-1 flex-wrap">
+                @if (t.tiene_cedula_salida) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary no-imprimir"
+                          (click)="descargarCedulaSalida()">
+                    <i class="bi bi-file-earmark-pdf"></i> Cédula de salida
+                  </button>
+                }
+                @if (t.tiene_cedula_entrada) {
+                  <button type="button" class="btn btn-sm btn-outline-secondary no-imprimir"
+                          (click)="descargarCedulaEntrada()">
+                    <i class="bi bi-file-earmark-pdf"></i> Cédula de entrada
+                  </button>
+                }
+              </dd>
+            }
+
             <dt class="col-5 sub fw-normal">Registrado</dt>
             <dd class="col-7">{{ fmt(t.f_registro) }}</dd>
 

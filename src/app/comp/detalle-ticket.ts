@@ -400,6 +400,30 @@ export class DetalleTicket {
     });
   }
 
+  /** Abre la cédula de salida en una pestaña nueva. */
+  descargarCedulaSalida() {
+    this.api.descargarCedulaSalida(this.id()).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  /** Abre la cédula de entrada en una pestaña nueva. */
+  descargarCedulaEntrada() {
+    this.api.descargarCedulaEntrada(this.id()).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
   enviarCancelar() {
     this.ocupado.set(true);
     this.api.cancelar(this.id(), this.motivo).subscribe({

@@ -231,6 +231,19 @@ export class Ticket extends Model {
   @Column(DataType.STRING(255))
   declare dictamen_url: string | null;
 
+  /**
+   * Cedulas de custodia del equipo (servicio CMP), en pdf:
+   * salida = el tecnico se lo lleva (se genera al pausar con motivo
+   * "Retirar el equipo del lugar para su revision"); entrada = se lo
+   * regresa al solicitante (se genera al resolver como "reparado", solo si
+   * hubo salida).
+   */
+  @Column(DataType.STRING(255))
+  declare cedula_salida_url: string | null;
+
+  @Column(DataType.STRING(255))
+  declare cedula_entrada_url: string | null;
+
   @Column(DataType.STRING(200))
   declare motivo_espera: string | null;
 

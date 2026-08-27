@@ -143,6 +143,14 @@ export class TicketsService {
   descargarDictamen(id: number) {
     return this.http.get(`${API}/tickets/${id}/dictamen`, { responseType: 'blob' });
   }
+  /** Descarga la cédula de salida (el técnico se llevó el equipo a revisar). */
+  descargarCedulaSalida(id: number) {
+    return this.http.get(`${API}/tickets/${id}/cedula-salida`, { responseType: 'blob' });
+  }
+  /** Descarga la cédula de entrada (el equipo regresó al solicitante). */
+  descargarCedulaEntrada(id: number) {
+    return this.http.get(`${API}/tickets/${id}/cedula-entrada`, { responseType: 'blob' });
+  }
 
   /** Reescribe con IA la observación del técnico en formato técnico formal. */
   mejorarObservaciones(texto: string) {

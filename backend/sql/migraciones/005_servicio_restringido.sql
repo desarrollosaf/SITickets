@@ -30,20 +30,24 @@ CREATE TABLE IF NOT EXISTS servicio_usuario_permitido (
   CONSTRAINT fk_svc_permitido_servicio FOREIGN KEY (servicio_id) REFERENCES servicio(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. Migra los dos casos que ya vivian cableados en el codigo (CAM-01 y SIS),
---    para no perder en produccion el acceso que esas personas ya tenian.
-UPDATE servicio SET restringido = TRUE WHERE clave IN ('CAM-01', 'SIS');
+-- 3. Migra los dos casos que ya vivian cableados en el codigo (CAMARAS y
+--    SISTEMAS), para no perder en produccion el acceso que esas personas ya
+--    tenian. Se empareja por nombre, no por clave: clave/prefijo_folio no
+--    son consistentes entre servicios (ej. SISTEMAS tiene clave 'SIS' pero
+--    prefijo_folio 'SIS-P'), asi que nombre es el dato mas confiable para
+--    identificar estos dos servicios puntuales.
+--
+--    Los 3 rfc ya tienen fila local en usuario (son gestor/tecnico), asi que
+--    no hace falta leer saf aqui: el usuario de la app (usr_tickets2 en
+--    produccion) no tiene permiso de SELECT sobre esa base.
+UPDATE servicio SET restringido = TRUE WHERE nombre IN ('CAMARAS', 'SISTEMAS (PROGRESS)');
 
 INSERT IGNORE INTO servicio_usuario_permitido (servicio_id, rfc, nombre)
 SELECT s.id, x.rfc,
-       COALESCE(
-         (SELECT nombre FROM usuario WHERE rfc = x.rfc LIMIT 1),
-         (SELECT Nombre FROM saf.s_usuario WHERE N_Usuario = x.rfc LIMIT 1),
-         x.rfc
-       )
+       COALESCE((SELECT nombre FROM usuario WHERE rfc = x.rfc LIMIT 1), x.rfc)
 FROM servicio s
 JOIN (
-  SELECT 'CAM-01' AS clave, 'TOMJ820727' AS rfc
-  UNION ALL SELECT 'CAM-01', 'NATL830315'
-  UNION ALL SELECT 'SIS', 'CACX680312'
-) x ON x.clave = s.clave;
+  SELECT 'CAMARAS' AS servicio_nombre, 'TOMJ820727' AS rfc
+  UNION ALL SELECT 'CAMARAS', 'NATL830315'
+  UNION ALL SELECT 'SISTEMAS (PROGRESS)', 'CACX680312'
+) x ON x.servicio_nombre = s.nombre;

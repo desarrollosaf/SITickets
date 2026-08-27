@@ -172,6 +172,18 @@ export class TicketsController {
     return this.tickets.dictamenDelTicket(id, usuario);
   }
 
+  /** Descarga la cédula de salida (el técnico se llevó el equipo a revisar). */
+  @Get(':id/cedula-salida')
+  cedulaSalida(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.cedulaSalidaDelTicket(id, usuario);
+  }
+
+  /** Descarga la cédula de entrada (el equipo regresó al solicitante). */
+  @Get(':id/cedula-entrada')
+  cedulaEntrada(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.cedulaEntradaDelTicket(id, usuario);
+  }
+
   @HttpCode(200)
   @Post(':id/validar')
   validar(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
