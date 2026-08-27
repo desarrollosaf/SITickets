@@ -82,3 +82,28 @@ export class SDepartamento extends Model {
   @Column(DataType.STRING(500))
   declare nombre_completo: string | null;
 }
+
+/** Domicilio fisico (calle, colonia, ciudad, C.P.) de un edificio del Congreso. */
+@Table({ tableName: 't_ubicacion', timestamps: false })
+export class SUbicacion extends Model {
+  @PrimaryKey
+  @Column(DataType.INTEGER)
+  declare id: number;
+
+  @Column(DataType.TEXT)
+  declare valor: string;
+}
+
+/** Liga un departamento con el domicilio (SUbicacion) del edificio donde esta. */
+@Table({ tableName: 't_ubicacion_departamento', timestamps: false })
+export class SUbicacionDepartamento extends Model {
+  @PrimaryKey
+  @Column(DataType.INTEGER)
+  declare id: number;
+
+  @Column(DataType.INTEGER)
+  declare departamento_id: number;
+
+  @Column(DataType.INTEGER)
+  declare ubicacion_id: number;
+}

@@ -60,6 +60,10 @@ export interface Ticket {
   /** Solo aplica a servicio CMP: como termino la atencion del equipo. */
   resultado_cmp: 'reparado' | 'baja' | null;
   tiene_dictamen: boolean;
+  /** Solo servicio CMP: si se pauso con motivo "retirar el equipo", el técnico se lo llevó. */
+  tiene_cedula_salida: boolean;
+  /** Solo servicio CMP: si se resolvió como reparado y hubo cédula de salida, el equipo regresó. */
+  tiene_cedula_entrada: boolean;
   dependencia: string;
   area: string;
   dependencia_id: number | null;

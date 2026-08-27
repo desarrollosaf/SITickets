@@ -693,6 +693,8 @@ export class BienesService {
     material: string | null;
     marca: string | null;
     modelo: string | null;
+    numero_serie: string | null;
+    color: string | null;
   } | null> {
     try {
       const url =
@@ -740,6 +742,12 @@ export class BienesService {
 
           modelo?:
             string | null;
+
+          numero_serie?:
+            string | null;
+
+          color?:
+            string | null;
         };
 
       if (
@@ -767,6 +775,13 @@ export class BienesService {
         modelo:
           cuerpo.modelo ??
           null,
+
+        numero_serie:
+          cuerpo.numero_serie ??
+          null,
+
+        color:
+          cuerpo.color ?? null,
       };
     } catch (e) {
       this.log.warn(
