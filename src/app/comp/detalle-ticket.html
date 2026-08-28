@@ -604,7 +604,7 @@
               <dd class="col-7">{{ t.sede || 'Sin sede registrada' }}</dd>
             }
 
-            @if (t.tiene_cedula_salida || t.tiene_cedula_entrada) {
+            @if ((t.tiene_cedula_salida || t.tiene_cedula_entrada) && rol() !== 'solicitante') {
               <dt class="col-5 sub fw-normal">Cédulas de custodia</dt>
               <dd class="col-7 d-flex gap-1 flex-wrap">
                 @if (t.tiene_cedula_salida) {
@@ -653,7 +653,7 @@
               @if (t.resultado_cmp === 'baja') {
                 <dt class="col-5 sub fw-normal">Resultado</dt>
                 <dd class="col-7">Equipo dado de baja</dd>
-                @if (t.tiene_dictamen) {
+                @if (t.tiene_dictamen && rol() !== 'solicitante') {
                   <dt class="col-5 sub fw-normal">Dictamen</dt>
                   <dd class="col-7">
                     <button type="button" class="btn btn-sm btn-outline-secondary no-imprimir"

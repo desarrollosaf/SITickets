@@ -39,7 +39,6 @@ export const SERVICIOS = [
     prefijo_folio: "CMP",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "IMP",
@@ -47,7 +46,6 @@ export const SERVICIOS = [
     prefijo_folio: "IMP",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "IMPA",
@@ -55,7 +53,6 @@ export const SERVICIOS = [
     prefijo_folio: "IMPA",
     origen: "usuario",
     externo: true,
-    multi_tecnico: false
   },
   {
     clave: "TEL",
@@ -63,7 +60,6 @@ export const SERVICIOS = [
     prefijo_folio: "TEL",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "NET",
@@ -71,7 +67,6 @@ export const SERVICIOS = [
     prefijo_folio: "NET",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "SIS",
@@ -79,7 +74,6 @@ export const SERVICIOS = [
     prefijo_folio: "SIS-P",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "COR",
@@ -87,7 +81,6 @@ export const SERVICIOS = [
     prefijo_folio: "COR",
     origen: "usuario",
     externo: false,
-    multi_tecnico: false
   },
   {
     clave: "CAB",
@@ -95,7 +88,6 @@ export const SERVICIOS = [
     prefijo_folio: "CAB",
     origen: "administrador",
     externo: false,
-    multi_tecnico: true
   },
   {
     clave: "INV",
@@ -103,7 +95,6 @@ export const SERVICIOS = [
     prefijo_folio: "INV",
     origen: "administrador",
     externo: false,
-    multi_tecnico: true
   },
   {
     clave: "MTO",
@@ -111,7 +102,6 @@ export const SERVICIOS = [
     prefijo_folio: "MTO",
     origen: "administrador",
     externo: false,
-    multi_tecnico: true
   },
   {
     clave: "CFG",
@@ -119,7 +109,6 @@ export const SERVICIOS = [
     prefijo_folio: "CFG",
     origen: "administrador",
     externo: false,
-    multi_tecnico: true
   }
 ];
 

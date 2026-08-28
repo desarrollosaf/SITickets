@@ -178,7 +178,6 @@ export interface Servicio {
   prefijo_folio: string;
   origen: 'usuario' | 'administrador';
   externo: boolean;
-  multi_tecnico: boolean;
   /** Alta/baja logica: false lo oculta del formulario de tickets sin borrarlo. */
   activo: boolean;
   /** true: solo la gente en su lista de usuarios permitidos (mas el admin) lo registra. */

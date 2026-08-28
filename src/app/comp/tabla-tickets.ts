@@ -1,4 +1,5 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
+import { AuthService } from '../core/auth.service';
 import { banderas, duracion, etiquetaEstatus } from '../core/formato';
 import type { Ticket } from '../core/modelos';
 
@@ -20,7 +21,9 @@ import type { Ticket } from '../core/modelos';
                 <th style="width: 140px">Folio</th>
                 <th>Asunto</th>
                 <th style="width: 130px">Servicio</th>
-                <th style="width: 60px">Prio</th>
+                @if (!esSolicitante()) {
+                  <th style="width: 60px">Prio</th>
+                }
                 <th style="width: 140px">Estatus</th>
                 @if (!sinTecnico()) {
                   <th style="width: 150px">Técnico</th>
@@ -64,12 +67,14 @@ import type { Ticket } from '../core/modelos';
                     }
                   </td>
                   <td class="sub">{{ t.servicio }}</td>
-                  <td><span class="chip" [class]="'chip-' + t.prioridad">{{ t.prioridad }}</span></td>
+                  @if (!esSolicitante()) {
+                    <td><span class="chip" [class]="'chip-' + t.prioridad">{{ t.prioridad }}</span></td>
+                  }
                   <td>
                     <span class="estatus" [class]="estatus(t).clase">{{ estatus(t).texto }}</span>
                   </td>
                   @if (!sinTecnico()) {
-                    <td class="sub">{{ t.tecnico || '—' }}</td>
+                    <td class="sub">{{ t.tecnico || 'Por definir' }}</td>
                   }
                   <td class="sub">
                     <span [class.vencido]="t.vencido">{{ dur(t.min_activo) }}</span>
@@ -85,6 +90,8 @@ import type { Ticket } from '../core/modelos';
   `,
 })
 export class TablaTickets {
+  private readonly auth = inject(AuthService);
+
   readonly tickets = input.required<Ticket[]>();
   readonly sinTecnico = input(false);
   readonly vacio = input('Sin tickets');
@@ -95,6 +102,12 @@ export class TablaTickets {
   readonly abrir = output<number>();
 
   readonly dur = duracion;
-  readonly estatus = etiquetaEstatus;
   readonly marcas = banderas;
+
+  /** Oculta Prio y la mecanica interna de "EN COLA": no le compete al solicitante. */
+  readonly esSolicitante = computed(() => this.auth.rol() === 'solicitante');
+
+  estatus(t: Ticket) {
+    return etiquetaEstatus(t, this.esSolicitante());
+  }
 }

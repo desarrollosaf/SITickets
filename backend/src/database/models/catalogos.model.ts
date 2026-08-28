@@ -196,11 +196,6 @@ export class Servicio extends Model {
   @Column(DataType.BOOLEAN)
   declare externo: boolean;
 
-  /** 1 = admite varios tecnicos. */
-  @Default(false)
-  @Column(DataType.BOOLEAN)
-  declare multi_tecnico: boolean;
-
   @Default(true)
   @Column(DataType.BOOLEAN)
   declare activo: boolean;

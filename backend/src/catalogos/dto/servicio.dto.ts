@@ -27,11 +27,6 @@ export class CrearServicioDto {
   @IsOptional()
   @IsBoolean()
   externo?: boolean;
-
-  /** 1 = admite varios tecnicos en el mismo ticket. */
-  @IsOptional()
-  @IsBoolean()
-  multi_tecnico?: boolean;
 }
 
 /** Edicion de un servicio ya existente. La clave no se toca (ver el servicio). */
@@ -57,10 +52,6 @@ export class ActualizarServicioDto {
   @IsOptional()
   @IsBoolean()
   externo?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  multi_tecnico?: boolean;
 
   /** 1 = solo la gente en su lista de usuarios permitidos (mas el admin) lo registra. */
   @IsOptional()

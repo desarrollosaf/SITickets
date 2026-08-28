@@ -72,7 +72,6 @@ export class DetalleTicket {
   readonly crono = cronometro;
   readonly fmt = fecha;
   readonly marcas = banderas;
-  readonly estatus = etiquetaEstatus;
   readonly geo = resumenUbicacion;
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
 
@@ -133,8 +132,14 @@ export class DetalleTicket {
   );
   readonly atiende = computed(() => ['tecnico', 'jefe', 'proveedor'].includes(this.rol() ?? ''));
   readonly esAdmin = computed(() => this.rol() === 'admin');
+  /** Oculta la mecanica interna de "EN COLA": al solicitante solo le importa que quedo registrado. */
+  readonly esSolicitante = computed(() => this.rol() === 'solicitante');
   /** El operador tambien puede reasignar tecnico, aunque no es admin. */
   readonly puedeReasignar = computed(() => this.esAdmin() || this.rol() === 'operador');
+
+  estatus(t: TicketDetalle) {
+    return etiquetaEstatus(t, this.esSolicitante());
+  }
   readonly abierto = computed(
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),
   );

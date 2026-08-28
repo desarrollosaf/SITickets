@@ -205,7 +205,6 @@ export class CatalogosService {
         prefijo_folio: dto.prefijo_folio.trim().toUpperCase(),
         origen: dto.origen,
         externo: dto.externo ?? false,
-        multi_tecnico: dto.multi_tecnico ?? false,
       });
     } catch (e) {
       if (e instanceof UniqueConstraintError) {
@@ -232,7 +231,6 @@ export class CatalogosService {
         }),
         ...(dto.origen !== undefined && { origen: dto.origen }),
         ...(dto.externo !== undefined && { externo: dto.externo }),
-        ...(dto.multi_tecnico !== undefined && { multi_tecnico: dto.multi_tecnico }),
         ...(dto.restringido !== undefined && { restringido: dto.restringido }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
       });
