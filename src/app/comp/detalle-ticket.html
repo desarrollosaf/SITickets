@@ -516,7 +516,7 @@
 
       <!-- Cuerpo -->
       <div class="flex-grow-1 overflow-auto p-3">
-        @if (t.en_cola) {
+        @if (t.en_cola && !esSolicitante()) {
           <div class="alert alert-danger py-2 small">
             Sin técnico asignado. La especialidad «{{ t.servicio }}» no tiene personal disponible hoy.
             Requiere asignación manual.
