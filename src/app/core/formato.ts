@@ -58,14 +58,15 @@ export const NOMBRE_PRIORIDAD: Record<string, string> = {
 
 /**
  * Un ticket sin tecnico se muestra como EN COLA aunque en la base siga
- * REGISTRADO: para el area lo relevante es que nadie lo esta viendo.
+ * REGISTRADO: para el area lo relevante es que nadie lo esta viendo. Al
+ * solicitante no le compete esa mecanica interna, asi que su vista pide
+ * ocultarEnCola=true para que vea el estatus real (Registrado).
  */
-export function etiquetaEstatus(t: {
-  estatus: string;
-  en_cola: boolean;
-  cierre_por_omision?: boolean;
-}): { texto: string; clase: string } {
-  if (t.en_cola) return { texto: 'EN COLA', clase: 'estatus-EN_COLA' };
+export function etiquetaEstatus(
+  t: { estatus: string; en_cola: boolean; cierre_por_omision?: boolean },
+  ocultarEnCola = false,
+): { texto: string; clase: string } {
+  if (t.en_cola && !ocultarEnCola) return { texto: 'EN COLA', clase: 'estatus-EN_COLA' };
   if (t.estatus === 'CERRADO' && t.cierre_por_omision) {
     return { texto: 'Cerrado por omisión', clase: 'estatus-CERRADO' };
   }

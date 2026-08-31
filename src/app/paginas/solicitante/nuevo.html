@@ -188,15 +188,17 @@
         </div>
       }
 
-      <div class="alert alert-info py-2 small">
-        Prioridad asignada automáticamente:
-        <span class="chip" [class]="'chip-' + p.prioridad">
-          {{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}
-        </span>
-        @if (esAdmin()) {
-          &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
-        }
-      </div>
+      @if (auth.rol() !== 'solicitante') {
+        <div class="alert alert-info py-2 small">
+          Prioridad asignada automáticamente:
+          <span class="chip" [class]="'chip-' + p.prioridad">
+            {{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}
+          </span>
+          @if (esAdmin()) {
+            &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
+          }
+        </div>
+      }
     }
 
     @if (error()) {

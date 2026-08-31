@@ -28,7 +28,6 @@ export class CatalogoServicios {
   svPrefijo = '';
   svOrigen: 'usuario' | 'administrador' = 'usuario';
   svExterno = false;
-  svMultiTecnico = false;
   svRestringido = false;
 
   /* ---------------- usuarios permitidos de un servicio restringido ---------------- */
@@ -62,7 +61,6 @@ export class CatalogoServicios {
     this.svPrefijo = '';
     this.svOrigen = 'usuario';
     this.svExterno = false;
-    this.svMultiTecnico = false;
     this.svRestringido = false;
     this.errorFormServicio.set('');
     this.mostrarFormServicio.set(true);
@@ -75,7 +73,6 @@ export class CatalogoServicios {
     this.svPrefijo = s.prefijo_folio;
     this.svOrigen = s.origen;
     this.svExterno = s.externo;
-    this.svMultiTecnico = s.multi_tecnico;
     this.svRestringido = s.restringido;
     this.errorFormServicio.set('');
     this.mostrarFormServicio.set(true);
@@ -108,7 +105,6 @@ export class CatalogoServicios {
       prefijo_folio: this.svPrefijo.trim(),
       origen: this.svOrigen,
       externo: this.svExterno,
-      multi_tecnico: this.svMultiTecnico,
       restringido: this.svRestringido,
     };
     const peticion = id

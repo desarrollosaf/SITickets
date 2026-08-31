@@ -231,7 +231,6 @@ export class TicketsService {
     prefijo_folio: string;
     origen: 'usuario' | 'administrador';
     externo?: boolean;
-    multi_tecnico?: boolean;
   }) {
     return this.http.post<Servicio>(`${API}/catalogos/servicios`, datos);
   }
@@ -242,7 +241,6 @@ export class TicketsService {
       prefijo_folio: string;
       origen: 'usuario' | 'administrador';
       externo: boolean;
-      multi_tecnico: boolean;
       restringido: boolean;
       activo: boolean;
     }>,
