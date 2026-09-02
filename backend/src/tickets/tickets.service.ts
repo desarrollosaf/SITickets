@@ -37,6 +37,7 @@ import { TrazaService } from './traza.service';
 import { BienesService } from '../bienes/bienes.service';
 import { DictamenService } from './dictamen.service';
 import { CedulaCustodiaService } from './cedula-custodia.service';
+import { ImpresorasService } from '../impresoras/impresoras.service';
 import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
@@ -110,6 +111,7 @@ export class TicketsService {
     private readonly bienesSrv: BienesService,
     private readonly dictamenSrv: DictamenService,
     private readonly cedulaCustodiaSrv: CedulaCustodiaService,
+    private readonly impresorasSrv: ImpresorasService,
   ) {}
 
   /* ==================================================================
@@ -892,8 +894,16 @@ export class TicketsService {
     departamento: string | null;
     /** Domicilio fisico del edificio del departamento (saf.t_ubicacion), solo para la cedula de retiro. */
     edificio: string | null;
+    /** Nombre largo de la direccion: es lo que usa eservice.impresoras.area (ver nivelTonerDelTicket). */
+    direccionCompleta: string | null;
   }> {
-    const vacio = { dependencia: null, direccion: null, departamento: null, edificio: null };
+    const vacio = {
+      dependencia: null,
+      direccion: null,
+      departamento: null,
+      edificio: null,
+      direccionCompleta: null,
+    };
 
     const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
     const sUsuario = local?.rfc
@@ -919,6 +929,7 @@ export class TicketsService {
       direccion: dir?.Nombre?.trim() ?? null,
       departamento: (depto?.nombre_completo ?? depto?.Nombre)?.trim() ?? null,
       edificio: ubicacion?.valor?.trim() ?? null,
+      direccionCompleta: dir?.nombre_completo?.trim() ?? null,
     };
   }
 
@@ -947,6 +958,20 @@ export class TicketsService {
       bien: encontrado,
       motivo: encontrado ? null : (motivo ?? 'Ese número de inventario ya no aparece en el sistema.'),
     };
+  }
+
+  /**
+   * Nivel de tóner de las impresoras arrendadas de la direccion del
+   * solicitante (solo servicio IMPA). Cruza saf.t_direccion.nombre_completo
+   * contra eservice.impresoras.area — ver ImpresorasService.nivelToner.
+   */
+  async nivelTonerDelTicket(id: number, usuario: UsuarioToken) {
+    const t = await this.cargar(id, usuario);
+    if (t.servicio?.clave !== 'IMPA') {
+      return { impresoras: [], motivo: 'Este ticket no es de Impresoras arrendadas.' };
+    }
+    const org = await this.datosOrganizacionalesDelSolicitante(t.solicitante_id);
+    return this.impresorasSrv.nivelToner(org.direccionCompleta, usuario);
   }
 
   /**

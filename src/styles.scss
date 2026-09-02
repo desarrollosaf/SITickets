@@ -44,6 +44,11 @@ body {
 .chip-P4 { background: #eef1f4; color: var(--p4); }
 .chip-bandera { background: #fff4e5; color: #a05a00; border: 1px solid #f0d9b5; }
 
+/* Nivel de tóner: mismos umbrales que el sistema de impresoras (rojo <20%, naranja <50%). */
+.toner-red { background: #fbe9e7; color: #b3261e; }
+.toner-orange { background: #fdf1e3; color: #a05a00; }
+.toner-green { background: #e6f4ea; color: #1e7a3d; }
+
 .estatus {
   display: inline-block;
   padding: 0.12rem 0.5rem;
