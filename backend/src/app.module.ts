@@ -6,7 +6,9 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import {
   BienMueble,
+  ComparacionImpre,
   EstatusBien,
+  Impresora,
   MODELOS,
   SDependencia,
   SDepartamento,
@@ -24,6 +26,7 @@ import { RolesGuard } from './auth/roles.guard';
 import { BienesModule } from './bienes/bienes.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { IaModule } from './ia/ia.module';
+import { ImpresorasModule } from './impresoras/impresoras.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OperacionModule } from './operacion/operacion.module';
 import { SeedModule } from './seed/seed.module';
@@ -117,6 +120,33 @@ import { UsuariosModule } from './usuarios/usuarios.module';
       }),
     }),
 
+    /*
+     * Base externa 'eservice': sistema viejo de impresoras arrendadas
+     * (PHP/Laravel). A diferencia de saf/bienes, aqui SI se escribe: los
+     * endpoints /pythonCompara y /pythonNotificaError (ver ImpresorasModule)
+     * insertan/actualizan el historial de lecturas de tóner que manda el
+     * script Python por SNMP.
+     */
+    SequelizeModule.forRootAsync({
+      name: 'eservice',
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        dialect: 'mysql' as const,
+        host: config.get('ESERVICE_DB_HOST', 'localhost'),
+        port: Number(config.get('ESERVICE_DB_PORT', 3306)),
+        database: config.get('ESERVICE_DB_NAME', 'eservice'),
+        username: config.get('ESERVICE_DB_USER', 'root'),
+        password: config.get('ESERVICE_DB_PASS', ''),
+        models: [Impresora, ComparacionImpre],
+        logging: false,
+        timezone: '-06:00',
+        synchronize: false,
+        autoLoadModels: false,
+        retryAttempts: 20,
+        retryDelay: 3000,
+      }),
+    }),
+
     /* Antes de SeedModule: el seed escribe sobre el esquema ya migrado. */
     MigracionesModule,
 
@@ -124,6 +154,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     BienesModule,
     CatalogosModule,
     IaModule,
+    ImpresorasModule,
     TicketsModule,
     OperacionModule,
     SeedModule,

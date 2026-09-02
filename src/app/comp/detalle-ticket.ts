@@ -14,7 +14,14 @@ import {
   resumenUbicacion,
   ubicacionActual,
 } from '../core/formato';
-import type { Bien, BienTicket, Catalogos, Tecnico, TicketDetalle } from '../core/modelos';
+import type {
+  Bien,
+  BienTicket,
+  Catalogos,
+  NivelTonerImpresora,
+  Tecnico,
+  TicketDetalle,
+} from '../core/modelos';
 
 /** Formularios que puede desplegar el cajon. */
 type Formulario =
@@ -62,6 +69,12 @@ export class DetalleTicket {
   readonly error = signal('');
   /** Equipo de computo elegido por el solicitante. Solo se pide para servicio CMP. */
   readonly bienTicket = signal<BienTicket | null>(null);
+  /** Nivel de tóner de impresoras arrendadas. Solo se pide para servicio IMPA. */
+  readonly nivelToner = signal<NivelTonerImpresora[]>([]);
+  readonly cargandoToner = signal(false);
+  readonly errorToner = signal('');
+  /** Por que la lista vino vacía (sin match de dirección, sin impresoras…), no un error. */
+  readonly motivoToner = signal('');
   readonly formulario = signal<Formulario>(null);
   readonly ocupado = signal(false);
   /** Aviso si SIASAF no respondio al avisar la asignacion temporal del equipo. */
@@ -146,6 +159,8 @@ export class DetalleTicket {
   readonly relojCorriendo = computed(() => this.ticket()?.sesiones.some((s) => !s.fin) ?? false);
   /** Equipo de computo: "Atender ticket" reemplaza a "Marcar resuelto". */
   readonly esCmpTicket = computed(() => this.ticket()?.servicio_clave === 'CMP');
+  /** Impresoras arrendadas: nivel de tóner del sistema eService, no para el solicitante. */
+  readonly esImpaTicket = computed(() => this.ticket()?.servicio_clave === 'IMPA');
 
   /** Avance contra el objetivo de resolucion, tope 100 %. */
   readonly avance = computed(() => {
@@ -182,12 +197,28 @@ export class DetalleTicket {
     this.cargando.set(true);
     this.error.set('');
     this.bienTicket.set(null);
+    this.nivelToner.set([]);
+    this.motivoToner.set('');
     this.api.detalle(id).subscribe({
       next: (t) => {
         this.ticket.set(t);
         this.cargando.set(false);
         if (t.servicio_clave === 'CMP') {
           this.api.bienDelTicket(id).subscribe({ next: (b) => this.bienTicket.set(b) });
+        }
+        if (t.servicio_clave === 'IMPA' && !this.esSolicitante()) {
+          this.cargandoToner.set(true);
+          this.api.nivelToner(id).subscribe({
+            next: (r) => {
+              this.cargandoToner.set(false);
+              this.nivelToner.set(r.impresoras);
+              this.motivoToner.set(r.motivo ?? '');
+            },
+            error: (e) => {
+              this.cargandoToner.set(false);
+              this.errorToner.set(mensajeError(e));
+            },
+          });
         }
       },
       error: (e) => {

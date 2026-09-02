@@ -31,6 +31,7 @@ import { TrazaService } from './traza.service';
 import { DictamenService } from './dictamen.service';
 import { CedulaCustodiaService } from './cedula-custodia.service';
 import { BienesModule } from '../bienes/bienes.module';
+import { ImpresorasModule } from '../impresoras/impresoras.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { BienesModule } from '../bienes/bienes.module';
       'saf',
     ),
     BienesModule,
+    ImpresorasModule,
   ],
   controllers: [TicketsController],
   providers: [
