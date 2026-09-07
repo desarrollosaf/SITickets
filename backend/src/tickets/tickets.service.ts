@@ -123,9 +123,21 @@ export class TicketsService {
    * cualquiera podia pedir cualquier ticket porque el identificador venia del
    * navegador. Aqui el alcance sale del token y no se puede ampliar por URL.
    */
+  /**
+   * modo solo importa para un tecnico/jefe/proveedor, que tiene dos
+   * historicos distintos (lo que le turnaron atender y lo que el mismo
+   * registro como solicitante):
+   *   'todo'     — la union de ambos. Es lo correcto para autorizar una
+   *                accion sobre UN ticket puntual (detalle, corregir datos,
+   *                etc.): no importa por cual de los dos motivos le toca,
+   *                sigue siendo suyo.
+   *   'propios'  — "Mis tickets": solo lo que registro para si mismo.
+   *   'turnados' — "Mis tickets turnados": solo lo que le toca atender.
+   * Para el resto de roles el modo no cambia nada.
+   */
   private async alcance(
     usuario: UsuarioToken,
-    soloPropios = false,
+    modo: 'todo' | 'propios' | 'turnados' = 'todo',
   ): Promise<Record<string, unknown>> {
     /** El operador ve todo, igual que el administrador, pero no administra catalogos. */
     if (usuario.rol === 'admin' || usuario.rol === 'operador') return {};
@@ -156,18 +168,10 @@ export class TicketsService {
           if (sUsuario) solicitanteIds.push(sUsuario.id_Usuario);
         }
       }
-      /*
-       * "Mis tickets" (soloPropios): unicamente lo que el tecnico registro
-       * para si mismo, como cualquier solicitante — nunca lo que se le turno
-       * a atender. Eso vive aparte, en "Mis tickets turnados" (bandeja).
-       */
-      if (soloPropios) {
-        return { solicitante_id: { [Op.in]: solicitanteIds } };
-      }
-      return {
+      const comoPropio = { solicitante_id: { [Op.in]: solicitanteIds } };
+      const comoTurnado = {
         [Op.or]: [
           { tecnico_id: usuario.id },
-          { solicitante_id: { [Op.in]: solicitanteIds } },
           {
             id: {
               [Op.in]: Sequelize.literal(
@@ -177,14 +181,17 @@ export class TicketsService {
           },
         ],
       };
+      if (modo === 'propios') return comoPropio;
+      if (modo === 'turnados') return comoTurnado;
+      return { [Op.or]: [comoPropio, comoTurnado] };
     }
     return { id: null };
   }
 
   async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
-    const where: Record<string, unknown> = {
-      ...(await this.alcance(usuario, filtros.propios === 'true')),
-    };
+    const modo =
+      filtros.propios === 'true' ? 'propios' : filtros.turnados === 'true' ? 'turnados' : 'todo';
+    const where: Record<string, unknown> = { ...(await this.alcance(usuario, modo)) };
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;
