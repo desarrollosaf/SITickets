@@ -31,6 +31,8 @@ export interface FiltrosTicket {
   tecnico?: string;
   interno?: string;
   abiertos?: string;
+  /** Para tecnico/jefe/proveedor: solo lo que registraron ellos mismos, nunca lo que se les turno. */
+  propios?: string;
 }
 
 @Injectable({ providedIn: 'root' })
