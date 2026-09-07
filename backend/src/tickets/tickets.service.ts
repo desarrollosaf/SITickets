@@ -123,7 +123,10 @@ export class TicketsService {
    * cualquiera podia pedir cualquier ticket porque el identificador venia del
    * navegador. Aqui el alcance sale del token y no se puede ampliar por URL.
    */
-  private async alcance(usuario: UsuarioToken): Promise<Record<string, unknown>> {
+  private async alcance(
+    usuario: UsuarioToken,
+    soloPropios = false,
+  ): Promise<Record<string, unknown>> {
     /** El operador ve todo, igual que el administrador, pero no administra catalogos. */
     if (usuario.rol === 'admin' || usuario.rol === 'operador') return {};
     if (usuario.rol === 'solicitante') return { solicitante_id: usuario.id };
@@ -153,6 +156,14 @@ export class TicketsService {
           if (sUsuario) solicitanteIds.push(sUsuario.id_Usuario);
         }
       }
+      /*
+       * "Mis tickets" (soloPropios): unicamente lo que el tecnico registro
+       * para si mismo, como cualquier solicitante — nunca lo que se le turno
+       * a atender. Eso vive aparte, en "Mis tickets turnados" (bandeja).
+       */
+      if (soloPropios) {
+        return { solicitante_id: { [Op.in]: solicitanteIds } };
+      }
       return {
         [Op.or]: [
           { tecnico_id: usuario.id },
@@ -171,7 +182,9 @@ export class TicketsService {
   }
 
   async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
-    const where: Record<string, unknown> = { ...(await this.alcance(usuario)) };
+    const where: Record<string, unknown> = {
+      ...(await this.alcance(usuario, filtros.propios === 'true')),
+    };
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;

@@ -61,7 +61,7 @@ export class MisTickets {
   }
 
   cargar() {
-    this.api.listar().subscribe({
+    this.api.listar({ propios: 'true' }).subscribe({
       next: (t) => this.tickets.set(t),
       error: (e) => this.error.set(mensajeError(e)),
     });
