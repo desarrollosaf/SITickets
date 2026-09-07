@@ -25,6 +25,7 @@ export * from './catalogos.model';
 export * from './operacion.model';
 export * from './saf.model';
 export * from './bienes.model';
+export * from './eservice.model';
 
 /**
  * Modelos de la conexion principal. UserSaf queda fuera: vive en la conexion

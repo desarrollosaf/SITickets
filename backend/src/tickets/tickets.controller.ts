@@ -75,6 +75,13 @@ export class TicketsController {
     return this.tickets.bienesParaCorregir(id, usuario);
   }
 
+  /** Nivel de tóner de las impresoras arrendadas de la direccion del solicitante (solo IMPA). */
+  @Roles('admin', 'operador', 'tecnico', 'jefe', 'proveedor', 'gestor')
+  @Get(':id/nivel-toner')
+  nivelTonerDelTicket(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.nivelTonerDelTicket(id, usuario);
+  }
+
   @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {

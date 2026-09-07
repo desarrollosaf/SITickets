@@ -58,7 +58,7 @@ export class SDependencia extends Model {
   declare Nombre: string;
 }
 
-/** Solo para el dictamen de baja: nombre de la direccion del solicitante. */
+/** Nombre de la direccion del solicitante (dictamen de baja, ficha del ticket). */
 @Table({ tableName: 't_direccion', timestamps: false })
 export class SDireccion extends Model {
   @PrimaryKey
@@ -67,6 +67,10 @@ export class SDireccion extends Model {
 
   @Column(DataType.STRING(100))
   declare Nombre: string;
+
+  /** Nombre largo: es lo que usa eservice.impresoras.area para identificar la direccion. */
+  @Column(DataType.STRING(250))
+  declare nombre_completo: string | null;
 }
 
 /** Solo para el dictamen de baja: nombre del departamento del solicitante. */

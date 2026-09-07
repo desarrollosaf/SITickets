@@ -247,6 +247,39 @@ export interface Tecnico {
   servicios: { id: number; nombre: string; suplente: boolean }[];
 }
 
+/** Nivel de tóner de una impresora arrendada (servicio IMPA), del sistema eService. */
+export interface NivelTonerImpresora {
+  id: number;
+  edificio: string;
+  dependencia: string;
+  direccion: string | null;
+  area: string;
+  marca: string | null;
+  modelo: string;
+  serie: string;
+  ip: string | null;
+  toner: {
+    porcent: number | null;
+    negro: number | null;
+    cian: number | null;
+    magenta: number | null;
+    amarillo: number | null;
+    residual: number | null;
+  };
+  tonerMasBajo: number;
+  colorEstado: 'red' | 'orange' | 'green';
+  colorResidual: 'red' | 'orange' | 'green' | null;
+  estado: string | null;
+  fechaHora: string | null;
+  sinLectura: boolean;
+}
+
+/** Respuesta de nivel de tóner: vacío con motivo cuando no se pudo cruzar la dirección del solicitante. */
+export interface NivelToner {
+  impresoras: NivelTonerImpresora[];
+  motivo: string | null;
+}
+
 export interface Organizacion {
   dependencias: { id: number; nombre: string }[];
   areas: { id: number; nombre: string; dependencia_id: number }[];

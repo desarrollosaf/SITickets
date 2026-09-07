@@ -10,6 +10,7 @@ import type {
   Geo,
   LineaTraza,
   Monitor,
+  NivelToner,
   Organizacion,
   Prioridad,
   Problema,
@@ -58,6 +59,11 @@ export class TicketsService {
   /** Bienes del solicitante para elegir al corregir el inventario (ticket en espera). */
   bienesParaCorregir(id: number) {
     return this.http.get<BienesUsuario>(`${API}/tickets/${id}/bienes-para-corregir`);
+  }
+
+  /** Nivel de tóner de las impresoras arrendadas del ticket (solo servicio IMPA, no para el solicitante). */
+  nivelToner(id: number) {
+    return this.http.get<NivelToner>(`${API}/tickets/${id}/nivel-toner`);
   }
 
   /* ---------------- alta ---------------- */

@@ -645,6 +645,80 @@
           </dl>
         </div>
 
+        <!-- Nivel de tóner (impresoras arrendadas) -->
+        @if (esImpaTicket() && !esSolicitante()) {
+          <div class="tarjeta p-3 mb-3">
+            <h3 class="h6 mb-3">Nivel de tóner</h3>
+            @if (errorToner()) {
+              <div class="alert alert-danger py-2 small">{{ errorToner() }}</div>
+            } @else if (cargandoToner()) {
+              <div class="sub small"><span class="spinner-border spinner-border-sm me-2"></span>Cargando…</div>
+            } @else if (!nivelToner().length) {
+              <div class="sub small">{{ motivoToner() || 'No hay impresoras registradas.' }}</div>
+            } @else {
+              <div class="table-responsive" style="max-height: 360px">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr class="sub">
+                      <th>Serie / modelo</th>
+                      <th>Ubicación</th>
+                      <th>Tóner</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of nivelToner(); track p.id) {
+                      <tr [class.text-danger]="p.estado === 'No actualizado'">
+                        <td>
+                          <div class="mono sub" style="font-size: 0.72rem">{{ p.serie }}</div>
+                          <div style="font-size: 0.8rem">{{ p.marca }} {{ p.modelo }}</div>
+                        </td>
+                        <td class="sub" style="font-size: 0.78rem">
+                          {{ p.edificio }}<br />{{ p.area }}
+                        </td>
+                        <td>
+                          <div class="d-flex flex-wrap gap-1">
+                            @if (p.toner.porcent !== null) {
+                              <span class="chip toner-{{ p.colorEstado }}">{{ p.toner.porcent }}%</span>
+                            }
+                            @if (p.toner.negro !== null) {
+                              <span class="chip toner-{{ p.colorEstado }}">N {{ p.toner.negro }}%</span>
+                            }
+                            @if (p.toner.cian !== null) {
+                              <span class="chip toner-{{ p.colorEstado }}">C {{ p.toner.cian }}%</span>
+                            }
+                            @if (p.toner.magenta !== null) {
+                              <span class="chip toner-{{ p.colorEstado }}">M {{ p.toner.magenta }}%</span>
+                            }
+                            @if (p.toner.amarillo !== null) {
+                              <span class="chip toner-{{ p.colorEstado }}">A {{ p.toner.amarillo }}%</span>
+                            }
+                            @if (p.sinLectura) {
+                              <span class="chip">Sin lectura</span>
+                            }
+                          </div>
+                        </td>
+                        <td>
+                          @if (p.estado === 'No actualizado') {
+                            <span class="badge text-bg-danger-subtle text-danger-emphasis">No actualizado</span>
+                          } @else if (p.sinLectura) {
+                            <span class="badge text-bg-secondary-subtle text-secondary-emphasis">Sin lectura</span>
+                          } @else {
+                            <span class="badge text-bg-success-subtle text-success-emphasis">Actualizado</span>
+                          }
+                          @if (p.fechaHora) {
+                            <div class="sub" style="font-size: 0.7rem">{{ p.fechaHora }}</div>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
         <!-- Cierre técnico -->
         @if (t.diagnostico || t.resultado_cmp === 'baja') {
           <div class="tarjeta p-3 mb-3">
