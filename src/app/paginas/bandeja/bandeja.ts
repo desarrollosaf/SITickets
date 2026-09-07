@@ -61,7 +61,7 @@ export class Bandeja implements OnDestroy {
   }
 
   cargar() {
-    this.api.listar().subscribe({
+    this.api.listar({ turnados: 'true' }).subscribe({
       next: (t) => {
         this.tickets.set(t);
         this.buscaRelojActivo(t);
