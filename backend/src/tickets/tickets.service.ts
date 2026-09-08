@@ -191,7 +191,7 @@ export class TicketsService {
   async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
     const modo =
       filtros.propios === 'true' ? 'propios' : filtros.turnados === 'true' ? 'turnados' : 'todo';
-    const where: Record<string, unknown> = { ...(await this.alcance(usuario, modo)) };
+    const where: Record<string | symbol, unknown> = { ...(await this.alcance(usuario, modo)) };
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;
@@ -201,6 +201,26 @@ export class TicketsService {
     if (filtros.estatus === 'EN_COLA') where.en_cola = true;
     else if (filtros.estatus) where.estatus = filtros.estatus;
     if (filtros.abiertos === 'true') where.estatus = { [Op.notIn]: ESTATUS_FINALES };
+
+    /*
+     * Busca por folio vigente o por folio general (TK/DI/N): el solicitante
+     * pudo dar cualquiera de los dos, ya que uno reemplaza al otro al
+     * cerrar. Se combina con Op.and para no pisar el Op.or que ya puso
+     * alcance() (gestor/tecnico ven por varias vias a la vez).
+     */
+    if (filtros.folio?.trim()) {
+      const termino = `%${filtros.folio.trim()}%`;
+      const condicionFolio = {
+        [Op.or]: [{ folio: { [Op.like]: termino } }, { folio_general: { [Op.like]: termino } }],
+      };
+      if (where[Op.or]) {
+        const previo = where[Op.or];
+        delete where[Op.or];
+        where[Op.and] = [{ [Op.or]: previo }, condicionFolio];
+      } else {
+        Object.assign(where, condicionFolio);
+      }
+    }
 
     const filas = await this.tickets.findAll({
       where,
@@ -320,6 +340,8 @@ export class TicketsService {
     return {
       id: t.id,
       folio: t.folio,
+      /** Fijo desde el registro, el mismo sin importar el servicio; folio puede diferir hasta el cierre. */
+      folio_general: t.folio_general,
       servicio_id: t.servicio_id,
       servicio: t.servicio?.nombre ?? '—',
       servicio_clave: t.servicio?.clave ?? '',
@@ -533,7 +555,7 @@ export class TicketsService {
     if (esCampoCuentaCorreo(problema.campo_adicional)) {
       const revision = revisaCuentaCorreo(
         contexto,
-        dominioInstitucional(this.config.get('CORREO_DOMINIO')),
+        dto.correo_libre ? '' : dominioInstitucional(this.config.get('CORREO_DOMINIO')),
       );
       if ('error' in revision) throw new BadRequestException(revision.error);
       contexto = revision.correo;
@@ -597,11 +619,18 @@ export class TicketsService {
     }
 
     const ticket = await this.db.transaction(async (tx) => {
-      const folio = await this.reglas.siguienteFolio(problema.servicio_id, tx);
+      /*
+       * El folio por servicio (TK/CMP/N, TK/TEL/N…) se asigna hasta que el
+       * ticket cierra de verdad (ver ReglasService.asignaFolioDeCierre). En
+       * lo que tanto, el ticket se identifica con el folio general
+       * (TK/DI/N), el mismo para cualquier servicio.
+       */
+      const folio = await this.reglas.siguienteFolioGeneral(tx);
 
       const t = await this.tickets.create(
         {
           folio,
+          folio_general: folio,
           servicio_id: problema.servicio_id,
           servicio_original_id: problema.servicio_id,
           problema_id: problema.id,
@@ -747,7 +776,11 @@ export class TicketsService {
      * nuevo en su lugar — si no, el anterior se queda "atorado" en
      * mantenimiento en SIASAF y el nuevo nunca se marca como en atencion.
      */
-    if (typeof nuevos.contexto === 'string' && ticket.servicio?.clave === 'CMP' && ticket.tecnico_id) {
+    if (
+      typeof nuevos.contexto === 'string' &&
+      ticket.tecnico_id &&
+      this.esTicketDeInventarioCmp(ticket)
+    ) {
       await this.traspasaCustodiaCmp(ticket, contextoAnterior, nuevos.contexto);
     }
 
@@ -821,11 +854,12 @@ export class TicketsService {
     if (!tecnicos.length) throw new BadRequestException('Ninguno de los tecnicos elegidos es valido');
 
     const ticket = await this.db.transaction(async (tx) => {
-      const folio = await this.reglas.siguienteFolio(problema.servicio_id, tx);
+      const folio = await this.reglas.siguienteFolioGeneral(tx);
 
       const t = await this.tickets.create(
         {
           folio,
+          folio_general: folio,
           servicio_id: problema.servicio_id,
           servicio_original_id: problema.servicio_id,
           problema_id: problema.id,
@@ -963,6 +997,11 @@ export class TicketsService {
     if (t.servicio?.clave !== 'CMP') {
       return { bien: null, motivo: 'Este ticket no es de Equipo de cómputo.' };
     }
+    /* Hay problemas de CMP (CMP-06, CMP-09, CMP-12…) cuyo campo adicional no
+       es un numero de inventario (programa, ubicacion, usuario/carpeta). */
+    if (!t.problema?.campo_adicional?.toLowerCase().includes('inventario')) {
+      return { bien: null, motivo: 'Este problema no pide un número de inventario.' };
+    }
     if (!t.contexto) {
       return { bien: null, motivo: 'El ticket no tiene un número de inventario capturado.' };
     }
@@ -1036,6 +1075,22 @@ export class TicketsService {
     return t.tecnico_id === usuario.id;
   }
 
+  /**
+   * true solo si el problema realmente pide un numero de inventario — hay
+   * CMP cuyo campo adicional es otra cosa (CMP-06 "Nombre del programa",
+   * CMP-09 "Ubicacion destino", CMP-12 "Usuario o carpeta"). Toda la
+   * mecanica de SIASAF (mantenimiento, cedulas de salida/entrada, traspaso
+   * de custodia) solo tiene sentido cuando esto es true: si no, t.contexto
+   * no es un numero de inventario y buscarlo en SIASAF solo produce avisos
+   * confusos o, peor, una cedula con datos inventados.
+   */
+  private esTicketDeInventarioCmp(t: Ticket): boolean {
+    return (
+      t.servicio?.clave === 'CMP' &&
+      !!t.problema?.campo_adicional?.toLowerCase().includes('inventario')
+    );
+  }
+
   private exigeTecnico(t: Ticket, usuario: UsuarioToken) {
     if (usuario.rol === 'admin') return;
     if (!ROLES_TECNICOS.includes(usuario.rol) || !this.esTecnicoDe(t, usuario)) {
@@ -1079,7 +1134,7 @@ export class TicketsService {
    * igual avanza. `t.servicio` debe venir cargado (ver cargar()).
    */
   async marcarCmpEnMantenimiento(t: Ticket, usuario: UsuarioToken): Promise<void> {
-    if (t.servicio?.clave !== 'CMP' || !t.contexto) return;
+    if (!t.contexto || !this.esTicketDeInventarioCmp(t)) return;
 
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
@@ -1110,7 +1165,7 @@ export class TicketsService {
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
 
-    if (t.servicio?.clave === 'CMP' && motivo === MOTIVO_RETIRO_EQUIPO) {
+    if (motivo === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t)) {
       await this.generarCedulaSalida(t, usuario);
     }
 
@@ -1179,7 +1234,8 @@ export class TicketsService {
       ? Math.round((Date.now() - new Date(t.f_espera_desde).getTime()) / 1000)
       : 0;
 
-    const veniaDeRetiroEquipo = t.servicio?.clave === 'CMP' && t.motivo_espera === MOTIVO_RETIRO_EQUIPO;
+    const veniaDeRetiroEquipo =
+      t.motivo_espera === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t);
 
     await t.update({
       espera_acum_seg: t.espera_acum_seg + pausaSeg,
@@ -1348,7 +1404,7 @@ export class TicketsService {
     let avisoCustodia: string | null = null;
     let bienId: number | null = null;
     let bienEsBc = false;
-    if (t.contexto) {
+    if (t.contexto && this.esTicketDeInventarioCmp(t)) {
       const [tecnicoLocal, rfcSolicitante] = await Promise.all([
         this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
         this.rfcDelSolicitante(t.solicitante_id),
@@ -1492,10 +1548,12 @@ export class TicketsService {
     this.exigeEstatus(t, [ESTATUS.RESUELTO]);
     if (usuario.rol !== 'admin') this.exigeSolicitante(t, usuario);
 
-    await t.update({
-      estatus: ESTATUS.CERRADO,
-      f_validacion: new Date(),
-      cierre_por_omision: false,
+    await this.db.transaction(async (tx) => {
+      await t.update(
+        { estatus: ESTATUS.CERRADO, f_validacion: new Date(), cierre_por_omision: false },
+        { transaction: tx },
+      );
+      await this.reglas.asignaFolioDeCierre(t, tx);
     });
     await this.reglas.anota(
       t.id,

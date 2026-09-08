@@ -22,8 +22,10 @@ export class Tickets {
   readonly cargando = signal(true);
   readonly error = signal('');
 
-  /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». */
-  filtros: FiltrosTicket = { servicio: '', estatus: '', prioridad: '', tecnico: '' };
+  /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». Esta vista ya está
+   * restringida a admin/operador por el guard de la ruta (app.routes.ts), así que el buscador
+   * por folio no necesita gating adicional aquí. */
+  filtros: FiltrosTicket = { servicio: '', estatus: '', prioridad: '', tecnico: '', folio: '' };
 
   constructor() {
     forkJoin({ catalogos: this.api.catalogos(), tecnicos: this.api.tecnicos() }).subscribe({
@@ -51,7 +53,7 @@ export class Tickets {
   }
 
   limpiar() {
-    this.filtros = { servicio: '', estatus: '', prioridad: '', tecnico: '' };
+    this.filtros = { servicio: '', estatus: '', prioridad: '', tecnico: '', folio: '' };
     this.cargar();
   }
 }

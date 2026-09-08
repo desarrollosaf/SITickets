@@ -12,6 +12,17 @@
 
 <div class="tarjeta p-3 mb-3">
   <div class="row g-2">
+    <div class="col-12 col-lg-4">
+      <label class="form-label small fw-semibold" for="f-folio">Buscar por folio</label>
+      <div class="input-group input-group-sm">
+        <input id="f-folio" type="text" class="form-control"
+               placeholder="Folio vigente o folio general (TK/DI/…)"
+               [(ngModel)]="filtros.folio" name="ffolio" (keyup.enter)="cargar()" />
+        <button class="btn btn-outline-secondary" type="button" (click)="cargar()">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+    </div>
     <div class="col-6 col-lg-3">
       <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
       <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio"

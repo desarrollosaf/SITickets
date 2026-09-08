@@ -41,7 +41,10 @@ export interface Sesion {
 
 export interface Ticket {
   id: number;
+  /** El vigente: TK/DI/N hasta el cierre real, luego TK/{servicio}/N. */
   folio: string;
+  /** Fijo desde el registro, el mismo sin importar el servicio (TK/DI/N). Nunca cambia. */
+  folio_general: string;
   servicio_id: number;
   servicio: string;
   servicio_clave: string;

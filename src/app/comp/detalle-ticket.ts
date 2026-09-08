@@ -203,7 +203,10 @@ export class DetalleTicket {
       next: (t) => {
         this.ticket.set(t);
         this.cargando.set(false);
-        if (t.servicio_clave === 'CMP') {
+        /* Solo si el problema realmente pide numero de inventario: hay CMP
+           (CMP-06, CMP-09, CMP-12…) cuyo campo adicional es otra cosa
+           (programa, ubicacion, usuario/carpeta), no un bien. */
+        if (t.servicio_clave === 'CMP' && esCampoInventario(t.campo_adicional)) {
           this.api.bienDelTicket(id).subscribe({ next: (b) => this.bienTicket.set(b) });
         }
         if (t.servicio_clave === 'IMPA' && !this.esSolicitante()) {

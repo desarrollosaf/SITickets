@@ -1,35 +1,43 @@
-<div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center py-5"
-     style="background: url('/img/fondo_tickets_01.svg') center / cover no-repeat">
-  <div style="max-width: 420px; width: 100%">
-    <div class="text-center mb-4">
-      <div class="d-inline-flex align-items-center justify-content-center rounded-3 mb-3"
-           style="width: 52px; height: 52px; background: #1d3552">
-        <i class="bi bi-headset text-white fs-4"></i>
+<div class="min-vh-100 d-flex flex-column align-items-center justify-content-center py-5 px-3"
+     style="background: radial-gradient(120% 120% at 70% 20%, #b31a5e 0%, #95134b 45%, #5c0c30 100%)">
+  <div style="max-width: 400px; width: 100%">
+    <div class="rounded-4 shadow-lg p-4 p-sm-5" style="background: #fff">
+      <div class="text-center mb-4">
+        <h1 class="h4 fw-bold mb-1" style="color: #95134b">Mesa de ayuda</h1>
+        <div class="mb-1">Iniciar sesión</div>
+        <p class="sub mb-0">Servicios de informática · SAF</p>
       </div>
-      <h1 class="h4 mb-1">eService-Ticket</h1>
-      <p class="sub mb-0">Servicios de informática</p>
-    </div>
 
-    <div class="tarjeta p-4">
       <form (ngSubmit)="entrar()">
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="rfc">RFC</label>
-          <input id="rfc" name="rfc" type="text" class="form-control text-uppercase" autocomplete="username"
-                 maxlength="10" placeholder="AAAA000000" [(ngModel)]="rfc" />
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-person-vcard"></i></span>
+            <input id="rfc" name="rfc" type="text" class="form-control text-uppercase" autocomplete="username"
+                   maxlength="10" placeholder="AAAA000000" [(ngModel)]="rfc" />
+          </div>
           <div class="form-text">10 caracteres, sin homoclave.</div>
         </div>
 
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="password">Contraseña</label>
-          <input id="password" name="password" type="password" class="form-control"
-                 autocomplete="current-password" [(ngModel)]="password" />
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-lock"></i></span>
+            <input [type]="verPassword() ? 'text' : 'password'" id="password" name="password" class="form-control"
+                   autocomplete="current-password" [(ngModel)]="password" />
+            <button type="button" class="btn btn-outline-secondary" (click)="verPassword.set(!verPassword())"
+                    [attr.aria-label]="verPassword() ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+              <i class="bi" [class.bi-eye]="!verPassword()" [class.bi-eye-slash]="verPassword()"></i>
+            </button>
+          </div>
         </div>
 
         @if (error()) {
           <div class="alert alert-danger py-2 small mb-3" role="alert">{{ error() }}</div>
         }
 
-        <button type="submit" class="btn btn-primary w-100" [disabled]="cargando()">
+        <button type="submit" class="btn w-100 text-white fw-semibold" style="background: #95134b"
+                [disabled]="cargando()">
           @if (cargando()) {
             <span class="spinner-border spinner-border-sm me-2"></span>
           }
@@ -38,9 +46,8 @@
       </form>
     </div>
 
-    <p class="sub text-center mt-3 mb-0">
-      El acceso se valida con tu RFC y contraseña institucional. Si no puedes entrar,
-      contacta al área de informática.
+    <p class="text-center mt-3 mb-0" style="color: rgba(255, 255, 255, 0.6); font-size: 0.72rem">
+      © {{ anio }} Gobierno del Estado de México · Mesa de ayuda
     </p>
   </div>
 </div>

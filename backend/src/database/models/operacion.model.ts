@@ -56,11 +56,23 @@ export class Ticket extends Model {
   @Column(DataType.BIGINT.UNSIGNED)
   declare id: number;
 
-  /** §6 inmutable: no se renumera al reclasificar. */
+  /**
+   * §6 Folio "vigente": nace igual a folio_general (TK/DI/N) y se
+   * reemplaza una sola vez, al cerrar de verdad, por el folio de servicio
+   * (TK/CMP/N, TK/TEL/N…) — ver ReglasService.asignaFolioDeCierre. Es el
+   * que usan bitacora, dictamen, cedulas y toda la UI: siempre el que
+   * corresponde mostrar en ese momento del ciclo de vida.
+   */
   @Unique
   @AllowNull(false)
   @Column(DataType.STRING(30))
   declare folio: string;
+
+  /** Folio general, fijo desde el registro, el mismo para cualquier servicio (TK/DI/N). Nunca cambia. */
+  @Unique
+  @AllowNull(false)
+  @Column(DataType.STRING(30))
+  declare folio_general: string;
 
   /** Servicio vigente. Los reportes se leen de aqui, nunca del prefijo del folio. */
   @ForeignKey(() => Servicio)

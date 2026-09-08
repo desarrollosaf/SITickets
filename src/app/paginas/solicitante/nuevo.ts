@@ -7,8 +7,10 @@ import {
   duracion,
   esCampoCuentaCorreo,
   esCampoInventario,
+  esCampoModeloImpresora,
   mensajeError,
   NOMBRE_PRIORIDAD,
+  quitarAcentos,
   revisaCuentaCorreo,
 } from '../../core/formato';
 import type { Bien, CandidatoSaf, Catalogos, Problema } from '../../core/modelos';
@@ -47,13 +49,78 @@ export class Nuevo {
   readonly esCorreo = computed(() => esCampoCuentaCorreo(this.problema()?.campo_adicional));
 
   /**
+   * Por omision el campo solo captura la parte local (antes de la @): el
+   * dominio institucional se arma solo. «Usar otro correo» lo cambia a un
+   * campo libre, para cuando la cuenta no es del dominio institucional.
+   */
+  readonly correoLibre = signal(false);
+
+  /** contextoV es la parte local en modo institucional, o la cuenta completa en modo libre. */
+  readonly correoParaEnviar = computed(() =>
+    this.correoLibre() ? this.contextoV().trim() : `${this.contextoV().trim()}@${this.dominio()}`,
+  );
+
+  toggleCorreoLibre(libre: boolean) {
+    this.correoLibre.set(libre);
+    /* Cambiar de modo a medio escribir deja el valor armado a medias
+       (ej. "nombre@dominio.com@congresoedomex.gob.mx"); mas claro empezar de cero. */
+    this.contextoV.set('');
+  }
+
+  /**
    * Aviso bajo el campo. Solo aparece cuando ya hay algo escrito: reganar al
    * solicitante por un campo vacio que aun no toca no ayuda a nadie.
    */
   readonly avisoCorreo = computed(() => {
     if (!this.esCorreo() || !this.contextoV().trim()) return '';
-    return revisaCuentaCorreo(this.contextoV(), this.dominio());
+    return revisaCuentaCorreo(this.correoParaEnviar(), this.correoLibre() ? '' : this.dominio());
   });
+
+  /* ---------------- modelo de impresora (servicio IMPA) ---------------- */
+
+  /** true cuando el campo adicional del catalogo pide el modelo de la impresora. */
+  readonly esModeloImpresora = computed(() =>
+    esCampoModeloImpresora(this.problema()?.campo_adicional),
+  );
+  readonly modelosImpresora = signal<string[]>([]);
+  readonly cargandoModelos = signal(false);
+  readonly modeloElegido = signal('');
+  /** Lo que se va escribiendo para filtrar la lista (estilo "buscar usuario"). */
+  readonly modeloBusqueda = signal('');
+  /** Se consulta una sola vez por sesion de pantalla, no en cada problema. */
+  private modelosPedidos = false;
+
+  readonly modelosFiltrados = computed(() => {
+    const q = quitarAcentos(this.modeloBusqueda().trim()).toLowerCase();
+    const lista = this.modelosImpresora();
+    return q ? lista.filter((m) => quitarAcentos(m).toLowerCase().includes(q)) : lista;
+  });
+
+  elegirModelo(modelo: string) {
+    this.modeloElegido.set(modelo);
+    this.modeloBusqueda.set('');
+  }
+
+  quitarModelo() {
+    this.modeloElegido.set('');
+  }
+
+  private cargaModelosImpresora() {
+    this.modelosPedidos = true;
+    this.cargandoModelos.set(true);
+    this.api.modelosImpresora().subscribe({
+      next: (r) => {
+        this.cargandoModelos.set(false);
+        this.modelosImpresora.set(r);
+      },
+      error: () => {
+        this.cargandoModelos.set(false);
+        this.modelosImpresora.set([]);
+        /* Se permite reintentar: pudo ser un corte momentaneo. */
+        this.modelosPedidos = false;
+      },
+    });
+  }
 
   /* ---------------- bienes bajo resguardo ---------------- */
 
@@ -71,12 +138,13 @@ export class Nuevo {
   /** Se consulta una sola vez por sesion de pantalla, no en cada problema. */
   private bienesPedidos = false;
 
-  /** Lo que se manda como contexto: los inventarios elegidos o el texto capturado. */
-  readonly contextoFinal = computed(() =>
-    this.esInventario() && this.bienes().length
-      ? this.seleccion().join(', ')
-      : this.contextoV().trim(),
-  );
+  /** Lo que se manda como contexto: los inventarios elegidos, la cuenta armada, el modelo elegido, o el texto capturado. */
+  readonly contextoFinal = computed(() => {
+    if (this.esInventario() && this.bienes().length) return this.seleccion().join(', ');
+    if (this.esCorreo()) return this.correoParaEnviar();
+    if (this.esModeloImpresora() && this.modelosImpresora().length) return this.modeloElegido();
+    return this.contextoV().trim();
+  });
 
   readonly excedeLargo = computed(() => this.contextoFinal().length > LARGO_CONTEXTO);
 
@@ -206,6 +274,7 @@ export class Nuevo {
     this.claveProblema.set(clave);
     this.seleccion.set([]);
     if (this.esInventario() && !this.bienesPedidos) this.cargaBienes();
+    if (this.esModeloImpresora() && !this.modelosPedidos) this.cargaModelosImpresora();
   }
 
   private cargaBienes() {
@@ -256,6 +325,9 @@ export class Nuevo {
     this.contextoV.set('');
     this.seleccion.set([]);
     this.texto = '';
+    this.correoLibre.set(false);
+    this.modeloElegido.set('');
+    this.modeloBusqueda.set('');
   }
 
   /** Boton "Limpiar": reinicia todo el formulario, no solo el contexto del problema actual. */
@@ -283,7 +355,9 @@ export class Nuevo {
       this.error.set(
         this.esInventario() && this.bienes().length
           ? 'Elige al menos un bien de tu resguardo.'
-          : `Captura: ${p.campo_adicional}`,
+          : this.esModeloImpresora() && this.modelosImpresora().length
+            ? 'Elige el modelo de impresora.'
+            : `Captura: ${p.campo_adicional}`,
       );
       return;
     }
@@ -295,7 +369,7 @@ export class Nuevo {
       return;
     }
     if (this.esCorreo()) {
-      const aviso = revisaCuentaCorreo(this.contextoV(), this.dominio());
+      const aviso = revisaCuentaCorreo(this.correoParaEnviar(), this.correoLibre() ? '' : this.dominio());
       if (aviso) {
         this.error.set(aviso);
         return;
@@ -316,6 +390,7 @@ export class Nuevo {
           : this.contextoFinal() || undefined,
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
+        correo_libre: this.esCorreo() ? this.correoLibre() : undefined,
         a_nombre_de: this.puedeElegirUsuario()
           ? (this.usuarioElegido()?.id_usuario_saf ?? undefined)
           : undefined,

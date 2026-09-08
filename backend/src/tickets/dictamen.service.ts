@@ -223,7 +223,7 @@ export class DictamenService {
   </div>
 
   <p class="justif">
-    Derivado de reporte realizado a través del sistema eService–Ticket con folio de registro
+    Derivado de reporte realizado a través del sistema Mesa de ayuda con folio de registro
     ${esc(d.folio)}; del tipo de servicio ${servicio} y con fundamento en lo dispuesto en las
     Normas DI 4 y DI 11 contenidas en el Título VI denominado “Tecnologías de la Información y
     Comunicación” de las Normas Administrativas del Poder Legislativo del Estado de México; el
