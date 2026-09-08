@@ -27,6 +27,7 @@ import { BienesModule } from './bienes/bienes.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { IaModule } from './ia/ia.module';
 import { ImpresorasModule } from './impresoras/impresoras.module';
+import { ManualesModule } from './manuales/manuales.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OperacionModule } from './operacion/operacion.module';
 import { SeedModule } from './seed/seed.module';
@@ -155,6 +156,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     CatalogosModule,
     IaModule,
     ImpresorasModule,
+    ManualesModule,
     TicketsModule,
     OperacionModule,
     SeedModule,

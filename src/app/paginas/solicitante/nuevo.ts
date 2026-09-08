@@ -5,6 +5,7 @@ import { AuthService } from '../../core/auth.service';
 import { TicketsService } from '../../core/tickets.service';
 import {
   duracion,
+  esCampoCantidadEquipos,
   esCampoCuentaCorreo,
   esCampoInventario,
   esCampoModeloImpresora,
@@ -126,6 +127,20 @@ export class Nuevo {
 
   /** true cuando el campo adicional del catalogo pide numero de inventario. */
   readonly esInventario = computed(() => esCampoInventario(this.problema()?.campo_adicional));
+  /** true cuando el campo adicional pide cuantos equipos afecta la falla (servicio INTERNET): solo numeros. */
+  readonly esCantidadEquipos = computed(() =>
+    esCampoCantidadEquipos(this.problema()?.campo_adicional),
+  );
+
+  /**
+   * El input type="number" usa NumberValueAccessor: escribe un `number` (o null),
+   * no un string. contextoV es siempre string en el resto de la clase (se le
+   * llama .trim() en varios lados), asi que aqui se normaliza de vuelta.
+   */
+  onCantidadEquiposChange(valor: number | string | null) {
+    this.contextoV.set(valor === null || valor === undefined ? '' : String(valor));
+  }
+
   /** Equipo de computo: un solo equipo por ticket, sacado de una API distinta. */
   readonly esCmp = computed(() => this.problema()?.servicio_clave === 'CMP');
 
@@ -374,6 +389,10 @@ export class Nuevo {
         this.error.set(aviso);
         return;
       }
+    }
+    if (this.esCantidadEquipos() && !/^\d+$/.test(this.contextoFinal())) {
+      this.error.set(`Captura solo números: ${p.campo_adicional}`);
+      return;
     }
     if (p.requiere_texto && !this.texto.trim()) {
       this.error.set('Describe el problema.');

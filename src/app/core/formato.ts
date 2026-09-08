@@ -150,6 +150,12 @@ export function esCampoInventario(campo: string | null | undefined): boolean {
   return !!campo && campo.toLowerCase().includes('inventario');
 }
 
+/** Etiqueta del catalogo que pide cuantos equipos afecta la falla (servicio INTERNET): solo numeros. */
+export function esCampoCantidadEquipos(campo: string | null | undefined): boolean {
+  if (!campo) return false;
+  return quitarAcentos(campo).toLowerCase().includes('cuantos equipos');
+}
+
 /** Devuelve el mensaje a mostrar, o cadena vacia si la cuenta es valida. */
 export function revisaCuentaCorreo(valor: string, dominio: string): string {
   const limpio = valor.trim().toLowerCase();
