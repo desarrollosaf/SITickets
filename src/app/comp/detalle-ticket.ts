@@ -18,6 +18,7 @@ import type {
   Bien,
   BienTicket,
   Catalogos,
+  LineaBitacora,
   NivelTonerImpresora,
   Tecnico,
   TicketDetalle,
@@ -149,9 +150,23 @@ export class DetalleTicket {
   readonly esSolicitante = computed(() => this.rol() === 'solicitante');
   /** El operador tambien puede reasignar tecnico, aunque no es admin. */
   readonly puedeReasignar = computed(() => this.esAdmin() || this.rol() === 'operador');
+  readonly esAdminUOperador = this.puedeReasignar;
 
   estatus(t: TicketDetalle) {
     return etiquetaEstatus(t, this.esSolicitante());
+  }
+
+  /**
+   * En «Asignacion automatica» el detalle trae, ademas de a quien se asigno,
+   * cuantos tecnicos se compararon y su carga («entre 4 disponibles, es quien
+   * tiene menos tickets abiertos (0)»). Eso es informacion operativa: solo
+   * admin/operador la ven, al resto solo le importa a quien le quedo el ticket.
+   */
+  detalleBitacora(b: LineaBitacora): string | null {
+    if (b.accion === 'Asignacion automatica' && !this.esAdminUOperador()) {
+      return b.detalle?.split(' · ')[0]?.trim() || null;
+    }
+    return b.detalle;
   }
   readonly abierto = computed(
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),

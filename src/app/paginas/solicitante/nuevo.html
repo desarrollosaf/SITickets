@@ -227,6 +227,11 @@
                 No se pudo consultar el catálogo de modelos. Captúralo a mano.
               </div>
             }
+          } @else if (esCantidadEquipos()) {
+            <input id="n-ctx" class="form-control" type="number" inputmode="numeric" min="1" step="1"
+                   autocomplete="off"
+                   [ngModel]="contextoV()" (ngModelChange)="onCantidadEquiposChange($event)" name="contexto"
+                   [placeholder]="p.campo_adicional" />
           } @else {
             <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
                    [placeholder]="p.campo_adicional" />

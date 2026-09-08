@@ -13,10 +13,16 @@
     </div>
 
     <nav class="nav flex-column gap-1 mb-auto">
-      @for (o of menu(); track o.ruta) {
-        <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo">
-          <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
-        </a>
+      @for (o of menu(); track o.etiqueta) {
+        @if (o.manual) {
+          <a class="nav-link" role="button" (click)="abrirManual(o.manual)">
+            <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+          </a>
+        } @else {
+          <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo">
+            <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+          </a>
+        }
       }
     </nav>
 
@@ -54,11 +60,18 @@
 
     @if (railAbierto()) {
       <nav class="d-lg-none bg-white border-bottom p-2 no-imprimir">
-        @for (o of menu(); track o.ruta) {
-          <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo"
-             (click)="railAbierto.set(false)">
-            <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
-          </a>
+        @for (o of menu(); track o.etiqueta) {
+          @if (o.manual) {
+            <a class="nav-link" role="button"
+               (click)="abrirManual(o.manual); railAbierto.set(false)">
+              <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+            </a>
+          } @else {
+            <a class="nav-link" [routerLink]="o.ruta" routerLinkActive="activo"
+               (click)="railAbierto.set(false)">
+              <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
+            </a>
+          }
         }
       </nav>
     }

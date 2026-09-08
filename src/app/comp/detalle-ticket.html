@@ -792,8 +792,8 @@
             <div class="border-start ps-3 pb-3 position-relative" style="border-color: var(--linea) !important">
               <div class="fw-semibold" style="font-size: 0.84rem">{{ b.accion }}</div>
               <div class="sub">{{ fmt(b.fecha) }} · {{ b.usuario }}</div>
-              @if (b.detalle) {
-                <div style="font-size: 0.82rem">{{ b.detalle }}</div>
+              @if (detalleBitacora(b); as detalle) {
+                <div style="font-size: 0.82rem">{{ detalle }}</div>
               }
               @if (b.valor_antes || b.valor_nuevo) {
                 <div class="sub">{{ b.valor_antes }} → {{ b.valor_nuevo }}</div>
