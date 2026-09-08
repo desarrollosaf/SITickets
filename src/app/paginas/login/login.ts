@@ -17,6 +17,8 @@ export class Login {
   password = '';
   readonly error = signal('');
   readonly cargando = signal(false);
+  readonly verPassword = signal(false);
+  readonly anio = new Date().getFullYear();
 
   entrar() {
     if (!this.rfc || !this.password) {

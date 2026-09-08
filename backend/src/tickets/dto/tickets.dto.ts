@@ -32,6 +32,15 @@ export class CrearTicketDto {
   @MaxLength(160)
   contexto?: string;
 
+  /**
+   * Solo aplica cuando el campo adicional pide «Cuenta de correo»: el
+   * solicitante marco «usar otro correo», asi que contexto no tiene que
+   * terminar en el dominio institucional — solo se valida el formato.
+   */
+  @IsOptional()
+  @IsBoolean()
+  correo_libre?: boolean;
+
   /** Solo se acepta cuando la opcion del catalogo es «Otro». */
   @IsOptional()
   @IsString()

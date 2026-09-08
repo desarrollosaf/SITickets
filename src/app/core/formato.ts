@@ -136,6 +136,12 @@ export function esCampoCuentaCorreo(campo: string | null | undefined): boolean {
   return limpio.includes('cuenta de correo') || limpio.includes('correo electronico');
 }
 
+/** Etiqueta del catalogo que pide el modelo de una impresora arrendada (servicio IMPA). */
+export function esCampoModeloImpresora(campo: string | null | undefined): boolean {
+  if (!campo) return false;
+  return quitarAcentos(campo).toLowerCase().includes('modelo de impresora');
+}
+
 /**
  * Etiquetas del catalogo que piden un numero de inventario. Ese campo se surte
  * del sistema de bienes muebles en vez de capturarse a mano.

@@ -73,6 +73,42 @@ export class ReglasService {
     return `TK/${servicio.prefijo_folio}/${consecutivo}/${anio}`;
   }
 
+  /** Igual que siguienteFolio, pero sin servicio: es el folio general (TK/DI/N) que trae todo ticket al registrarse. */
+  async siguienteFolioGeneral(tx: Transaction): Promise<string> {
+    const prefijo = 'DI';
+    const anio = new Date().getFullYear();
+    const [serie] = await this.series.findOrCreate({
+      where: { prefijo, anio },
+      defaults: { prefijo, anio, consecutivo: 0 },
+      transaction: tx,
+      lock: tx.LOCK.UPDATE,
+    });
+
+    const consecutivo = serie.consecutivo + 1;
+    await serie.update({ consecutivo }, { transaction: tx });
+
+    return `TK/${prefijo}/${consecutivo}/${anio}`;
+  }
+
+  /**
+   * Al cerrar de verdad (validado por el solicitante o por omision, nunca
+   * al cancelar) se le asigna al ticket su folio de servicio real
+   * (TK/CMP/N, TK/TEL/N…), tomando el servicio vigente al momento del
+   * cierre — asi que si se reclasifico, el folio refleja el servicio final,
+   * no el original. Antes de eso el ticket solo trae el folio general
+   * (TK/DI/N, ver siguienteFolioGeneral), que es el que usan bitacora,
+   * dictamen, cedulas, etc. mientras el ticket sigue abierto.
+   *
+   * Se guarda una sola vez: si folio ya es distinto de folio_general (ya se
+   * habia asignado antes), no se toca — evita que un reabrir + validar de
+   * nuevo consuma un segundo consecutivo.
+   */
+  async asignaFolioDeCierre(t: Ticket, tx: Transaction): Promise<void> {
+    if (t.folio !== t.folio_general) return;
+    const folio = await this.siguienteFolio(t.servicio_id, tx);
+    await t.update({ folio }, { transaction: tx });
+  }
+
   /* ------------------------------------------------------------------
      §8 · disponibilidad
      ------------------------------------------------------------------ */
@@ -303,6 +339,7 @@ export class ReglasService {
           { estatus: ESTATUS.CERRADO, cierre_por_omision: true, f_validacion: new Date() },
           { transaction: tx },
         );
+        await this.asignaFolioDeCierre(t, tx);
         await this.anota(
           t.id,
           null,

@@ -35,6 +35,8 @@ export interface FiltrosTicket {
   propios?: string;
   /** Para tecnico/jefe/proveedor: solo lo que les toca atender, nunca lo que registraron ellos mismos. */
   turnados?: string;
+  /** Busca por folio vigente o por folio general (TK/DI/N), coincidencia parcial. */
+  folio?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -70,6 +72,11 @@ export class TicketsService {
     return this.http.get<NivelToner>(`${API}/tickets/${id}/nivel-toner`);
   }
 
+  /** Modelos de impresora registrados, para el select del campo «Modelo de impresora» (servicio IMPA). */
+  modelosImpresora() {
+    return this.http.get<string[]>(`${API}/impresoras/modelos`);
+  }
+
   /* ---------------- alta ---------------- */
 
   crear(datos: {
@@ -77,6 +84,8 @@ export class TicketsService {
     contexto?: string;
     texto?: string;
     extension?: string;
+    /** Solo si el campo adicional es «Cuenta de correo»: no exige el dominio institucional. */
+    correo_libre?: boolean;
     a_nombre_de?: number;
   }) {
     return this.http.post<TicketDetalle>(`${API}/tickets`, datos);

@@ -92,16 +92,35 @@
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
           @if (esCorreo()) {
-            <input id="n-ctx" class="form-control" type="email" inputmode="email"
-                   autocomplete="email" spellcheck="false" autocapitalize="off"
-                   [(ngModel)]="contextoV" name="contexto"
-                   [class.is-invalid]="avisoCorreo()"
-                   [placeholder]="'nombre.apellido@' + dominio()" />
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="n-correo-libre"
+                     [ngModel]="correoLibre()" (ngModelChange)="toggleCorreoLibre($event)"
+                     name="correoLibre" />
+              <label class="form-check-label small" for="n-correo-libre">
+                Usar otro correo (no es de &#64;{{ dominio() }})
+              </label>
+            </div>
+            @if (correoLibre()) {
+              <input id="n-ctx" class="form-control" type="email" inputmode="email"
+                     autocomplete="email" spellcheck="false" autocapitalize="off"
+                     [(ngModel)]="contextoV" name="contexto"
+                     [class.is-invalid]="avisoCorreo()"
+                     placeholder="nombre@dominio.com" />
+            } @else {
+              <div class="input-group">
+                <input id="n-ctx" class="form-control" type="text" inputmode="email"
+                       autocomplete="off" spellcheck="false" autocapitalize="off"
+                       [(ngModel)]="contextoV" name="contexto"
+                       [class.is-invalid]="avisoCorreo()"
+                       placeholder="nombre.apellido" />
+                <span class="input-group-text">&#64;{{ dominio() }}</span>
+              </div>
+            }
             @if (avisoCorreo()) {
               <div class="invalid-feedback d-block">{{ avisoCorreo() }}</div>
-            } @else {
+            } @else if (!correoLibre()) {
               <div class="form-text">
-                Cuenta institucional completa, con el dominio <b>&#64;{{ dominio() }}</b>.
+                Se completa sola con el dominio institucional <b>&#64;{{ dominio() }}</b>.
               </div>
             }
           } @else if (esInventario()) {
@@ -171,6 +190,41 @@
                      [placeholder]="p.campo_adicional" />
               <div class="form-text">
                 {{ motivoBienes() || 'Captura el número de inventario que aparece en la etiqueta.' }}
+              </div>
+            }
+          } @else if (esModeloImpresora()) {
+            @if (cargandoModelos()) {
+              <div class="form-text">
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                Consultando los modelos registrados…
+              </div>
+            } @else if (modelosImpresora().length) {
+              @if (modeloElegido(); as modelo) {
+                <div class="d-flex align-items-center gap-2">
+                  <input class="form-control" [value]="modelo" disabled />
+                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
+                    Cambiar
+                  </button>
+                </div>
+              } @else {
+                <input id="n-ctx" class="form-control" [(ngModel)]="modeloBusqueda" name="contexto"
+                       placeholder="Escribe para buscar el modelo…" autocomplete="off" />
+                <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
+                  @for (m of modelosFiltrados(); track m) {
+                    <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
+                            (click)="elegirModelo(m)">
+                      {{ m }}
+                    </button>
+                  } @empty {
+                    <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
+                  }
+                </div>
+              }
+            } @else {
+              <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                     placeholder="Modelo de impresora" />
+              <div class="form-text">
+                No se pudo consultar el catálogo de modelos. Captúralo a mano.
               </div>
             }
           } @else {

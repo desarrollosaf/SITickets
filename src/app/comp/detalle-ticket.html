@@ -569,7 +569,7 @@
               <dt class="col-5 sub fw-normal">{{ t.campo_adicional || 'Contexto' }}</dt>
               <dd class="col-7">
                 {{ t.contexto }}
-                @if (t.servicio_clave === 'CMP') {
+                @if (t.servicio_clave === 'CMP' && esInventarioTicket()) {
                   @if (bienTicket()?.bien; as b) {
                     <span class="sub"> · {{ b.descripcion }}</span>
                   } @else if (bienTicket()?.motivo) {

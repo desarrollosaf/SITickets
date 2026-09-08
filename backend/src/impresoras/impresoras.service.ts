@@ -170,6 +170,21 @@ export class ImpresorasService {
   }
 
   /* ==================================================================
+     Catalogo: modelos de impresora registrados, para el select del
+     formulario de alta (servicio IMPRESORAS ARRENDADAS).
+     ================================================================== */
+
+  async modelos(): Promise<string[]> {
+    const filas = await this.impresoras.findAll({
+      attributes: ['modelo'],
+      where: { bactivo: 1 },
+      group: ['modelo'],
+      order: [['modelo', 'ASC']],
+    });
+    return filas.map((f) => f.modelo).filter((m): m is string => !!m?.trim());
+  }
+
+  /* ==================================================================
      Vista: nivel de tóner por impresora, para el detalle de un ticket
      de IMPRESORAS ARRENDADAS.
      ================================================================== */

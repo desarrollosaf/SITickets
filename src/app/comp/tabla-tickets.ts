@@ -19,6 +19,9 @@ import type { Ticket } from '../core/modelos';
             <thead class="table-light">
               <tr class="sub">
                 <th style="width: 140px">Folio</th>
+                @if (esAdminUOperador()) {
+                  <th style="width: 140px">Folio general</th>
+                }
                 <th>Asunto</th>
                 <th style="width: 130px">Servicio</th>
                 @if (!esSolicitante()) {
@@ -36,11 +39,14 @@ import type { Ticket } from '../core/modelos';
                 <tr (click)="abrir.emit(t.id)"
                     [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'">
                   <td>
-                    <span class="folio">{{ t.folio }}</span>
+                    <span class="folio">{{ esSolicitante() ? t.folio_general : t.folio }}</span>
                     @if (t.reclasificado) {
                       <div class="sub" style="font-size: 0.7rem">prefijo original</div>
                     }
                   </td>
+                  @if (esAdminUOperador()) {
+                    <td class="sub">{{ t.folio_general }}</td>
+                  }
                   <td>
                     <div class="fw-semibold" style="font-size: 0.86rem">{{ t.problema }}</div>
                     <div class="sub text-truncate" style="max-width: 340px">
@@ -106,6 +112,10 @@ export class TablaTickets {
 
   /** Oculta Prio y la mecanica interna de "EN COLA": no le compete al solicitante. */
   readonly esSolicitante = computed(() => this.auth.rol() === 'solicitante');
+  /** Admin/operador ven ademas el folio general (TK/DI/N), aparte del folio vigente. */
+  readonly esAdminUOperador = computed(() =>
+    ['admin', 'operador'].includes(this.auth.rol() ?? ''),
+  );
 
   estatus(t: Ticket) {
     return etiquetaEstatus(t, this.esSolicitante());
