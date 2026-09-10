@@ -82,6 +82,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./paginas/prioridades/prioridades').then((m) => m.Prioridades),
       },
+      {
+        path: 'reportes',
+        canActivate: [guardRol('admin')],
+        loadComponent: () => import('./paginas/reportes/reportes').then((m) => m.Reportes),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },
     ],
   },

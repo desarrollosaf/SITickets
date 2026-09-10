@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  StreamableFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
@@ -56,6 +57,35 @@ export class TicketsController {
   @Get('solicitantes')
   buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.buscarSolicitantes(q, usuario);
+  }
+
+  /**
+   * Reporte en excel de todos los tickets, filtrable por servicio, estatus,
+   * prioridad y tecnico. Solo administrador. Va antes de ':id' para que no se
+   * confunda "reporte-excel" con un identificador de ticket.
+   */
+  @Roles('admin')
+  @Get('reporte-excel')
+  async reporteExcel(
+    @Query() filtros: Record<string, string | undefined>,
+    @UsuarioActual() usuario: UsuarioToken,
+  ): Promise<StreamableFile> {
+    const buffer = await this.tickets.reporteExcel(usuario, filtros);
+    const fecha = new Date().toISOString().slice(0, 10);
+    return new StreamableFile(Buffer.from(buffer), {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="reporte-tickets-${fecha}.xlsx"`,
+    });
+  }
+
+  /** Datos agregados para las graficas del reporte, mismos filtros que reporte-excel. */
+  @Roles('admin')
+  @Get('reporte-datos')
+  reporteDatos(
+    @Query() filtros: Record<string, string | undefined>,
+    @UsuarioActual() usuario: UsuarioToken,
+  ) {
+    return this.tickets.reporteDatos(usuario, filtros);
   }
 
   @Get(':id')

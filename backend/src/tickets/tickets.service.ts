@@ -10,6 +10,7 @@ import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize } from 'sequelize';
 import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import * as ExcelJS from 'exceljs';
 import {
   Area,
   CatalogoProblema,
@@ -188,7 +189,11 @@ export class TicketsService {
     return { id: null };
   }
 
-  async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
+  /** Arma el where de listar()/reporteExcel() a partir de los mismos filtros de query string. */
+  private async construyeFiltro(
+    usuario: UsuarioToken,
+    filtros: Record<string, string | undefined>,
+  ): Promise<Record<string | symbol, unknown>> {
     const modo =
       filtros.propios === 'true' ? 'propios' : filtros.turnados === 'true' ? 'turnados' : 'todo';
     const where: Record<string | symbol, unknown> = { ...(await this.alcance(usuario, modo)) };
@@ -222,6 +227,12 @@ export class TicketsService {
       }
     }
 
+    return where;
+  }
+
+  async listar(usuario: UsuarioToken, filtros: Record<string, string | undefined> = {}) {
+    const where = await this.construyeFiltro(usuario, filtros);
+
     const filas = await this.tickets.findAll({
       where,
       include: INCLUDES,
@@ -232,6 +243,140 @@ export class TicketsService {
     const objetivos = await this.reglas.objetivos();
     const conteos = await this.conteoSesiones(filas.map((t) => t.id));
     return filas.map((t) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0));
+  }
+
+  /**
+   * Reporte en excel para el administrador: mismos filtros que listar() (§
+   * construyeFiltro), pero sin el tope de 500 — el reporte debe traer todo lo
+   * que cumpla el filtro, no solo lo mas reciente.
+   */
+  async reporteExcel(
+    usuario: UsuarioToken,
+    filtros: Record<string, string | undefined>,
+  ): Promise<ExcelJS.Buffer> {
+    const where = await this.construyeFiltro(usuario, filtros);
+    const filas = await this.tickets.findAll({ where, include: INCLUDES, order: [['f_registro', 'DESC']] });
+    const objetivos = await this.reglas.objetivos();
+    /*
+     * Direccion/departamento reales del solicitante viven en saf, no en el
+     * ticket local (dependencia_id/area_id son una clasificacion propia,
+     * mas amplia y casi siempre vacia en area_id) — se resuelven aparte,
+     * igual que en detalle() y nivelTonerDelTicket().
+     */
+    const orgs = await Promise.all(
+      filas.map((t) => this.datosOrganizacionalesDelSolicitante(t.solicitante_id)),
+    );
+
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet('Tickets');
+    hoja.columns = [
+      { header: 'Folio', key: 'folio', width: 18 },
+      { header: 'Folio general', key: 'folio_general', width: 18 },
+      { header: 'Servicio', key: 'servicio', width: 22 },
+      { header: 'Problema', key: 'problema', width: 36 },
+      { header: 'Prioridad', key: 'prioridad', width: 10 },
+      { header: 'Estatus', key: 'estatus', width: 14 },
+      { header: 'Solicitante', key: 'solicitante', width: 30 },
+      { header: 'Dependencia', key: 'dependencia', width: 30 },
+      { header: 'Dirección', key: 'direccion', width: 32 },
+      { header: 'Departamento', key: 'departamento', width: 32 },
+      { header: 'Técnico', key: 'tecnico', width: 26 },
+      { header: 'Fecha de registro', key: 'f_registro', width: 19 },
+      { header: 'Tiempo activo (h)', key: 'horas_activo', width: 15 },
+      { header: 'Vencido', key: 'vencido', width: 10 },
+    ];
+    hoja.getRow(1).font = { bold: true };
+    hoja.getColumn('f_registro').numFmt = 'dd/mm/yyyy hh:mm';
+
+    filas.forEach((t, i) => {
+      const objetivo = objetivos.get(t.prioridad) ?? 1440;
+      const org = orgs[i];
+      hoja.addRow({
+        folio: t.folio,
+        folio_general: t.folio_general,
+        servicio: t.servicio?.nombre ?? '—',
+        problema: t.problema?.descripcion ?? 'Sin clasificar',
+        prioridad: t.prioridad,
+        estatus: t.estatus,
+        solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
+        dependencia: t.dependencia?.nombre ?? '—',
+        direccion: org.direccionCompleta ?? '—',
+        departamento: org.departamento ?? '—',
+        tecnico: t.tecnico?.nombre ?? 'Sin asignar',
+        f_registro: t.f_registro,
+        horas_activo: Math.round((ReglasService.minutosActivos(t) / 60) * 10) / 10,
+        vencido: ReglasService.vencido(t, objetivo) ? 'Sí' : 'No',
+      });
+    });
+
+    return libro.xlsx.writeBuffer();
+  }
+
+  /**
+   * Datos agregados para las graficas del reporte (mismos filtros que
+   * listar()/reporteExcel()). Se agrupa en memoria en vez de con SQL porque
+   * "vencido" es una regla de negocio (ReglasService.vencido), no una
+   * columna: no se puede expresar en un GROUP BY.
+   */
+  async reporteDatos(usuario: UsuarioToken, filtros: Record<string, string | undefined>) {
+    const where = await this.construyeFiltro(usuario, filtros);
+    const filas = await this.tickets.findAll({ where, include: INCLUDES });
+    const objetivos = await this.reglas.objetivos();
+
+    const porEstatus = new Map<string, number>();
+    const porPrioridad = new Map<string, number>();
+    const porServicio = new Map<string, number>();
+    const porMes = new Map<string, number>();
+    const hoy = new Date().toDateString();
+    const esHoy = (f: Date | null) => !!f && new Date(f).toDateString() === hoy;
+
+    let vencidos = 0;
+    let recibidosHoy = 0;
+    let enCurso = 0;
+    let enEspera = 0;
+    let esperandoTurno = 0;
+    let cerradosHoy = 0;
+    let finalizadosHoy = 0;
+
+    for (const t of filas) {
+      porEstatus.set(t.estatus, (porEstatus.get(t.estatus) ?? 0) + 1);
+      porPrioridad.set(t.prioridad, (porPrioridad.get(t.prioridad) ?? 0) + 1);
+      const servicio = t.servicio?.nombre ?? 'Sin clasificar';
+      porServicio.set(servicio, (porServicio.get(servicio) ?? 0) + 1);
+      if (ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440)) vencidos++;
+      const mes = new Date(t.f_registro).toISOString().slice(0, 7);
+      porMes.set(mes, (porMes.get(mes) ?? 0) + 1);
+
+      if (esHoy(t.f_registro)) recibidosHoy++;
+      if (t.estatus === ESTATUS.EN_ATENCION) enCurso++;
+      if (t.estatus === ESTATUS.EN_ESPERA) enEspera++;
+      if (t.en_cola) esperandoTurno++;
+      if (t.estatus === ESTATUS.CERRADO && esHoy(t.f_validacion)) cerradosHoy++;
+      if (esHoy(t.f_resolucion)) finalizadosHoy++;
+    }
+
+    const aOrdenado = (m: Map<string, number>) =>
+      [...m.entries()].sort((a, b) => b[1] - a[1]).map(([clave, total]) => ({ clave, total }));
+
+    return {
+      total: filas.length,
+      vencidos,
+      a_tiempo: filas.length - vencidos,
+      /** §11 · misma foto que el tablero de actividad del dia (ver reportes.html). */
+      recibidos_hoy: recibidosHoy,
+      en_curso: enCurso,
+      en_espera: enEspera,
+      esperando_turno: esperandoTurno,
+      cerrados_hoy: cerradosHoy,
+      fuera_de_tiempo: vencidos,
+      finalizados_hoy: finalizadosHoy,
+      por_estatus: aOrdenado(porEstatus),
+      por_prioridad: aOrdenado(porPrioridad),
+      por_servicio: aOrdenado(porServicio),
+      tendencia_mensual: [...porMes.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([mes, total]) => ({ mes, total })),
+    };
   }
 
   async detalle(id: number, usuario: UsuarioToken) {

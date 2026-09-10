@@ -223,6 +223,32 @@ export interface Catalogos {
   correo_dominio: string;
 }
 
+/** Un valor agregado del reporte (clave del catalogo + cuantos tickets caen ahi). */
+export interface ConteoReporte {
+  clave: string;
+  total: number;
+}
+
+/** Datos agregados para las graficas de «Reporte de tickets» (solo administrador). */
+export interface ReporteDatos {
+  total: number;
+  vencidos: number;
+  a_tiempo: number;
+  /** §11 · foto de la actividad del dia, con los mismos filtros del reporte. */
+  recibidos_hoy: number;
+  en_curso: number;
+  en_espera: number;
+  esperando_turno: number;
+  cerrados_hoy: number;
+  fuera_de_tiempo: number;
+  finalizados_hoy: number;
+  por_estatus: ConteoReporte[];
+  por_prioridad: ConteoReporte[];
+  /** Aqui «clave» es el nombre del servicio, no una clave corta. */
+  por_servicio: ConteoReporte[];
+  tendencia_mensual: { mes: string; total: number }[];
+}
+
 /** Bien bajo resguardo del usuario, tal como lo entrega el sistema de bienes. */
 export interface Bien {
   inventario: string;
