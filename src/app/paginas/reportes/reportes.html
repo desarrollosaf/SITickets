@@ -1,0 +1,147 @@
+<div class="mb-3">
+  <h1 class="h5 mb-1">Reporte de tickets</h1>
+  <p class="sub mb-0">
+    Elige los filtros que quieras aplicar: las gráficas se actualizan solas y puedes descargar el
+    detalle en Excel. Un filtro vacío no restringe nada.
+  </p>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+<div class="tarjeta p-3 mb-3">
+  <div class="row g-2">
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
+      <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio" name="fsrv"
+              (change)="cargarDatos()">
+        <option value="">Todos</option>
+        @for (s of catalogos()?.servicios ?? []; track s.id) {
+          <option [value]="s.id">{{ s.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-est">Estatus</label>
+      <select id="f-est" class="form-select form-select-sm" [(ngModel)]="filtros.estatus" name="fest"
+              (change)="cargarDatos()">
+        <option value="">Todos</option>
+        <option value="EN_COLA">En cola (sin técnico)</option>
+        @for (e of catalogos()?.estatus ?? []; track e.clave) {
+          <option [value]="e.clave">{{ e.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-pri">Prioridad</label>
+      <select id="f-pri" class="form-select form-select-sm" [(ngModel)]="filtros.prioridad" name="fpri"
+              (change)="cargarDatos()">
+        <option value="">Todas</option>
+        @for (p of catalogos()?.prioridades ?? []; track p.clave) {
+          <option [value]="p.clave">{{ p.clave }} · {{ p.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-6 col-lg-3">
+      <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
+      <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico" name="ftec"
+              (change)="cargarDatos()">
+        <option value="">Todos</option>
+        @for (t of tecnicos(); track t.id) {
+          <option [value]="t.id">{{ t.nombre }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    <button class="btn btn-outline-secondary btn-sm" (click)="limpiar()">Limpiar filtros</button>
+    <button class="btn btn-primary btn-sm" (click)="generar()" [disabled]="generando()">
+      @if (generando()) {
+        <span class="spinner-border spinner-border-sm me-2"></span>
+      } @else {
+        <i class="bi bi-file-earmark-excel me-1"></i>
+      }
+      Generar reporte (Excel)
+    </button>
+  </div>
+</div>
+
+@if (cargandoDatos() && !datos()) {
+  <p class="sub">Cargando…</p>
+} @else if (datos(); as d) {
+  <div class="d-flex gap-2 mb-3" style="overflow-x: auto">
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #eef1f4">
+        <div class="fs-3 fw-bold" style="color: var(--tinta)">{{ d.total }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Total</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #e8f0fa">
+        <div class="fs-3 fw-bold" style="color: var(--p3)">{{ d.recibidos_hoy }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Recibidos hoy</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #ece7fb">
+        <div class="fs-3 fw-bold" style="color: #6b46c1">{{ d.en_curso }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">En curso</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #fdf1e3">
+        <div class="fs-3 fw-bold" style="color: var(--p2)">{{ d.en_espera }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">En espera</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #eef1f4">
+        <div class="fs-3 fw-bold" style="color: var(--tinta-2)">{{ d.esperando_turno }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Esperando turno</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #e6f4ea">
+        <div class="fs-3 fw-bold" style="color: #1c7a5a">{{ d.cerrados_hoy }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Cerrados hoy</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #fbe9e7">
+        <div class="fs-3 fw-bold" style="color: var(--p1)">{{ d.fuera_de_tiempo }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Fuera de tiempo</div>
+      </div>
+    </div>
+    <div class="flex-fill" style="min-width: 130px">
+      <div class="rounded-3 p-3 h-100" style="background: #e6f4ea">
+        <div class="fs-3 fw-bold" style="color: #1c7a5a">{{ d.finalizados_hoy }}</div>
+        <div class="sub text-uppercase" style="font-size: 0.72rem">Finalizados hoy</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <app-dona-chart
+        titulo="Estatus"
+        [etiquetas]="etiquetasEstatus()"
+        [valores]="valoresEstatus()" />
+    </div>
+    <div class="col-md-4">
+      <app-dona-chart
+        titulo="Prioridad"
+        [etiquetas]="etiquetasPrioridad()"
+        [valores]="valoresPrioridad()" />
+    </div>
+    <div class="col-md-4">
+      <app-dona-chart
+        titulo="Tipo de servicio"
+        [etiquetas]="etiquetasServicio()"
+        [valores]="valoresServicio()" />
+    </div>
+  </div>
+
+  <app-tendencia-chart [etiquetas]="etiquetasTendencia()" [valores]="valoresTendencia()" />
+}

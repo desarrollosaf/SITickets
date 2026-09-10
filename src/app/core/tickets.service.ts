@@ -15,6 +15,7 @@ import type {
   Prioridad,
   Problema,
   ProblemaForm,
+  ReporteDatos,
   Servicio,
   Tablero,
   Tecnico,
@@ -51,6 +52,24 @@ export class TicketsService {
       if (v) params = params.set(k, v);
     }
     return this.http.get<Ticket[]>(`${API}/tickets`, { params });
+  }
+
+  /** Reporte en excel de todos los tickets segun los filtros (solo administrador). */
+  reporteExcel(filtros: FiltrosTicket = {}) {
+    let params = new HttpParams();
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v) params = params.set(k, v);
+    }
+    return this.http.get(`${API}/tickets/reporte-excel`, { params, responseType: 'blob' });
+  }
+
+  /** Datos agregados para las graficas del reporte, mismos filtros que reporteExcel(). */
+  reporteDatos(filtros: FiltrosTicket = {}) {
+    let params = new HttpParams();
+    for (const [k, v] of Object.entries(filtros)) {
+      if (v) params = params.set(k, v);
+    }
+    return this.http.get<ReporteDatos>(`${API}/tickets/reporte-datos`, { params });
   }
 
   detalle(id: number) {
