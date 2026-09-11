@@ -314,6 +314,38 @@ export class TicketsService {
     return libro.xlsx.writeBuffer();
   }
 
+  /** Excel de «Equipos dados de baja»: mismas columnas que la tabla, sin el dictamen (ese es el pdf aparte). */
+  async bajasExcel(usuario: UsuarioToken): Promise<ExcelJS.Buffer> {
+    const where = { ...(await this.alcance(usuario)), resultado_cmp: 'baja' };
+    const filas = await this.tickets.findAll({ where, include: INCLUDES, order: [['f_registro', 'DESC']] });
+
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet('Equipos dados de baja');
+    hoja.columns = [
+      { header: 'Folio general', key: 'folio_general', width: 18 },
+      { header: 'Folio', key: 'folio', width: 18 },
+      { header: 'Solicitante', key: 'solicitante', width: 30 },
+      { header: 'Técnico', key: 'tecnico', width: 26 },
+      { header: 'No. de inventario', key: 'inventario', width: 20 },
+      { header: 'Fecha', key: 'f_registro', width: 19 },
+    ];
+    hoja.getRow(1).font = { bold: true };
+    hoja.getColumn('f_registro').numFmt = 'dd/mm/yyyy hh:mm';
+
+    for (const t of filas) {
+      hoja.addRow({
+        folio_general: t.folio_general,
+        folio: t.folio,
+        solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
+        tecnico: t.tecnico?.nombre ?? 'Sin asignar',
+        inventario: t.contexto ?? '—',
+        f_registro: t.f_registro,
+      });
+    }
+
+    return libro.xlsx.writeBuffer();
+  }
+
   /**
    * Datos agregados para las graficas del reporte (mismos filtros que
    * listar()/reporteExcel()). Se agrupa en memoria en vez de con SQL porque
