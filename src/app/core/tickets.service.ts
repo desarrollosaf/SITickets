@@ -38,6 +38,8 @@ export interface FiltrosTicket {
   turnados?: string;
   /** Busca por folio vigente o por folio general (TK/DI/N), coincidencia parcial. */
   folio?: string;
+  /** Para «Equipos dados de baja»: 'baja' trae solo los tickets CMP donde se dio de baja el equipo. */
+  resultado_cmp?: string;
 }
 
 @Injectable({ providedIn: 'root' })

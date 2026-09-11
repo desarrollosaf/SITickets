@@ -87,6 +87,11 @@ export const routes: Routes = [
         canActivate: [guardRol('admin')],
         loadComponent: () => import('./paginas/reportes/reportes').then((m) => m.Reportes),
       },
+      {
+        path: 'bajas',
+        canActivate: [guardRol('admin')],
+        loadComponent: () => import('./paginas/bajas/bajas').then((m) => m.Bajas),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },
     ],
   },
