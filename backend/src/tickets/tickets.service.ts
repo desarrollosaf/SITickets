@@ -206,6 +206,8 @@ export class TicketsService {
     if (filtros.estatus === 'EN_COLA') where.en_cola = true;
     else if (filtros.estatus) where.estatus = filtros.estatus;
     if (filtros.abiertos === 'true') where.estatus = { [Op.notIn]: ESTATUS_FINALES };
+    /** Para «Equipos dados de baja»: tickets CMP donde el tecnico dio de baja el equipo. */
+    if (filtros.resultado_cmp) where.resultado_cmp = filtros.resultado_cmp;
 
     /*
      * Busca por folio vigente o por folio general (TK/DI/N): el solicitante
@@ -1614,7 +1616,8 @@ export class TicketsService {
       f_resolucion: new Date(),
       f_espera_desde: null,
       resultado_cmp: dto.resultado,
-      diagnostico: reparado ? dto.diagnostico : null,
+      /* En baja, diagnostico guarda el mismo texto que el "II. DICTAMEN" del pdf: antes solo vivia en el archivo. */
+      diagnostico: reparado ? dto.diagnostico : dto.observaciones!.trim(),
       solucion: reparado ? dto.solucion : null,
       refacciones: reparado ? dto.refacciones?.trim() || 'Ninguna' : null,
       dictamen_url: reparado ? null : dictamenArchivo,

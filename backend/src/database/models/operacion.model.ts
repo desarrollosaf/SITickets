@@ -226,7 +226,8 @@ export class Ticket extends Model {
   @Column(DataType.SMALLINT.UNSIGNED)
   declare rechazos: number;
 
-  @Column(DataType.STRING(400))
+  /** Si el servicio es CMP y el resultado fue "baja", aqui queda el mismo texto que el "II. DICTAMEN" del pdf. */
+  @Column(DataType.STRING(2000))
   declare diagnostico: string | null;
 
   @Column(DataType.STRING(400))
