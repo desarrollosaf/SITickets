@@ -14,6 +14,7 @@ export class Bajas {
   readonly tickets = signal<Ticket[]>([]);
   readonly cargando = signal(true);
   readonly error = signal('');
+  readonly generando = signal(false);
   readonly fmt = fecha;
 
   constructor() {
@@ -43,6 +44,27 @@ export class Bajas {
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       },
       error: (e) => this.error.set(mensajeError(e)),
+    });
+  }
+
+  /** Descarga la tabla (sin el dictamen) en excel. */
+  generarExcel() {
+    this.error.set('');
+    this.generando.set(true);
+    this.api.bajasExcel().subscribe({
+      next: (blob) => {
+        this.generando.set(false);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `equipos-dados-de-baja-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (e) => {
+        this.generando.set(false);
+        this.error.set(mensajeError(e));
+      },
     });
   }
 }

@@ -88,6 +88,21 @@ export class TicketsController {
     return this.tickets.reporteDatos(usuario, filtros);
   }
 
+  /**
+   * Excel de «Equipos dados de baja». Solo administrador. Va antes de ':id'
+   * para que no se confunda "bajas-excel" con un identificador de ticket.
+   */
+  @Roles('admin')
+  @Get('bajas-excel')
+  async bajasExcel(@UsuarioActual() usuario: UsuarioToken): Promise<StreamableFile> {
+    const buffer = await this.tickets.bajasExcel(usuario);
+    const fecha = new Date().toISOString().slice(0, 10);
+    return new StreamableFile(Buffer.from(buffer), {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="equipos-dados-de-baja-${fecha}.xlsx"`,
+    });
+  }
+
   @Get(':id')
   detalle(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.detalle(id, usuario);

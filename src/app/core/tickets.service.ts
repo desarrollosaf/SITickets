@@ -65,6 +65,11 @@ export class TicketsService {
     return this.http.get(`${API}/tickets/reporte-excel`, { params, responseType: 'blob' });
   }
 
+  /** Excel de «Equipos dados de baja» (solo administrador). */
+  bajasExcel() {
+    return this.http.get(`${API}/tickets/bajas-excel`, { responseType: 'blob' });
+  }
+
   /** Datos agregados para las graficas del reporte, mismos filtros que reporteExcel(). */
   reporteDatos(filtros: FiltrosTicket = {}) {
     let params = new HttpParams();
