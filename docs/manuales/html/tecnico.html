@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual del Técnico</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<div class="portada">
+  <div class="logo-card"><img src="../../../backend/assets/manuales/congreso-saf.svg" alt="Congreso del Estado de México · SAF"></div>
+  <div class="marca">MESA<span> DE AYUDA</span></div>
+  <h1>Manual del Técnico</h1>
+  <div class="subtitulo">Cómo atender un ticket, el reloj checador y el proceso de bienes</div>
+  <div class="pie">Secretaría de Administración y Finanzas · Congreso del Estado de México</div>
+</div>
+
+<div class="indice">
+  <h2>Contenido</h2>
+  <ol>
+    <li>Tu bandeja de tickets turnados</li>
+    <li>Iniciar la atención y el reloj checador</li>
+    <li>Marcar un ticket como resuelto</li>
+    <li>Equipo de cómputo: reparado o dado de baja</li>
+    <li>Poner un ticket en espera</li>
+    <li>Otras acciones disponibles</li>
+    <li>Preguntas frecuentes</li>
+  </ol>
+</div>
+
+<div class="contenido">
+
+<section class="capitulo">
+  <span class="rol-chip">TÉCNICO</span>
+  <h2 class="titulo-cap"><span class="num">1</span> Tu bandeja de tickets turnados</h2>
+  <p class="intro-cap">La asignación de tickets es automática: el sistema te los turna según tu especialidad y tu carga de trabajo. No eliges qué atender de una lista general — "Mis tickets turnados" es lo que te toca.</p>
+
+  <figure>
+    <img src="../img/tec-01-bandeja.png" alt="Bandeja de tickets turnados del técnico">
+    <figcaption>«Mis tickets turnados»: arriba, el reloj checador; abajo, tus pendientes y tus abiertos vs. fuera de tiempo.</figcaption>
+  </figure>
+
+  <p>Desde aquí ves de un vistazo cuántos tickets tienes <b>abiertos</b> y cuántos ya están <b>fuera de tiempo</b> (pasaron su objetivo de atención). Da clic en cualquier renglón de la lista de pendientes para abrir el detalle.</p>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">2</span> Iniciar la atención y el reloj checador</h2>
+  <p class="intro-cap">El reloj registra el tiempo real que pasas atendiendo en sitio. No es solo un cronómetro: también sirve para que el sistema sepa cuándo empezaste a trabajar en el ticket.</p>
+
+  <figure>
+    <img src="../img/tec-02-detalle-asignado.png" alt="Detalle de ticket recién asignado">
+    <figcaption>Ticket recién turnado (estatus <b>Asignado</b>): el botón principal es <b>Iniciar reloj</b>.</figcaption>
+  </figure>
+
+  <ol class="pasos">
+    <li>Abre el ticket y da clic en <b>Iniciar reloj</b>.</li>
+    <li>Si el navegador te lo pide, permite el acceso a tu ubicación — el sistema registra desde dónde empezaste a atender. Si no das el permiso, el ticket se sigue procesando igual, solo queda anotado "sin ubicación".</li>
+    <li>El estatus del ticket cambia automáticamente a <b>En atención</b> en cuanto arranca el reloj — no es un paso aparte.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/tec-03-reloj-corriendo.png" alt="Reloj corriendo, ticket en atención">
+    <figcaption>Con el reloj corriendo: cronómetro en vivo, y ya puedes usar <b>Atender ticket</b> / <b>Marcar resuelto</b> y <b>Poner en espera</b>.</figcaption>
+  </figure>
+
+  <div class="aviso"><b>El reloj es obligatorio para cerrar</b>
+  No puedes marcar un ticket como resuelto (ni atenderlo, en el caso de Equipo de cómputo) si el reloj no está corriendo. Si saliste a atender el reporte y se te olvidó iniciarlo, ábrelo en cuanto puedas — igual puedes "Detener reloj" y volver a "Iniciar reloj" cuantas veces haga falta dentro del mismo ticket.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">3</span> Marcar un ticket como resuelto</h2>
+  <p class="intro-cap">Para la mayoría de los servicios (Internet, Correo institucional, Impresoras, Telefonía…), cerrar el ticket es un solo formulario.</p>
+
+  <ol class="pasos">
+    <li>Con el reloj corriendo, da clic en <b>Marcar resuelto</b>.</li>
+    <li>Captura el <b>Diagnóstico</b> (qué estaba fallando) y la <b>Solución aplicada</b> (qué hiciste).</li>
+    <li>Envía el formulario. El ticket pasa a estatus <b>Resuelto</b> y queda a la espera de que el solicitante lo confirme.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/tec-06-resuelto.png" alt="Ticket resuelto con diagnóstico y solución">
+    <figcaption>Ticket ya resuelto: el bloque «Cierre técnico» muestra el diagnóstico y la solución que capturaste.</figcaption>
+  </figure>
+
+  <div class="nota"><b>El ticket no se cierra solo</b>
+  Que tú lo marques como resuelto no lo cierra todavía — el solicitante debe confirmar que de verdad quedó bien. Si no está de acuerdo, puede rechazarlo y regresa a ti. Si no contesta en 3 días, el sistema lo cierra automáticamente.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">4</span> Equipo de cómputo: reparado o dado de baja</h2>
+  <p class="intro-cap">Para el servicio <b>EQUIPO DE CÓMPUTO</b> el botón no dice "Marcar resuelto" sino <b>Atender ticket</b>, porque hay dos resultados posibles y uno de ellos involucra al equipo mismo, no solo al ticket.</p>
+
+  <h3>4.1 Si el equipo se reparó</h3>
+  <ol class="pasos">
+    <li>Con el reloj corriendo, da clic en <b>Atender ticket</b>.</li>
+    <li>En "Qué se hizo con el equipo" elige <b>Reparado</b>.</li>
+    <li>Captura diagnóstico, solución aplicada y, si usaste refacciones o insumos, descríbelos (si no usaste ninguna, se guarda "Ninguna").</li>
+    <li>Da clic en <b>Finalizar ticket</b>.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/tec-05-atender-formulario.png" alt="Formulario de atender ticket, resultado reparado">
+    <figcaption>«Atender ticket» con resultado <b>Reparado</b>: diagnóstico, solución y refacciones.</figcaption>
+  </figure>
+
+  <h3>4.2 Si el equipo se da de baja</h3>
+  <p>Cuando el equipo no tiene reparación, el procedimiento es distinto porque el sistema genera un <b>Dictamen Técnico oficial en PDF</b> a partir de lo que captures, y ese documento es el respaldo formal de la baja ante el área de Bienes Muebles.</p>
+
+  <ol class="pasos">
+    <li>En "Qué se hizo con el equipo" elige <b>Dado de baja</b>.</li>
+    <li>Redacta las <b>Observaciones</b>: la falla encontrada, el diagnóstico y por qué se dictamina la baja. Esto se imprime tal cual en el dictamen (sección "II. DICTAMEN").</li>
+    <li>Si quieres, usa el botón <b>Mejorar redacción</b> para que el sistema pase tu texto a formato técnico formal, sin inventar datos que no hayas dado. El resultado se puede seguir editando antes de enviar.</li>
+    <li>Adjunta fotos del equipo si las tienes (quedan como anexo fotográfico del dictamen; son opcionales).</li>
+    <li>Da clic en <b>Finalizar ticket</b>.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/tec-07-atender-baja.png" alt="Formulario de atender ticket, resultado dado de baja">
+    <figcaption>«Atender ticket» con resultado <b>Dado de baja</b>: observaciones (cuerpo del dictamen) y fotos opcionales.</figcaption>
+  </figure>
+
+  <div class="aviso"><b>El equipo queda asignado temporalmente a ti</b>
+  Al atender un ticket de inventario, el sistema avisa a SIASAF que el equipo está contigo mientras dura el servicio (igual que cuando lo retiras físicamente para revisarlo). Al finalizar el ticket — reparado o dado de baja — esa asignación temporal se cierra sola.</div>
+
+  <div class="tip"><b>¿Dónde queda el dictamen?</b>
+  El PDF generado queda disponible para descargar desde el propio ticket (botón "Ver dictamen"), y el administrador puede consultar todos los equipos dados de baja, con su número de inventario y el enlace al dictamen, en <b>Equipos dados de baja</b> dentro del menú de administración.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">5</span> Poner un ticket en espera</h2>
+  <p>Si necesitas pausar un ticket (por ejemplo, esperando una refacción, una autorización, o porque vas a retirar el equipo para revisarlo), usa <b>Poner en espera</b> y elige el motivo correspondiente.</p>
+  <ul>
+    <li>El tiempo que el ticket pasa en espera <b>no cuenta</b> contra el objetivo de atención — la causa suele ser ajena a ti.</li>
+    <li>Si el motivo es "Retirar el equipo del lugar para su revisión" (solo Equipo de cómputo), el sistema genera automáticamente una <b>cédula de retiro</b> en PDF, como respaldo de que te llevaste el equipo.</li>
+    <li>Para continuar, abre el ticket de nuevo y usa <b>Reanudar</b>.</li>
+  </ul>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">6</span> Otras acciones disponibles</h2>
+  <table class="datos">
+    <tr><th>Acción</th><th>Para qué sirve</th></tr>
+    <tr><td><b>Corregir datos</b></td><td>Ajustar el dato adicional del reporte (por ejemplo, el número de inventario) mientras el ticket está en espera — no cambia el problema ni la prioridad.</td></tr>
+    <tr><td><b>Registrar ticket</b></td><td>Tú también puedes registrar tickets, igual que un solicitante — por ejemplo, para reportar algo que detectaste tú mismo.</td></tr>
+    <tr><td><b>Imprimir</b></td><td>Genera una versión imprimible del detalle del ticket.</td></tr>
+  </table>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">7</span> Preguntas frecuentes</h2>
+
+  <h3>¿Puedo atender un ticket que no está asignado a mí?</h3>
+  <p>No. Solo el técnico asignado (o el administrador) puede iniciar el reloj, atender o resolver un ticket.</p>
+
+  <h3>¿Qué pasa si el solicitante rechaza mi solución?</h3>
+  <p>El ticket se reabre y regresa a ti con el motivo que haya capturado el solicitante, visible en la bitácora.</p>
+
+  <h3>¿Por qué no puedo iniciar el reloj dos veces a la vez?</h3>
+  <p>Cada sesión del reloj registra un inicio y un fin; si necesitas pausar y retomar, usa "Detener reloj" y "Iniciar reloj" de nuevo — cada tramo queda registrado por separado en "Reloj de atención en sitio".</p>
+
+  <h3>¿El GPS tiene que ser exacto?</h3>
+  <p>No. Es un indicador de calidad del dato, no de tu desempeño: un porcentaje bajo de ubicación casi siempre significa permiso no otorgado o mala señal dentro del edificio, no que no hayas asistido.</p>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual del Administrador</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<div class="portada">
+  <div class="logo-card"><img src="../../../backend/assets/manuales/congreso-saf.svg" alt="Congreso del Estado de México · SAF"></div>
+  <div class="marca">MESA<span> DE AYUDA</span></div>
+  <h1>Manual del Administrador</h1>
+  <div class="subtitulo">Catálogos, gestión de tickets, tiempos de técnicos, reportes y gráficas</div>
+  <div class="pie">Secretaría de Administración y Finanzas · Congreso del Estado de México</div>
+</div>
+
+<div class="indice">
+  <h2>Contenido</h2>
+  <ol>
+    <li>El menú de administración</li>
+    <li>Todos los tickets: búsqueda, reasignación y reclasificación</li>
+    <li>Catálogo de servicios</li>
+    <li>Catálogo de problemas</li>
+    <li>Prioridades</li>
+    <li>Monitor de turnos</li>
+    <li>Tablero: tiempos y desempeño de los técnicos</li>
+    <li>Reporte de tickets: gráficas y Excel</li>
+    <li>Equipos dados de baja</li>
+    <li>Registrar usuario</li>
+    <li>Preguntas frecuentes</li>
+  </ol>
+</div>
+
+<div class="contenido">
+
+<section class="capitulo">
+  <span class="rol-chip">ADMINISTRADOR</span>
+  <h2 class="titulo-cap"><span class="num">1</span> El menú de administración</h2>
+  <p class="intro-cap">El administrador ve todas las opciones del sistema: registrar y consultar tickets, los tres catálogos, los paneles de seguimiento, los reportes y la gestión de usuarios.</p>
+  <ul>
+    <li><b>Registrar ticket / Todos los tickets</b> — operación diaria.</li>
+    <li><b>Monitor de turnos / Tablero</b> — seguimiento en tiempo real y desempeño.</li>
+    <li><b>Disponibilidad / Tickets internos</b> — agenda del equipo técnico y trabajo interno.</li>
+    <li><b>Catálogo de servicios / Catálogo de problemas / Prioridades</b> — configuración del sistema.</li>
+    <li><b>Registrar usuario</b> — alta de personal interno (técnicos, jefes, operadores, proveedores).</li>
+    <li><b>Reporte de tickets / Equipos dados de baja</b> — analítica y documentación.</li>
+  </ul>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">2</span> Todos los tickets: búsqueda, reasignación y reclasificación</h2>
+  <p class="intro-cap">A diferencia de los demás roles, el administrador (y el operador) ven <b>todos</b> los tickets del sistema, no solo los propios o los turnados.</p>
+
+  <figure>
+    <img src="../img/adm-01-tickets.png" alt="Pantalla Todos los tickets con buscador">
+    <figcaption>«Todos los tickets»: filtros por tipo de servicio, estatus, prioridad y técnico, más un buscador por folio (acepta tanto el folio vigente como el folio general).</figcaption>
+  </figure>
+
+  <p>Da clic en cualquier renglón para abrir el ticket. Ahí, además de las acciones que ya conoces del técnico, el administrador tiene disponibles:</p>
+
+  <figure>
+    <img src="../img/adm-02-reasignar-modal.png" alt="Modal de reasignación de ticket">
+    <figcaption>Barra de acciones del administrador: <b>Corregir datos</b>, <b>Iniciar reloj</b>, <b>Iniciar atención</b>, <b>Reasignar</b>, <b>Reclasificar</b>, <b>Cambiar prioridad</b>, <b>Cancelar ticket</b> e <b>Imprimir</b>.</figcaption>
+  </figure>
+
+  <h3>Reasignar</h3>
+  <ol class="pasos">
+    <li>Abre el ticket y da clic en <b>Reasignar</b>.</li>
+    <li>Elige el nuevo técnico — si eliges a alguien de otra especialidad el sistema lo permite, pero lo deja marcado.</li>
+    <li>Elige el motivo y, si hace falta, agrega una nota.</li>
+    <li>Confirma con <b>Reasignar</b>. La reasignación manual siempre queda anotada en la bitácora con motivo, usuario y fecha.</li>
+  </ol>
+
+  <h3>Reclasificar y cambiar prioridad</h3>
+  <p><b>Reclasificar</b> cambia el ticket a un problema distinto (incluso de otro servicio) cuando el reporte original no era el correcto — el ticket conserva su historial, pero el sistema anota que fue reclasificado. <b>Cambiar prioridad</b> ajusta la urgencia manualmente, con motivo obligatorio, para los casos donde el catálogo no refleja la urgencia real.</p>
+
+  <h3>Cancelar ticket</h3>
+  <p>Cancela el reporte sin generarle un folio de servicio — se mantiene únicamente con su folio general. Úsalo para reportes duplicados o que ya no aplican.</p>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">3</span> Catálogo de servicios</h2>
+  <p class="intro-cap">Aquí se define qué tipos de servicio existen, con qué prefijo de folio, quién los puede registrar y si están activos.</p>
+
+  <figure>
+    <img src="../img/adm-05-catalogo-servicios.png" alt="Catálogo de servicios">
+    <figcaption>Catálogo de servicios: clave, nombre, prefijo de folio, origen (usuario o administrador) y estado.</figcaption>
+  </figure>
+
+  <table class="datos">
+    <tr><th>Campo</th><th>Qué significa</th></tr>
+    <tr><td><b>Origen: usuario</b></td><td>Cualquier solicitante lo puede elegir al registrar un ticket (salvo que esté restringido — ver abajo)</td></tr>
+    <tr><td><b>Origen: administrador</b></td><td>Solo se usa desde "Tickets internos", no aparece en el formulario del solicitante</td></tr>
+    <tr><td><b>Acceso restringido</b></td><td>Solo las personas de la lista de "Usuarios permitidos" de ese servicio pueden registrar ahí (por ejemplo CÁMARAS o SISTEMAS)</td></tr>
+    <tr><td><b>Dar de baja</b></td><td>Desactiva el servicio sin borrar su historial — deja de aparecer como opción nueva</td></tr>
+  </table>
+
+  <div class="nota"><b>El prefijo de folio no se puede cambiar libremente</b>
+  Cada servicio tiene su propio consecutivo de folio (p. ej. <span class="codigo">TK/CMP/N/año</span>). Cambiarlo afecta cómo se identifican los tickets de ese servicio hacia adelante.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">4</span> Catálogo de problemas</h2>
+  <p class="intro-cap">Cada servicio tiene su propia lista de problemas; cada problema trae ya decidida su prioridad y si pide un dato adicional (número de inventario, nombre del programa, etc.).</p>
+
+  <figure>
+    <img src="../img/adm-06-catalogo-problemas.png" alt="Catálogo de problemas">
+    <figcaption>Catálogo de problemas, agrupado por servicio, con su prioridad y el campo adicional que solicita (si aplica).</figcaption>
+  </figure>
+
+  <div class="tip"><b>Por qué conviene mantenerlo cuidado</b>
+  Entre más preciso sea el catálogo de problemas, menos tickets terminan en "Otro" con texto libre — y la prioridad asignada refleja mejor la urgencia real de cada tipo de falla.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">5</span> Prioridades</h2>
+  <p class="intro-cap">Las cuatro prioridades (P1 Crítica a P4 Baja) definen el tiempo objetivo de respuesta y de resolución que usa todo el sistema — el tablero, el monitor y los reportes de "fuera de tiempo" se calculan contra estos valores.</p>
+
+  <figure>
+    <img src="../img/adm-07-prioridades.png" alt="Catálogo de prioridades">
+    <figcaption>Catálogo de prioridades con sus tiempos objetivo de respuesta y resolución.</figcaption>
+  </figure>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">6</span> Monitor de turnos</h2>
+  <p class="intro-cap">Pantalla pensada para proyectar en el área de informática: se actualiza sola cada 3 segundos, sin que nadie tenga que recargarla.</p>
+
+  <figure>
+    <img src="../img/adm-03-monitor.png" alt="Monitor de turnos en tiempo real">
+    <figcaption>Monitor de turnos: quién está atendiendo ahora mismo, quién sigue en turno, y los contadores del día (recibidos, en curso, en espera, cerrados, fuera de tiempo, finalizados).</figcaption>
+  </figure>
+
+  <div class="nota"><b>Cómo se ordena el turno</b>
+  Por prioridad primero, y dentro de la misma prioridad, por hora de llegada. Un ticket P1 se coloca al frente aunque haya llegado después que otros de menor prioridad.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">7</span> Tablero: tiempos y desempeño de los técnicos</h2>
+  <p class="intro-cap">El Tablero es la vista más completa para supervisión: rezago del día, desempeño por técnico, y los datos que respaldan una solicitud de compra o de refuerzo de personal.</p>
+
+  <figure>
+    <img src="../img/adm-04-tablero.png" alt="Tablero de rezago y desempeño por técnico">
+    <figcaption>Tablero completo: rezago del día, cobertura por servicio, desempeño por técnico y los problemas más frecuentes.</figcaption>
+  </figure>
+
+  <h3>Bloque 1 · Rezago</h3>
+  <p>Abiertos, fuera de tiempo, sin asignar, en espera y cierres por omisión del día — y, aparte, los tickets abiertos agrupados por prioridad.</p>
+
+  <h3>Bloque 2 · Desempeño por técnico</h3>
+  <p>Por cada técnico: cuántos tickets tiene hoy, cuántos abiertos, cuántos ha atendido, su tiempo promedio, el porcentaje de tickets resueltos en tiempo, y sus reaperturas/rechazos. El tiempo descuenta el periodo en espera, para no castigar al técnico por esperas ajenas a él.</p>
+
+  <div class="aviso"><b>Sobre la columna "En sitio"</b>
+  Es un indicador de calidad del dato, no de conducta. Un porcentaje bajo casi siempre significa que no se otorgó el permiso de ubicación o hubo mala señal dentro del edificio — no que el técnico no haya asistido.</div>
+
+  <h3>Bloque 3 · Justificación de compras</h3>
+  <p>Problemas más frecuentes y tickets por dependencia — el respaldo cuantitativo cuando se necesita justificar una compra de equipo o insumos ante otra área.</p>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">8</span> Reporte de tickets: gráficas y Excel</h2>
+  <p class="intro-cap">Esta pantalla combina un vistazo visual inmediato con la posibilidad de bajar el detalle completo para trabajarlo aparte.</p>
+
+  <figure>
+    <img src="../img/adm-09-reportes.png" alt="Reporte de tickets con gráficas">
+    <figcaption>Reporte de tickets: tarjetas de actividad del día, gráficas por estatus/prioridad/servicio, y tendencia mensual de registro.</figcaption>
+  </figure>
+
+  <ol class="pasos">
+    <li>Ajusta los filtros (Tipo de servicio, Estatus, Prioridad, Técnico) — las gráficas se recalculan solas, sin recargar la página.</li>
+    <li>Revisa las tarjetas de actividad del día y las tres gráficas de dona (Estatus, Prioridad, Tipo de servicio).</li>
+    <li>Si necesitas el detalle fila por fila para Excel, da clic en <b>Generar reporte (Excel)</b> — descarga exactamente los tickets que cumplen el filtro elegido.</li>
+  </ol>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">9</span> Equipos dados de baja</h2>
+  <p class="intro-cap">Lista concentrada de todos los tickets de Equipo de cómputo donde el técnico dictaminó la baja del equipo, con acceso directo a cada dictamen en PDF.</p>
+
+  <figure>
+    <img src="../img/adm-10-bajas.png" alt="Equipos dados de baja">
+    <figcaption>«Equipos dados de baja»: folio general, folio, solicitante, técnico, número de inventario y el dictamen de cada caso.</figcaption>
+  </figure>
+
+  <p>El botón <b>Descargar en Excel</b> exporta la misma tabla (sin el PDF del dictamen, que se descarga aparte por caso) — útil para entregarle al área de Bienes Muebles la relación completa de bajas de un periodo.</p>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">10</span> Registrar usuario</h2>
+  <p class="intro-cap">Da de alta al personal interno del sistema: técnicos, jefes de departamento, operadores, gestores y proveedores externos. Los solicitantes <b>no</b> se dan de alta aquí — cualquier persona del padrón institucional ya puede entrar como solicitante con su RFC.</p>
+
+  <figure>
+    <img src="../img/adm-08-usuarios.png" alt="Registrar usuario">
+    <figcaption>Busca a la persona en el padrón institucional y asígnale su rol de personal interno.</figcaption>
+  </figure>
+
+  <ol class="pasos">
+    <li>Busca por nombre (mínimo 3 letras) — el sistema busca directo en el padrón institucional.</li>
+    <li>Elige a la persona y asígnale su rol: técnico, jefe, administrador, operador, gestor o proveedor.</li>
+    <li>Si es técnico, asígnale el o los servicios que puede atender — de eso depende qué tickets le turna el sistema automáticamente.</li>
+  </ol>
+
+  <p>Desde la misma lista puedes <b>Editar</b> a alguien ya registrado (cambiar su rol o sus servicios) o <b>Dar de baja</b> su acceso sin perder su historial de tickets atendidos.</p>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">11</span> Preguntas frecuentes</h2>
+
+  <h3>¿Cuál es la diferencia entre administrador y operador?</h3>
+  <p>El operador ve y opera lo mismo que el administrador en el día a día (todos los tickets, reasignar, monitor, tablero, reportes), pero no administra catálogos ni usuarios.</p>
+
+  <h3>¿Puedo registrar un ticket a nombre de otra persona?</h3>
+  <p>Sí — administrador, operador y gestor pueden elegir "Registrar a nombre de" y buscar a cualquier persona activa del padrón.</p>
+
+  <h3>¿Qué pasa si doy de baja un servicio con tickets abiertos?</h3>
+  <p>Los tickets ya existentes no se ven afectados; el servicio simplemente deja de estar disponible para registrar tickets nuevos.</p>
+
+  <h3>¿Dónde veo el historial completo de cambios de un ticket, no solo lo visible?</h3>
+  <p>La bitácora dentro del detalle del ticket registra cada movimiento con fecha, usuario y motivo (cuando aplica) — incluyendo reasignaciones, cambios de prioridad y reclasificaciones.</p>
+</section>
+
+</div>
+</body>
+</html>
