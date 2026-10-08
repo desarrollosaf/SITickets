@@ -11,7 +11,7 @@ interface Opcion {
   /** Ausente cuando la opcion abre un manual en vez de navegar (ver `manual`). */
   ruta?: string;
   /** Abre el pdf correspondiente en una pestaña nueva en vez de navegar. */
-  manual?: 'solicitante' | 'tecnico';
+  manual?: 'solicitante' | 'tecnico' | 'administrador';
   etiqueta: string;
   icono: string;
 }
@@ -31,12 +31,13 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
     { ruta: '/reportes', etiqueta: 'Reporte de tickets', icono: 'bi-file-earmark-excel' },
     { ruta: '/bajas', etiqueta: 'Equipos dados de baja', icono: 'bi-pc-display-horizontal' },
+    { manual: 'administrador', etiqueta: 'Manual del administrador', icono: 'bi-question-circle' },
   ],
   tecnico: [
     { ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' },
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
     { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
-    { manual: 'tecnico', etiqueta: 'Manual de usuario', icono: 'bi-question-circle' },
+    { manual: 'tecnico', etiqueta: 'Manual del técnico', icono: 'bi-question-circle' },
   ],
   proveedor: [
     { ruta: '/bandeja', etiqueta: 'Tickets turnados', icono: 'bi-clipboard-check' },
@@ -93,7 +94,7 @@ export class Shell {
   readonly railAbierto = signal(false);
 
   /** Abre el manual en pdf en una pestaña nueva. */
-  abrirManual(tipo: 'solicitante' | 'tecnico') {
+  abrirManual(tipo: 'solicitante' | 'tecnico' | 'administrador') {
     this.http.get(`${API}/manuales/${tipo}`, { responseType: 'blob' }).subscribe((blob) => {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');

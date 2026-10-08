@@ -14,7 +14,12 @@ export class ManualesController {
 
   @Get('tecnico')
   tecnico() {
-    return this.abrir('Manual de Usuario - SITickets.pdf', 'manual-de-usuario.pdf');
+    return this.abrir('Manual del Tecnico - SITickets.pdf', 'manual-del-tecnico.pdf');
+  }
+
+  @Get('administrador')
+  administrador() {
+    return this.abrir('Manual del Administrador - SITickets.pdf', 'manual-del-administrador.pdf');
   }
 
   private abrir(archivo: string, nombreDescarga: string): StreamableFile {

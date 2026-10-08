@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía del Solicitante</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<div class="portada">
+  <div class="logo-card"><img src="../../../backend/assets/manuales/congreso-saf.svg" alt="Congreso del Estado de México · SAF"></div>
+  <div class="marca">MESA<span> DE AYUDA</span></div>
+  <h1>Guía del Solicitante</h1>
+  <div class="subtitulo">Cómo registrar un reporte y darle seguimiento</div>
+  <div class="pie">Secretaría de Administración y Finanzas · Congreso del Estado de México</div>
+</div>
+
+<div class="indice">
+  <h2>Contenido</h2>
+  <ol>
+    <li>Entrar al sistema</li>
+    <li>Registrar un ticket</li>
+    <li>Dar seguimiento a tus tickets</li>
+    <li>Cuando el técnico marca tu ticket como resuelto</li>
+    <li>Preguntas frecuentes</li>
+  </ol>
+</div>
+
+<div class="contenido">
+
+<section class="capitulo">
+  <span class="rol-chip">SOLICITANTE</span>
+  <h2 class="titulo-cap"><span class="num">1</span> Entrar al sistema</h2>
+  <p class="intro-cap">El acceso es con tu RFC y la contraseña institucional — la misma que usas en los demás sistemas del Congreso.</p>
+
+  <figure>
+    <img src="../img/login.png" alt="Pantalla de inicio de sesión">
+    <figcaption>Pantalla de inicio de sesión. Captura tu <b>RFC</b> (10 caracteres, sin homoclave) y tu <b>contraseña</b>.</figcaption>
+  </figure>
+
+  <div class="nota"><b>Si no puedes entrar</b>
+  Verifica que tu RFC no incluya la homoclave y que la contraseña sea la institucional vigente. Si el problema sigue, contacta al área de informática — no hay una opción de "recuperar contraseña" dentro del propio sistema.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">2</span> Registrar un ticket</h2>
+  <p class="intro-cap">El formulario es corto a propósito: en vez de escribir libremente el problema, lo eliges de un catálogo. Así el sistema sabe automáticamente a qué técnico turnarlo y con qué urgencia — tú no decides la prioridad.</p>
+
+  <ol class="pasos">
+    <li>En el menú lateral entra a <b>Registrar ticket</b>.</li>
+    <li>Tu nombre ya aparece precargado (viene de tu sesión, no es editable) y la extensión telefónica se sugiere a partir de tu perfil — puedes corregirla si es necesario.</li>
+    <li>Elige el <b>Tipo de servicio</b> (por ejemplo, Equipo de cómputo, Internet, Correo institucional, Impresoras arrendadas…).</li>
+    <li>Elige el <b>Problema</b> específico de la lista — las opciones cambian según el servicio elegido.</li>
+    <li>Dependiendo del problema, el sistema pide un dato adicional (por ejemplo el número de inventario del equipo, el nombre del programa a instalar, o cuántos equipos afecta la falla).</li>
+    <li>Si tu problema no aparece en la lista, usa la opción <b>Otro</b>: el sistema habilita un campo de texto libre.</li>
+    <li>Da clic en <b>Guardar ticket</b>.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/sol-02-nuevo-lleno.png" alt="Formulario de registro de ticket lleno">
+    <figcaption>Ejemplo: servicio <b>EQUIPO DE CÓMPUTO</b>, problema <b>Instalación o actualización de software</b>, con el nombre del programa capturado.</figcaption>
+  </figure>
+
+  <div class="tip"><b>Por qué no eliges tú la prioridad</b>
+  La urgencia (P1 a P4) la determina la opción del catálogo que elegiste, para que el mismo tipo de problema tenga siempre la misma urgencia, sin importar quién lo reporte. Esto también define el tiempo objetivo de atención y a qué técnico se turna automáticamente.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">3</span> Dar seguimiento a tus tickets</h2>
+  <p class="intro-cap">Todo lo que has reportado queda en <b>Mis tickets</b>, con su estatus actual.</p>
+
+  <figure>
+    <img src="../img/sol-03-mis-tickets.png" alt="Lista de Mis tickets">
+    <figcaption>«Mis tickets»: aquí ves el folio, el asunto y el estatus de cada reporte que has hecho.</figcaption>
+  </figure>
+
+  <p>Da clic en cualquier renglón para abrir el detalle completo: datos del reporte, a qué técnico se asignó, tiempo transcurrido contra el objetivo, y la bitácora de todo lo que ha pasado con el ticket.</p>
+
+  <figure>
+    <img src="../img/sol-04-detalle-ticket.png" alt="Detalle de un ticket como solicitante">
+    <figcaption>Detalle del ticket: datos del reporte y bitácora de movimientos.</figcaption>
+  </figure>
+
+  <h3>Dos folios, un mismo ticket</h3>
+  <p>Vas a ver dos números de folio en tus tickets:</p>
+  <ul>
+    <li><b>Folio general</b> (formato <span class="codigo">TK/DI/N/año</span>) — se asigna desde que registras el ticket y <b>nunca cambia</b>. Es tu referencia fija.</li>
+    <li><b>Folio</b> — mientras el ticket está abierto es el mismo que el folio general; cuando se cierra de verdad (lo confirmas tú, o pasan 3 días sin que respondas), cambia al folio específico del servicio (por ejemplo <span class="codigo">TK/CMP/12/2026</span> para Equipo de cómputo).</li>
+  </ul>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">4</span> Cuando el técnico marca tu ticket como resuelto</h2>
+  <p class="intro-cap">El ticket no se cierra solo porque el técnico diga que terminó: te toca confirmar a ti.</p>
+
+  <figure>
+    <img src="../img/sol-05-resuelto-confirmar.png" alt="Ticket en espera de confirmación del solicitante">
+    <figcaption>Cuando el técnico marca el ticket como resuelto, aparecen dos botones: <b>Sí quedó resuelto</b> y <b>No quedó resuelto</b>.</figcaption>
+  </figure>
+
+  <ol class="pasos">
+    <li>Si el problema de verdad se resolvió, da clic en <b>Sí quedó resuelto</b>. El ticket pasa a <b>Validado / cerrado</b> y en ese momento se le asigna su folio definitivo de servicio.</li>
+    <li>Si el problema sigue, da clic en <b>No quedó resuelto</b> y describe por qué — el ticket se reabre y regresa al técnico.</li>
+  </ol>
+
+  <figure>
+    <img src="../img/sol-06-cerrado.png" alt="Ticket cerrado y validado">
+    <figcaption>Ticket ya validado y cerrado, con su folio definitivo de servicio.</figcaption>
+  </figure>
+
+  <div class="aviso"><b>¿Y si no respondo?</b>
+  Si no confirmas ni rechazas dentro de 3 días naturales después de que el técnico lo marcó como resuelto, el sistema lo cierra automáticamente ("cierre por omisión"). El folio definitivo se asigna igual, solo que la bitácora queda marcada como que no hubo confirmación tuya.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">5</span> Preguntas frecuentes</h2>
+
+  <h3>¿Puedo registrar un ticket a nombre de otra persona?</h3>
+  <p>No, como solicitante siempre registras a tu propio nombre. Esa opción solo existe para administrador, operador y gestor.</p>
+
+  <h3>¿Por qué no puedo elegir al técnico?</h3>
+  <p>La asignación es automática: el sistema turna el ticket al técnico de esa especialidad con menos carga de trabajo en ese momento, para repartir el trabajo de forma justa.</p>
+
+  <h3>¿Qué pasa si cancelo un ticket?</h3>
+  <p>Un ticket cancelado no recibe folio de servicio — mantiene únicamente su folio general. Solo puede cancelarlo quien lo registró o el administrador.</p>
+
+  <h3>¿Dónde veo cuánto tiempo lleva mi ticket?</h3>
+  <p>En el detalle del ticket aparece "Tiempo activo" contra el objetivo de atención de esa prioridad. El tiempo que el ticket pasa "en espera" (por ejemplo, esperando una refacción) no cuenta en tu contra ni en contra del técnico.</p>
+</section>
+
+</div>
+</body>
+</html>

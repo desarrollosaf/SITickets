@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de Instalación</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<div class="portada">
+  <div class="logo-card"><img src="../../../backend/assets/manuales/congreso-saf.svg" alt="Congreso del Estado de México · SAF"></div>
+  <div class="marca">MESA<span> DE AYUDA</span></div>
+  <h1>Manual de Instalación</h1>
+  <div class="subtitulo">Qué se necesita y cómo poner el sistema en producción</div>
+  <div class="pie">Secretaría de Administración y Finanzas · Congreso del Estado de México</div>
+</div>
+
+<div class="indice">
+  <h2>Contenido</h2>
+  <ol>
+    <li>Qué es el sistema y cómo está armado</li>
+    <li>Requisitos antes de instalar</li>
+    <li>Variables de entorno (archivo .env)</li>
+    <li>Despliegue con Docker</li>
+    <li>Conexión con el proxy externo (dominio público)</li>
+    <li>Primer arranque y verificación</li>
+    <li>Mantenimiento y actualizaciones</li>
+    <li>Lista de verificación final</li>
+  </ol>
+</div>
+
+<div class="contenido">
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">1</span> Qué es el sistema y cómo está armado</h2>
+  <p class="intro-cap">Antes de instalar conviene tener claro de qué piezas se compone el sistema y de dónde depende cada una.</p>
+
+  <p>Mesa de ayuda (SITickets) es un sistema de dos partes que se ejecutan por separado:</p>
+  <ul>
+    <li><b>Backend</b> — API en NestJS (Node.js), expone todo bajo <code class="inline">/api</code> y genera los PDF (dictámenes, cédulas) con Puppeteer/Chromium.</li>
+    <li><b>Frontend</b> — aplicación Angular compilada a archivos estáticos, servidos por un contenedor nginx propio.</li>
+  </ul>
+
+  <p>El sistema <b>no trae su propia base de datos</b>: se conecta a bases MySQL que ya existen y son operadas por otras áreas. En total usa <b>cuatro conexiones</b>:</p>
+
+  <table class="datos">
+    <tr><th>Conexión</th><th>Para qué se usa</th><th>Quién la provee</th></tr>
+    <tr><td><b>Por defecto</b> (<span class="codigo">mesa_ayuda</span>)</td><td>Toda la operación propia del sistema: tickets, catálogos, usuarios, bitácora</td><td>Propia del sistema — el equipo de informática crea este esquema</td></tr>
+    <tr><td><span class="codigo">saf</span></td><td>Padrón de personal del Congreso (nombre, RFC, dependencia, dirección, departamento) — es de solo lectura</td><td>Área de Recursos Humanos / Secretaría de Administración y Finanzas</td></tr>
+    <tr><td><span class="codigo">bienes</span></td><td>Resguardos de equipo de cómputo (número de inventario), solo para servicios fuera de EQUIPO DE CÓMPUTO</td><td>Área de Bienes Muebles</td></tr>
+    <tr><td><span class="codigo">eservice</span></td><td>Catálogo de impresoras arrendadas y nivel de tóner (lectura y escritura, la alimenta un script externo en Python)</td><td>Sistema eService (PHP/Laravel) existente</td></tr>
+  </table>
+
+  <div class="nota"><b>Importante</b>
+  Para EQUIPO DE CÓMPUTO, el número de inventario y el trámite de "equipo en mantenimiento"/baja <b>no pasan por la base <span class="codigo">bienes</span></b>, sino por una API HTTP real del sistema SIASAF (<span class="codigo">BIENES_API_BASE_URL</span>). Esa API debe estar accesible desde el servidor donde corra el backend.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">2</span> Requisitos antes de instalar</h2>
+
+  <h3>En el servidor</h3>
+  <ul>
+    <li>Docker y Docker Compose (v2) — es la forma soportada de correr el sistema, en desarrollo y en producción.</li>
+    <li>Acceso de red saliente, desde el servidor, hacia: el MySQL que aloja las 4 bases, y la API de SIASAF (<span class="codigo">siasaf.gob.mx</span>).</li>
+    <li>Un dominio o subruta pública detrás de un proxy (por ejemplo <span class="codigo">https://siasaf.gob.mx/sitickets</span>), con HTTPS.</li>
+    <li>Puertos libres en el host para los dos contenedores (por convención <span class="codigo">8087</span> para el frontend y <span class="codigo">3032</span> para el backend; son configurables).</li>
+  </ul>
+
+  <h3>En las bases de datos</h3>
+  <ul>
+    <li>Un usuario de MySQL con permisos de <b>lectura y escritura</b> sobre el esquema propio del sistema (el backend crea y actualiza sus tablas solo).</li>
+    <li>Un usuario con permiso de <b>solo lectura</b> sobre <span class="codigo">saf</span> y <span class="codigo">bienes</span>.</li>
+    <li>Un usuario con lectura y escritura sobre <span class="codigo">eservice</span> (ahí escribe el script de monitoreo de tóner).</li>
+  </ul>
+
+  <div class="aviso"><b>Nota sobre host.docker.internal</b>
+  Si el MySQL vive en la misma máquina donde corre Docker, el backend se conecta a él por <span class="codigo">host.docker.internal</span>, no por <span class="codigo">localhost</span> (localhost dentro del contenedor es el propio contenedor). Si el MySQL está en otro servidor de la red, se usa su IP o su nombre interno.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">3</span> Variables de entorno</h2>
+  <p class="intro-cap">Todo lo anterior se configura en un solo archivo: <span class="codigo">backend/.env</span>. Nunca se sube al repositorio — se copia a mano en el servidor a partir de la plantilla.</p>
+
+  <div class="codigo">cp backend/.env.example backend/.env
+# y despues se edita backend/.env con los valores reales</div>
+
+  <h3>Conexión principal y comportamiento del esquema</h3>
+  <table class="datos">
+    <tr><th>Variable</th><th>Para qué sirve</th></tr>
+    <tr><td><span class="codigo">DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASS</span></td><td>Conexión al esquema propio del sistema</td></tr>
+    <tr><td><span class="codigo">DB_SYNC</span></td><td><b>false</b> en producción. En <b>true</b>, Sequelize crea/ajusta tablas directo desde el código — solo para desarrollo.</td></tr>
+    <tr><td><span class="codigo">DB_MIGRAR</span></td><td><b>true</b> en producción. Aplica los <span class="codigo">.sql</span> de <span class="codigo">backend/sql/migraciones</span> al arrancar, uno por uno, y nunca repite uno ya aplicado.</td></tr>
+    <tr><td><span class="codigo">SEED_ON_BOOT</span> / <span class="codigo">SEED_PASSWORD</span></td><td>Si la base está vacía, siembra catálogos y el padrón de usuarios con esa contraseña inicial.</td></tr>
+  </table>
+
+  <h3>Las otras tres conexiones</h3>
+  <table class="datos">
+    <tr><th>Variable</th><th>Para qué sirve</th></tr>
+    <tr><td><span class="codigo">SAF_DB_HOST / _PORT / _NAME / _USER / _PASS</span></td><td>Conexión de solo lectura al padrón de personal</td></tr>
+    <tr><td><span class="codigo">BIENES_DB_HOST / _PORT / _NAME / _USER / _PASS</span></td><td>Conexión de solo lectura a resguardos (servicios distintos a EQUIPO DE CÓMPUTO)</td></tr>
+    <tr><td><span class="codigo">ESERVICE_DB_HOST / _PORT / _NAME / _USER / _PASS</span></td><td>Conexión de lectura y escritura al catálogo de impresoras y lecturas de tóner</td></tr>
+  </table>
+
+  <h3>Integraciones externas</h3>
+  <table class="datos">
+    <tr><th>Variable</th><th>Para qué sirve</th></tr>
+    <tr><td><span class="codigo">BIENES_API_BASE_URL</span></td><td>API real de SIASAF para EQUIPO DE CÓMPUTO (consulta de resguardos, ficha técnica, alta/baja de "en mantenimiento")</td></tr>
+    <tr><td><span class="codigo">PYTHON_TONER_API_KEY</span></td><td>Clave fija que debe enviar el script externo de monitoreo de tóner (header <span class="codigo">X-Api-Key</span>), no usa sesión de usuario</td></tr>
+    <tr><td><span class="codigo">ANTHROPIC_API_KEY</span> / <span class="codigo">ANTHROPIC_MODEL</span></td><td>Solo para el botón "Mejorar redacción" del dictamen de baja. Si se deja vacío, el resto del sistema sigue funcionando; solo ese botón no responde.</td></tr>
+  </table>
+
+  <h3>Seguridad y sesión</h3>
+  <table class="datos">
+    <tr><th>Variable</th><th>Para qué sirve</th></tr>
+    <tr><td><span class="codigo">JWT_SECRET</span></td><td>Firma los tokens de sesión. Generar uno largo y aleatorio: <span class="codigo">openssl rand -base64 48</span></td></tr>
+    <tr><td><span class="codigo">JWT_EXPIRES</span></td><td>Duración de la sesión (por omisión <b>8h</b>)</td></tr>
+    <tr><td><span class="codigo">CORS_ORIGIN</span></td><td>Dominio exacto desde el que el navegador puede llamar a la API, por ejemplo <span class="codigo">https://siasaf.gob.mx</span></td></tr>
+    <tr><td><span class="codigo">CORREO_DOMINIO</span></td><td>Dominio institucional que exige el campo "Cuenta de correo" (p. ej. <span class="codigo">congresoedomex.gob.mx</span>)</td></tr>
+  </table>
+
+  <div class="aviso"><b>Antes de arrancar en producción</b>
+  Revisa que <span class="codigo">DB_SYNC=false</span> y <span class="codigo">DB_MIGRAR=true</span>. Con <span class="codigo">DB_SYNC=true</span> en un servidor real, el sistema puede intentar modificar tablas directo desde los modelos antes de que corran las migraciones.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">4</span> Despliegue con Docker</h2>
+
+  <ol class="pasos">
+    <li><b>Clonar el repositorio</b> en el servidor y entrar a la carpeta del proyecto.</li>
+    <li><b>Crear <span class="codigo">backend/.env</span></b> a partir de <span class="codigo">backend/.env.example</span>, con los valores reales (capítulo 3).</li>
+    <li><b>Revisar <span class="codigo">docker-compose.prod.yml</span></b>: define dos servicios —
+      <ul>
+        <li><span class="codigo">frontend</span>: compila el Angular (con <span class="codigo">BASE_HREF=/sitickets/</span>) y lo sirve con nginx en el puerto <span class="codigo">8087</span>.</li>
+        <li><span class="codigo">backend</span>: compila y corre el NestJS en el puerto <span class="codigo">3032</span>, monta <span class="codigo">backend/storage</span> como volumen (ahí se guardan los PDF de dictamen y cédulas — <b>debe persistir</b> entre despliegues).</li>
+      </ul>
+    </li>
+    <li><b>Levantar los contenedores:</b>
+      <div class="codigo">docker compose -f docker-compose.prod.yml up -d --build</div>
+    </li>
+    <li><b>Revisar el arranque del backend:</b>
+      <div class="codigo">docker logs sitickets-backend --tail 50</div>
+      Debe aparecer <span class="codigo">Migraciones: Esquema al corriente</span> y <span class="codigo">Nest application successfully started</span>. Si es la primera vez, antes aparecerán las migraciones aplicándose una por una.
+    </li>
+  </ol>
+
+  <div class="tip"><b>Dato util</b>
+  Las migraciones son automáticas e idempotentes: cada vez que se despliega una versión nueva del código, el backend revisa qué archivos de <span class="codigo">backend/sql/migraciones</span> no se han aplicado todavía y solo corre esos. No hace falta correr nada a mano.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">5</span> Conexión con el proxy externo</h2>
+  <p class="intro-cap">Los contenedores no se exponen directo a internet: quedan detrás de un servidor web existente (por ejemplo el que ya atiende <span class="codigo">siasaf.gob.mx</span>), que debe reenviar dos rutas.</p>
+
+  <table class="datos">
+    <tr><th>Ruta pública</th><th>Debe apuntar a</th></tr>
+    <tr><td><span class="codigo">/sitickets/</span></td><td>Contenedor <span class="codigo">frontend</span>, puerto <span class="codigo">8087</span></td></tr>
+    <tr><td><span class="codigo">/sitickets/backend/api/</span></td><td>Contenedor <span class="codigo">backend</span>, puerto <span class="codigo">3032</span>, ruta <span class="codigo">/api/</span></td></tr>
+  </table>
+
+  <p>Esto es así porque el frontend, cuando NO corre en <span class="codigo">localhost:4200</span> (modo desarrollo), arma sus llamadas a la API con esa ruta relativa fija: <span class="codigo">/sitickets/backend/api/</span>. Si el proxy externo usa otro prefijo, hay que avisar para ajustar esa constante en el código antes de compilar.</p>
+
+  <div class="nota"><b>HTTPS</b>
+  El certificado y el TLS los resuelve el proxy externo, no los contenedores de este sistema — ellos solo hablan HTTP puro entre sí dentro de la red del servidor.</div>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">6</span> Primer arranque y verificación</h2>
+
+  <ol class="pasos">
+    <li>Con <span class="codigo">SEED_ON_BOOT=true</span> y la base vacía, el sistema siembra los catálogos (servicios, problemas, prioridades) y el padrón de usuarios internos, todos con la contraseña de <span class="codigo">SEED_PASSWORD</span>.</li>
+    <li>Entrar a <span class="codigo">https://&lt;dominio&gt;/sitickets/entrar</span> y validar que cargue la pantalla de inicio de sesión.</li>
+    <li>Iniciar sesión con un RFC sembrado como <b>administrador</b> y revisar que el menú lateral muestre todas las opciones de administración (Catálogo de servicios, Catálogo de problemas, Prioridades, Registrar usuario, Reporte de tickets, Equipos dados de baja).</li>
+    <li>Registrar un ticket de prueba y confirmar que aparece en <b>Todos los tickets</b> y que el reloj y la asignación automática funcionan.</li>
+    <li>Confirmar que <span class="codigo">backend/storage</span> es un volumen persistente: generar un dictamen de prueba y verificar que el archivo sobrevive a un <span class="codigo">docker compose restart</span>.</li>
+  </ol>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">7</span> Mantenimiento y actualizaciones</h2>
+
+  <h3>Actualizar a una versión nueva</h3>
+  <div class="codigo">git pull origin main
+docker compose -f docker-compose.prod.yml up -d --build</div>
+  <p>Las migraciones nuevas que traiga el código se aplican solas al reiniciar el backend.</p>
+
+  <h3>Ver logs</h3>
+  <div class="codigo">docker logs sitickets-backend --tail 100 -f
+docker logs sitickets-frontend --tail 100 -f</div>
+
+  <h3>Respaldos</h3>
+  <ul>
+    <li>La base de datos propia del sistema se respalda igual que cualquier base MySQL (<span class="codigo">mysqldump</span> programado).</li>
+    <li>La carpeta <span class="codigo">backend/storage</span> (dictámenes y cédulas en PDF) debe respaldarse aparte: no vive en la base de datos.</li>
+  </ul>
+</section>
+
+<section class="capitulo">
+  <h2 class="titulo-cap"><span class="num">8</span> Lista de verificación final</h2>
+  <ul>
+    <li>☐ <span class="codigo">backend/.env</span> creado, con <span class="codigo">DB_SYNC=false</span> y <span class="codigo">DB_MIGRAR=true</span></li>
+    <li>☐ <span class="codigo">JWT_SECRET</span> generado de forma aleatoria (no el de ejemplo)</li>
+    <li>☐ Las 4 conexiones a bases de datos probadas desde el servidor</li>
+    <li>☐ Acceso de red confirmado hacia la API de SIASAF (<span class="codigo">BIENES_API_BASE_URL</span>)</li>
+    <li>☐ <span class="codigo">CORS_ORIGIN</span> apuntando al dominio público real</li>
+    <li>☐ Proxy externo reenviando <span class="codigo">/sitickets/</span> y <span class="codigo">/sitickets/backend/api/</span></li>
+    <li>☐ Volumen de <span class="codigo">backend/storage</span> persistente y con respaldo</li>
+    <li>☐ Login de prueba exitoso y ticket de prueba registrado correctamente</li>
+  </ul>
+</section>
+
+</div>
+</body>
+</html>
