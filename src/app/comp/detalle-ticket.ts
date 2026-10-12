@@ -181,7 +181,11 @@ export class DetalleTicket {
   readonly mostrandoQr = signal(false);
   readonly urlChecador = computed(() => {
     const t = this.ticket();
-    return t ? `${location.origin}/checador/${t.id}` : '';
+    /* document.baseURI (no location.origin) respeta el <base href> del
+       index.html: en produccion la app vive bajo /sitickets/, y armar la
+       url con location.origin a secas generaba un enlace a la raiz del
+       dominio que nunca existio. */
+    return t ? new URL(`checador/${t.id}`, document.baseURI).href : '';
   });
   /** Equipo de computo: "Atender ticket" reemplaza a "Marcar resuelto". */
   readonly esCmpTicket = computed(() => this.ticket()?.servicio_clave === 'CMP');
