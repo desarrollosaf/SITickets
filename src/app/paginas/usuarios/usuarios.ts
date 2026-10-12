@@ -76,15 +76,21 @@ export class Usuarios {
   correo = '';
   extension = '';
   rol: '' | 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = '';
-  servicioId: number | null = null;
+  servicioIds: number[] = [];
 
-  /* ---------------- tipo de servicio (solo si rol es tecnico) ---------------- */
+  /* ---------------- tipo(s) de servicio (solo si rol es tecnico) ---------------- */
 
   readonly servicios = signal<Servicio[]>([]);
 
   /** Metodo normal, no computed(): rol es una propiedad plana que cambia por ngModel. */
   mostrarServicio() {
     return this.rol === 'tecnico';
+  }
+
+  alternarServicio(id: number) {
+    this.servicioIds = this.servicioIds.includes(id)
+      ? this.servicioIds.filter((s) => s !== id)
+      : [...this.servicioIds, id];
   }
 
   /* ---------------- personal ya registrado ---------------- */
@@ -149,7 +155,7 @@ export class Usuarios {
     this.correo = '';
     this.extension = '';
     this.rol = '';
-    this.servicioId = null;
+    this.servicioIds = [];
     this.errorForm.set('');
     this.aviso.set('');
   }
@@ -175,7 +181,7 @@ export class Usuarios {
         correo: this.correo.trim() || undefined,
         extension: this.extension.trim() || undefined,
         rol: this.rol,
-        servicio_id: this.mostrarServicio() && this.servicioId ? this.servicioId : undefined,
+        servicio_ids: this.mostrarServicio() && this.servicioIds.length ? this.servicioIds : undefined,
       })
       .subscribe({
         next: (r) => {
@@ -200,10 +206,16 @@ export class Usuarios {
   editRol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = 'tecnico';
   editCorreo = '';
   editExtension = '';
-  editServicioId: number | null = null;
+  editServicioIds: number[] = [];
 
   mostrarServicioEdicion() {
     return this.editRol === 'tecnico';
+  }
+
+  alternarServicioEdicion(id: number) {
+    this.editServicioIds = this.editServicioIds.includes(id)
+      ? this.editServicioIds.filter((s) => s !== id)
+      : [...this.editServicioIds, id];
   }
 
   abrirEditar(u: UsuarioStaff) {
@@ -211,7 +223,7 @@ export class Usuarios {
     this.editRol = u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
     this.editCorreo = u.correo ?? '';
     this.editExtension = u.extension ?? '';
-    this.editServicioId = u.servicio_id;
+    this.editServicioIds = [...u.servicio_ids];
     this.errorEdicion.set('');
   }
 
@@ -229,9 +241,7 @@ export class Usuarios {
         rol: this.editRol,
         correo: this.editCorreo.trim() || undefined,
         extension: this.editExtension.trim() || undefined,
-        servicio_id: this.mostrarServicioEdicion() && this.editServicioId
-          ? this.editServicioId
-          : undefined,
+        servicio_ids: this.mostrarServicioEdicion() ? this.editServicioIds : undefined,
         activo: u.activo,
       })
       .subscribe({
@@ -254,7 +264,7 @@ export class Usuarios {
         rol: u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor',
         correo: u.correo ?? undefined,
         extension: u.extension ?? undefined,
-        servicio_id: u.servicio_id ?? undefined,
+        servicio_ids: u.servicio_ids,
         activo: !u.activo,
       })
       .subscribe({

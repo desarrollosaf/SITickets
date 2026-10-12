@@ -49,6 +49,10 @@
               <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="iniciarReloj()">
                 <i class="bi bi-play-circle"></i> Iniciar reloj
               </button>
+              <button class="btn btn-sm btn-outline-secondary no-imprimir" (click)="mostrandoQr.set(true)"
+                      title="Código QR para iniciar el reloj al llegar">
+                <i class="bi bi-qr-code"></i> Código QR
+              </button>
             }
             @if (t.estatus === 'ASIGNADO') {
               <button class="btn btn-sm btn-outline-secondary" [disabled]="ocupado()" (click)="iniciar()">
@@ -600,8 +604,6 @@
               <dd class="col-7">{{ t.departamento_saf || '—' }}</dd>
               <dt class="col-5 sub fw-normal">Extensión</dt>
               <dd class="col-7">{{ t.extension || '—' }}</dd>
-              <dt class="col-5 sub fw-normal">Sede esperada</dt>
-              <dd class="col-7">{{ t.sede || 'Sin sede registrada' }}</dd>
             }
 
             @if ((t.tiene_cedula_salida || t.tiene_cedula_entrada) && rol() !== 'solicitante') {
@@ -807,4 +809,13 @@
       </div>
     }
   </aside>
+
+  @if (mostrandoQr()) {
+    <div class="cajon-fondo" style="z-index: 1055" (click)="mostrandoQr.set(false)"></div>
+    <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4 text-center no-imprimir"
+         style="z-index: 1060; width: min(320px, 92vw)">
+      <app-qr-code [valor]="urlChecador()" class="d-block mx-auto mb-3" style="width: 220px" />
+      <button class="btn btn-outline-secondary btn-sm" (click)="mostrandoQr.set(false)">Cerrar</button>
+    </div>
+  }
 }

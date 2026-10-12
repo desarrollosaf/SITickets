@@ -7,6 +7,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
@@ -30,10 +31,11 @@ export class ActualizarUsuarioDto {
   @MaxLength(10)
   extension?: string;
 
-  /** Solo aplica si rol es tecnico; sin valor limpia la especialidad asignada. */
+  /** Solo aplica si rol es tecnico; sin valor (o []) quita todas las especialidades. */
   @IsOptional()
-  @IsInt()
-  servicio_id?: number;
+  @Type(() => Number)
+  @IsInt({ each: true })
+  servicio_ids?: number[];
 
   @IsOptional()
   @IsBoolean()

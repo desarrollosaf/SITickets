@@ -427,7 +427,7 @@ export interface UsuarioStaff {
   correo: string | null;
   extension: string | null;
   servicios: string[];
-  servicio_id: number | null;
+  servicio_ids: number[];
   dependencia: string | null;
   area: string | null;
   activo: boolean;
@@ -438,8 +438,8 @@ export interface RegistrarUsuarioForm {
   correo?: string;
   extension?: string;
   rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
-  /** Tipo de servicio del que sera tecnico (tecnico_servicio). Solo aplica si rol es tecnico. */
-  servicio_id?: number;
+  /** Servicios de los que sera tecnico (tecnico_servicio), uno o varios. Solo aplica si rol es tecnico. */
+  servicio_ids?: number[];
 }
 
 /** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
@@ -447,6 +447,6 @@ export interface ActualizarUsuarioForm {
   rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
   correo?: string;
   extension?: string;
-  servicio_id?: number;
+  servicio_ids?: number[];
   activo?: boolean;
 }

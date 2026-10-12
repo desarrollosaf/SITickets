@@ -93,12 +93,24 @@ export class UsuariosService {
       correo: u.correo,
       extension: u.extension,
       servicios: (u.especialidades ?? []).map((e) => e.servicio?.nombre).filter(Boolean),
-      /** El select de edicion es unico: se usa la primera especialidad asignada, si hay. */
-      servicio_id: u.especialidades?.[0]?.servicio_id ?? null,
+      /** Para preseleccionar los checkboxes del formulario de edicion. */
+      servicio_ids: (u.especialidades ?? []).map((e) => e.servicio_id),
       dependencia: u.dependencia?.nombre ?? null,
       area: u.area?.nombre ?? null,
       activo: u.activo,
     }));
+  }
+
+  /** Valida que todos los ids existan y que solo un tecnico pueda traer servicios. */
+  private async validarServicios(servicioIds: number[] | undefined, rol: string): Promise<void> {
+    if (!servicioIds?.length) return;
+    if (rol !== 'tecnico') {
+      throw new BadRequestException('Solo el rol tecnico puede traer tipo de servicio');
+    }
+    const encontrados = await this.servicios.count({ where: { id: { [Op.in]: servicioIds } } });
+    if (encontrados !== new Set(servicioIds).size) {
+      throw new BadRequestException('Alguno de los servicios elegidos no existe');
+    }
   }
 
   async registrar(dto: RegistrarUsuarioDto) {
@@ -112,13 +124,7 @@ export class UsuariosService {
       throw new ConflictException('Ese rfc ya tiene un rol asignado en el sistema');
     }
 
-    if (dto.servicio_id && dto.rol !== 'tecnico') {
-      throw new BadRequestException('Solo el rol tecnico puede traer tipo de servicio');
-    }
-    if (dto.servicio_id) {
-      const servicio = await this.servicios.findByPk(dto.servicio_id);
-      if (!servicio) throw new BadRequestException('El servicio elegido no existe');
-    }
+    await this.validarServicios(dto.servicio_ids, dto.rol);
 
     const dependenciaId = await this.resolverDependenciaSaf(sUsuario.id_Dependencia);
 
@@ -134,12 +140,10 @@ export class UsuariosService {
         activo: true,
       });
 
-      if (dto.servicio_id) {
-        await this.tecnicoServicio.create({
-          usuario_id: creado.id,
-          servicio_id: dto.servicio_id,
-          suplente: false,
-        });
+      if (dto.servicio_ids?.length) {
+        await this.tecnicoServicio.bulkCreate(
+          dto.servicio_ids.map((servicio_id) => ({ usuario_id: creado.id, servicio_id, suplente: false })),
+        );
       }
 
       return { id: creado.id, rfc: creado.rfc, nombre: creado.nombre, rol: creado.rol };
@@ -152,22 +156,20 @@ export class UsuariosService {
   }
 
   /**
-   * rfc y nombre no se tocan: vienen de saf y no se editan aqui. El
-   * servicio se reemplaza por completo en cada edicion (se borra lo que
-   * tenia y se vuelve a crear si mandan uno), para no acumular filas viejas
-   * del select anterior.
+   * rfc y nombre no se tocan: vienen de saf y no se editan aqui. Los
+   * servicios se ajustan por diferencia (se quitan los que ya no vienen en
+   * la lista, se agregan los nuevos) en vez de borrar todo y recrear, para
+   * no tocar de mas la tabla tecnico_servicio. Esto es independiente de la
+   * bitacora de tickets: quitar un servicio de un tecnico no afecta ni
+   * borra nada del historial de los tickets que ya atendio con ese
+   * servicio, solo deja de contar para la asignacion automatica de ahi en
+   * adelante.
    */
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
     const usuario = await this.usuarios.findByPk(id);
     if (!usuario) throw new NotFoundException('Ese usuario no existe');
 
-    if (dto.servicio_id && dto.rol !== 'tecnico') {
-      throw new BadRequestException('Solo el rol tecnico puede traer tipo de servicio');
-    }
-    if (dto.servicio_id) {
-      const servicio = await this.servicios.findByPk(dto.servicio_id);
-      if (!servicio) throw new BadRequestException('El servicio elegido no existe');
-    }
+    await this.validarServicios(dto.servicio_ids, dto.rol);
 
     try {
       await usuario.update({
@@ -177,13 +179,24 @@ export class UsuariosService {
         ...(dto.activo !== undefined && { activo: dto.activo }),
       });
 
-      await this.tecnicoServicio.destroy({ where: { usuario_id: id } });
-      if (dto.rol === 'tecnico' && dto.servicio_id) {
-        await this.tecnicoServicio.create({
-          usuario_id: id,
-          servicio_id: dto.servicio_id,
-          suplente: false,
-        });
+      if (dto.rol !== 'tecnico') {
+        await this.tecnicoServicio.destroy({ where: { usuario_id: id } });
+      } else {
+        const nuevos = dto.servicio_ids ?? [];
+        const actuales = await this.tecnicoServicio.findAll({ where: { usuario_id: id } });
+        const aQuitar = actuales.filter((e) => !nuevos.includes(e.servicio_id));
+        const aAgregar = nuevos.filter((sid) => !actuales.some((e) => e.servicio_id === sid));
+
+        if (aQuitar.length) {
+          await this.tecnicoServicio.destroy({
+            where: { usuario_id: id, servicio_id: { [Op.in]: aQuitar.map((e) => e.servicio_id) } },
+          });
+        }
+        if (aAgregar.length) {
+          await this.tecnicoServicio.bulkCreate(
+            aAgregar.map((servicio_id) => ({ usuario_id: id, servicio_id, suplente: false })),
+          );
+        }
       }
     } catch (e) {
       if (e instanceof UniqueConstraintError) {

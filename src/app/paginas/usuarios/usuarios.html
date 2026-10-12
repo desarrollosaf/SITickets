@@ -65,14 +65,20 @@
 
       @if (mostrarServicio()) {
         <div class="mb-3">
-          <label class="form-label small fw-semibold" for="u-servicio">Tipo de servicio</label>
-          <select id="u-servicio" class="form-select" [(ngModel)]="servicioId" name="servicioId">
-            <option [ngValue]="null">Selecciona…</option>
+          <label class="form-label small fw-semibold">Tipos de servicio</label>
+          <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto">
             @for (s of servicios(); track s.id) {
-              <option [ngValue]="s.id">{{ s.nombre }}</option>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'u-srv-' + s.id"
+                       [checked]="servicioIds.includes(s.id)" (change)="alternarServicio(s.id)" />
+                <label class="form-check-label small" [for]="'u-srv-' + s.id">{{ s.nombre }}</label>
+              </div>
             }
-          </select>
-          <div class="form-text">Opcional; puede quedar sin especialidad y asignarse después.</div>
+          </div>
+          <div class="form-text">
+            Opcional; puede quedar sin especialidad y asignarse después. Puede atender más de un tipo
+            de servicio.
+          </div>
         </div>
       }
 
@@ -211,13 +217,20 @@
 
       @if (mostrarServicioEdicion()) {
         <div class="mb-3">
-          <label class="form-label small fw-semibold" for="e-servicio">Tipo de servicio</label>
-          <select id="e-servicio" class="form-select" [(ngModel)]="editServicioId" name="editServicioId">
-            <option [ngValue]="null">Selecciona…</option>
+          <label class="form-label small fw-semibold">Tipos de servicio</label>
+          <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto">
             @for (s of servicios(); track s.id) {
-              <option [ngValue]="s.id">{{ s.nombre }}</option>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'e-srv-' + s.id"
+                       [checked]="editServicioIds.includes(s.id)" (change)="alternarServicioEdicion(s.id)" />
+                <label class="form-check-label small" [for]="'e-srv-' + s.id">{{ s.nombre }}</label>
+              </div>
             }
-          </select>
+          </div>
+          <div class="form-text">
+            Quitar un servicio no borra nada del historial de tickets que este técnico ya atendió con
+            él — solo deja de recibir tickets nuevos de ese tipo.
+          </div>
         </div>
       }
 

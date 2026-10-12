@@ -3,11 +3,12 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import type { Rol } from './modelos';
 
-/** Exige sesion. Sin ella, al acceso. */
-export const guardSesion: CanActivateFn = () => {
+/** Exige sesion. Sin ella, al acceso — y recuerda a dónde iba (p. ej. /checador/:id del QR). */
+export const guardSesion: CanActivateFn = (_ruta, estado) => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  return auth.autenticado() ? true : router.createUrlTree(['/entrar']);
+  if (auth.autenticado()) return true;
+  return router.createUrlTree(['/entrar'], { queryParams: { volver: estado.url } });
 };
 
 /** Ya autenticado: el acceso y el alta de cuenta dejan de tener sentido. */
@@ -24,11 +25,11 @@ export const guardAnonimo: CanActivateFn = () => {
  * que revisan el rol contra la base en cada peticion.
  */
 export const guardRol = (...permitidos: Rol[]): CanActivateFn => {
-  return () => {
+  return (_ruta, estado) => {
     const auth = inject(AuthService);
     const router = inject(Router);
     const rol = auth.rol();
-    if (!rol) return router.createUrlTree(['/entrar']);
+    if (!rol) return router.createUrlTree(['/entrar'], { queryParams: { volver: estado.url } });
     return permitidos.includes(rol) ? true : router.createUrlTree([auth.inicioDeRol(rol)]);
   };
 };
