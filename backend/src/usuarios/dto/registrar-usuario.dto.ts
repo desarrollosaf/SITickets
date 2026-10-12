@@ -1,4 +1,5 @@
 import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
 
 const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
@@ -26,8 +27,9 @@ export class RegistrarUsuarioDto {
   @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin, proveedor, operador o gestor' })
   rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
 
-  /** Tipo de servicio del que sera tecnico (tecnico_servicio). Solo aplica si rol es tecnico. */
+  /** Servicios de los que sera tecnico (tecnico_servicio), uno o varios. Solo aplica si rol es tecnico. */
   @IsOptional()
-  @IsInt()
-  servicio_id?: number;
+  @Type(() => Number)
+  @IsInt({ each: true })
+  servicio_ids?: number[];
 }

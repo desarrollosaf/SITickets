@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth.service';
 import { TicketsService } from '../core/tickets.service';
+import { QrCode } from './qr-code';
 import {
   banderas,
   cronometro,
@@ -49,7 +50,7 @@ const MOTIVOS_ESPERA = [
 
 @Component({
   selector: 'app-detalle-ticket',
-  imports: [FormsModule],
+  imports: [FormsModule, QrCode],
   templateUrl: './detalle-ticket.html',
 })
 export class DetalleTicket {
@@ -172,6 +173,16 @@ export class DetalleTicket {
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),
   );
   readonly relojCorriendo = computed(() => this.ticket()?.sesiones.some((s) => !s.fin) ?? false);
+
+  /**
+   * §16 · QR "de llegada": al escanearlo, si hace falta pide iniciar sesion y
+   * luego arranca el reloj de este ticket solo (ver /checador/:id y guards.ts).
+   */
+  readonly mostrandoQr = signal(false);
+  readonly urlChecador = computed(() => {
+    const t = this.ticket();
+    return t ? `${location.origin}/checador/${t.id}` : '';
+  });
   /** Equipo de computo: "Atender ticket" reemplaza a "Marcar resuelto". */
   readonly esCmpTicket = computed(() => this.ticket()?.servicio_clave === 'CMP');
   /** Impresoras arrendadas: nivel de tóner del sistema eService, no para el solicitante. */

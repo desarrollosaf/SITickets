@@ -92,6 +92,12 @@ export const routes: Routes = [
         canActivate: [guardRol('admin')],
         loadComponent: () => import('./paginas/bajas/bajas').then((m) => m.Bajas),
       },
+      {
+        /* Destino del QR "de llegada" (ver boton en el detalle del ticket). */
+        path: 'checador/:id',
+        canActivate: [guardRol('admin', 'tecnico', 'jefe', 'proveedor')],
+        loadComponent: () => import('./paginas/checador/checador').then((m) => m.Checador),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },
     ],
   },

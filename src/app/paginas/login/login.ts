@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { mensajeError } from '../../core/formato';
 
@@ -12,6 +12,7 @@ import { mensajeError } from '../../core/formato';
 export class Login {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   rfc = '';
   password = '';
@@ -31,7 +32,10 @@ export class Login {
     this.auth.login(this.rfc, this.password).subscribe({
       next: (s) => {
         this.cargando.set(false);
-        void this.router.navigate([this.auth.inicioDeRol(s.usuario.rol)]);
+        /* Si llegó aquí por el guard de una ruta protegida (p. ej. el QR de
+           llegada /checador/:id), regresa justo a esa misma ruta. */
+        const volver = this.route.snapshot.queryParamMap.get('volver');
+        void this.router.navigateByUrl(volver || this.auth.inicioDeRol(s.usuario.rol));
       },
       error: (e) => {
         this.cargando.set(false);
