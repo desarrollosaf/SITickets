@@ -13,6 +13,12 @@
 <div class="tarjeta p-3 mb-3">
   <div class="row g-2">
     <div class="col-12 col-lg-4">
+      <label class="form-label small fw-semibold" for="f-texto">Buscar por nombre, servicio o descripción</label>
+      <input id="f-texto" type="text" class="form-control form-control-sm"
+             placeholder="Nombre del solicitante, tipo de servicio o asunto del ticket…"
+             [(ngModel)]="busquedaTexto" name="ftexto" (ngModelChange)="onBuscarTexto()" />
+    </div>
+    <div class="col-12 col-lg-4">
       <label class="form-label small fw-semibold" for="f-folio">Buscar por folio</label>
       <div class="input-group input-group-sm">
         <input id="f-folio" type="text" class="form-control"
@@ -23,7 +29,17 @@
         </button>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-12 col-lg-4">
+      <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
+      <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico"
+              name="ftec" (change)="cargar()">
+        <option value="">Todos</option>
+        @for (t of tecnicos(); track t.id) {
+          <option [value]="t.id">{{ t.nombre }}</option>
+        }
+      </select>
+    </div>
+    <div class="col-12 col-lg-4">
       <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
       <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio"
               name="fsrv" (change)="cargar()">
@@ -33,7 +49,7 @@
         }
       </select>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-12 col-lg-4">
       <label class="form-label small fw-semibold" for="f-est">Estatus</label>
       <select id="f-est" class="form-select form-select-sm" [(ngModel)]="filtros.estatus"
               name="fest" (change)="cargar()">
@@ -44,23 +60,13 @@
         }
       </select>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-12 col-lg-4">
       <label class="form-label small fw-semibold" for="f-pri">Prioridad</label>
       <select id="f-pri" class="form-select form-select-sm" [(ngModel)]="filtros.prioridad"
               name="fpri" (change)="cargar()">
         <option value="">Todas</option>
         @for (p of catalogos()?.prioridades ?? []; track p.clave) {
           <option [value]="p.clave">{{ p.clave }} · {{ p.nombre }}</option>
-        }
-      </select>
-    </div>
-    <div class="col-6 col-lg-3">
-      <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
-      <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico"
-              name="ftec" (change)="cargar()">
-        <option value="">Todos</option>
-        @for (t of tecnicos(); track t.id) {
-          <option [value]="t.id">{{ t.nombre }}</option>
         }
       </select>
     </div>
@@ -71,11 +77,29 @@
   @if (cargando()) {
     Cargando…
   } @else {
-    {{ tickets().length }} ticket(s)
+    {{ ticketsFiltrados().length }} ticket(s)
   }
 </p>
 
-<app-tabla-tickets [tickets]="tickets()" (abrir)="abierto.set($event)" />
+<app-tabla-tickets [tickets]="ticketsPagina()" (abrir)="abierto.set($event)"
+                    [ordenable]="true" [ordenPor]="ordenPor()" [ordenDir]="ordenDir()"
+                    (ordenar)="ordenar($event)" />
+
+@if (totalPaginas() > 1) {
+  <div class="d-flex align-items-center justify-content-between mt-2">
+    <span class="sub small">Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
+              (click)="paginaAnterior()">
+        <i class="bi bi-chevron-left"></i> Anterior
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
+              (click)="paginaSiguiente()">
+        Siguiente <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+}
 
 <app-detalle-ticket
   [ticketId]="abierto()"

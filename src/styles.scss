@@ -107,6 +107,12 @@ body {
 table.tickets tbody tr { cursor: pointer; }
 table.tickets tbody tr:hover { background: #f7f9fc; }
 
+table.tickets thead th.ordenable { cursor: pointer; user-select: none; white-space: nowrap; }
+table.tickets thead th.ordenable:hover { color: var(--bs-body-color, #1a1a1a); }
+table.tickets thead th.ordenable i { font-size: 0.65rem; margin-left: 2px; opacity: 0.35; }
+table.tickets thead th.ordenable i.activo { opacity: 1; color: var(--p3, #2563eb); }
+table.tickets thead th.ordenable:hover i { opacity: 0.7; }
+
 /* Resuelto, esperando que el solicitante confirme o rechace. */
 table.tickets tbody tr.por-confirmar { background: #fff8ec; border-left: 3px solid #f0b45c; }
 table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }

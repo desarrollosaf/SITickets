@@ -25,13 +25,27 @@ import type { Ticket } from '../core/modelos';
                 <th>Asunto</th>
                 <th style="width: 130px">Servicio</th>
                 @if (!esSolicitante()) {
-                  <th style="width: 60px">Prio</th>
+                  <th style="width: 60px" [class.ordenable]="ordenable()" (click)="ordenable() && ordenar.emit('prioridad')">
+                    Prio
+                    @if (ordenable()) {
+                      <i class="bi" [class.bi-caret-up-fill]="ordenPor() === 'prioridad' && ordenDir() === 'asc'"
+                         [class.bi-caret-down-fill]="ordenPor() !== 'prioridad' || ordenDir() === 'desc'"
+                         [class.activo]="ordenPor() === 'prioridad'"></i>
+                    }
+                  </th>
                 }
                 <th style="width: 140px">Estatus</th>
                 @if (!sinTecnico()) {
                   <th style="width: 150px">Técnico</th>
                 }
-                <th style="width: 110px">Tiempo</th>
+                <th style="width: 110px" [class.ordenable]="ordenable()" (click)="ordenable() && ordenar.emit('tiempo')">
+                  Tiempo
+                  @if (ordenable()) {
+                    <i class="bi" [class.bi-caret-up-fill]="ordenPor() === 'tiempo' && ordenDir() === 'asc'"
+                       [class.bi-caret-down-fill]="ordenPor() !== 'tiempo' || ordenDir() === 'desc'"
+                       [class.activo]="ordenPor() === 'tiempo'"></i>
+                  }
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -105,7 +119,13 @@ export class TablaTickets {
   /** Solo tiene sentido en "Mis tickets": el solicitante debe confirmar o rechazar. */
   readonly pedirConfirmacion = input(false);
 
+  /** Encabezados clicables de Prio/Tiempo; el padre decide el orden real (ver tickets.ts). */
+  readonly ordenable = input(false);
+  readonly ordenPor = input<'prioridad' | 'tiempo' | null>(null);
+  readonly ordenDir = input<'asc' | 'desc'>('desc');
+
   readonly abrir = output<number>();
+  readonly ordenar = output<'prioridad' | 'tiempo'>();
 
   readonly dur = duracion;
   readonly marcas = banderas;
