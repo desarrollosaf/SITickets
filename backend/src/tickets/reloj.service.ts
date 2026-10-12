@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize, Transaction } from 'sequelize';
-import { ESTATUS, Sede, Servicio, Ticket, TicketSesion } from '../database/models';
+import { ESTATUS, Sede, Servicio, Ticket, TicketSesion, Usuario } from '../database/models';
 import { ReglasService } from './reglas.service';
 import { TrazaService } from './traza.service';
 import { TicketsService } from './tickets.service';
@@ -69,6 +69,23 @@ export class RelojService {
     const geo = geoDe(dto);
 
     await this.db.transaction(async (tx) => {
+      /* Un ticket solo puede tener un reloj corriendo a la vez. Sin este
+         candado, dos personas autorizadas (p. ej. el tecnico y un admin)
+         podian arrancarlo casi al mismo tiempo y quedar dos sesiones
+         abiertas; al resolver el ticket ambas se cerraban juntas con el
+         mismo motivo y casi el mismo instante, mostrando "dos visitas"
+         identicas que en realidad nunca ocurrieron. */
+      const yaAbiertaAqui = await this.sesiones.findOne({
+        where: { ticket_id: t.id, fin: null },
+        include: [{ model: Usuario, as: 'usuario' }],
+        transaction: tx,
+      });
+      if (yaAbiertaAqui) {
+        throw new BadRequestException(
+          `Ya hay un reloj corriendo en este ticket, iniciado por ${yaAbiertaAqui.usuario.nombre}`,
+        );
+      }
+
       /* Un tecnico solo puede tener un reloj corriendo: la sesion anterior se
          detiene sola y su ticket queda EN ESPERA, no abandonado. */
       const abierta = await this.sesiones.findOne({

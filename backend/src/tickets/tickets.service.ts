@@ -1837,6 +1837,14 @@ export class TicketsService {
       ? ((await this.usuarios.findByPk(t.tecnico_id))?.nombre ?? 'Sin asignar')
       : 'Sin asignar';
 
+    /* Si el tecnico anterior dejo el reloj corriendo, se cierra aqui: el
+       nuevo tecnico arranca desde 0 y no queda bloqueado por una sesion
+       ajena que ya no aplica. */
+    await this.sesiones.update(
+      { fin: new Date(), motivo: 'Ticket reasignado' },
+      { where: { ticket_id: t.id, fin: null } },
+    );
+
     await t.update({
       tecnico_id: destino.id,
       en_cola: false,
