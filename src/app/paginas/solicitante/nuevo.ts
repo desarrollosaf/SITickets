@@ -77,11 +77,19 @@ export class Nuevo {
     return revisaCuentaCorreo(this.correoParaEnviar(), this.correoLibre() ? '' : this.dominio());
   });
 
-  /* ---------------- modelo de impresora (servicio IMPA) ---------------- */
+  /* ---------------- modelo de impresora ---------------- */
 
   /** true cuando el campo adicional del catalogo pide el modelo de la impresora. */
   readonly esModeloImpresora = computed(() =>
     esCampoModeloImpresora(this.problema()?.campo_adicional),
+  );
+  /** IMPA: parque de impresoras arrendadas, con catalogo de modelos para buscar/elegir. */
+  readonly esModeloImpresoraCatalogo = computed(
+    () => this.esModeloImpresora() && this.problema()?.servicio_clave === 'IMPA',
+  );
+  /** IMP: impresoras propias, sin catalogo central — el modelo se captura a mano. */
+  readonly esModeloImpresoraLibre = computed(
+    () => this.esModeloImpresora() && this.problema()?.servicio_clave === 'IMP',
   );
   readonly modelosImpresora = signal<string[]>([]);
   readonly cargandoModelos = signal(false);
@@ -144,6 +152,24 @@ export class Nuevo {
   /** Equipo de computo: un solo equipo por ticket, sacado de una API distinta. */
   readonly esCmp = computed(() => this.problema()?.servicio_clave === 'CMP');
 
+  /* ---------------- color de toner (IMP-01 / IMPA-01, solicitud de toner/cartucho) ---------------- */
+
+  /** Este problema ademas del modelo de impresora pide el color de toner a cambiar. */
+  readonly esColorToner = computed(() =>
+    ['IMP-01', 'IMPA-01'].includes(this.problema()?.clave ?? ''),
+  );
+  colorToner = '';
+
+  /* ---------------- traslado de impresora arrendada (IMPA-09) ---------------- */
+
+  /**
+   * IMPA-09: el campo adicional del catalogo (contexto) ya pide la
+   * ubicacion destino; ademas hace falta el modelo que se traslada, asi
+   * que reusa el mismo catalogo/widget de IMPA (modelosImpresora,
+   * modeloElegido…) como un segundo campo independiente.
+   */
+  readonly esTrasladoImpa = computed(() => this.problema()?.clave === 'IMPA-09');
+
   readonly bienes = signal<Bien[]>([]);
   readonly cargandoBienes = signal(false);
   /** Explica por que no hay lista; con eso la pantalla ofrece captura manual. */
@@ -157,7 +183,7 @@ export class Nuevo {
   readonly contextoFinal = computed(() => {
     if (this.esInventario() && this.bienes().length) return this.seleccion().join(', ');
     if (this.esCorreo()) return this.correoParaEnviar();
-    if (this.esModeloImpresora() && this.modelosImpresora().length) return this.modeloElegido();
+    if (this.esModeloImpresoraCatalogo() && this.modelosImpresora().length) return this.modeloElegido();
     return this.contextoV().trim();
   });
 
@@ -289,7 +315,9 @@ export class Nuevo {
     this.claveProblema.set(clave);
     this.seleccion.set([]);
     if (this.esInventario() && !this.bienesPedidos) this.cargaBienes();
-    if (this.esModeloImpresora() && !this.modelosPedidos) this.cargaModelosImpresora();
+    if ((this.esModeloImpresoraCatalogo() || this.esTrasladoImpa()) && !this.modelosPedidos) {
+      this.cargaModelosImpresora();
+    }
   }
 
   private cargaBienes() {
@@ -343,6 +371,7 @@ export class Nuevo {
     this.correoLibre.set(false);
     this.modeloElegido.set('');
     this.modeloBusqueda.set('');
+    this.colorToner = '';
   }
 
   /** Boton "Limpiar": reinicia todo el formulario, no solo el contexto del problema actual. */
@@ -370,7 +399,7 @@ export class Nuevo {
       this.error.set(
         this.esInventario() && this.bienes().length
           ? 'Elige al menos un bien de tu resguardo.'
-          : this.esModeloImpresora() && this.modelosImpresora().length
+          : this.esModeloImpresoraCatalogo() && this.modelosImpresora().length
             ? 'Elige el modelo de impresora.'
             : `Captura: ${p.campo_adicional}`,
       );
@@ -398,6 +427,14 @@ export class Nuevo {
       this.error.set('Describe el problema.');
       return;
     }
+    if (this.esColorToner() && !this.colorToner.trim()) {
+      this.error.set('Indica que color de toner se va a cambiar.');
+      return;
+    }
+    if (this.esTrasladoImpa() && !this.modeloElegido().trim()) {
+      this.error.set('Elige el modelo de impresora que se va a trasladar.');
+      return;
+    }
 
     this.guardando.set(true);
     this.api
@@ -410,6 +447,8 @@ export class Nuevo {
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
         correo_libre: this.esCorreo() ? this.correoLibre() : undefined,
+        color_toner: this.esColorToner() ? this.colorToner.trim() : undefined,
+        modelo_traslado: this.esTrasladoImpa() ? this.modeloElegido().trim() : undefined,
         a_nombre_de: this.puedeElegirUsuario()
           ? (this.usuarioElegido()?.id_usuario_saf ?? undefined)
           : undefined,

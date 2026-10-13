@@ -112,6 +112,10 @@ export class TicketsService {
     extension?: string;
     /** Solo si el campo adicional es «Cuenta de correo»: no exige el dominio institucional. */
     correo_libre?: boolean;
+    /** Solo si el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
+    color_toner?: string;
+    /** Solo si el problema es IMPA-09 (traslado): que modelo se traslada. */
+    modelo_traslado?: string;
     a_nombre_de?: number;
   }) {
     return this.http.post<TicketDetalle>(`${API}/tickets`, datos);

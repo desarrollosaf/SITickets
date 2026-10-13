@@ -74,6 +74,9 @@ const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
 /** Roles que atienden tickets y por tanto ven solo lo que traen turnado. */
 const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe'];
 
+/** Solicitud de toner/cartucho: aqui ademas del modelo se pide el color a cambiar. */
+const CLAVES_TONER = ['IMP-01', 'IMPA-01'];
+
 const INCLUDES = [
   { model: Servicio, as: 'servicio' },
   { model: Servicio, as: 'servicio_original' },
@@ -531,6 +534,8 @@ export class TicketsService {
       prioridad: t.prioridad,
       estatus: t.estatus,
       contexto: t.contexto,
+      color_toner: t.color_toner,
+      modelo_traslado: t.modelo_traslado,
       solicitante_id: t.solicitante_id,
       solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
       /** Solo trae valor cuando alguien registro el ticket a nombre de otro. */
@@ -727,6 +732,12 @@ export class TicketsService {
     if (problema.requiere_texto && !dto.texto?.trim()) {
       throw new BadRequestException('La opcion «Otro» exige capturar la descripcion');
     }
+    if (CLAVES_TONER.includes(problema.clave) && !dto.color_toner?.trim()) {
+      throw new BadRequestException('Indica que color de toner se va a cambiar');
+    }
+    if (problema.clave === 'IMPA-09' && !dto.modelo_traslado?.trim()) {
+      throw new BadRequestException('Indica que modelo de impresora se va a trasladar');
+    }
 
     /* El campo adicional del catalogo. Si pide cuenta de correo se valida aqui
        con la misma regla que la correccion de datos generales. */
@@ -825,6 +836,8 @@ export class TicketsService {
           sede_id: quien.sede_id,
           extension: dto.extension?.trim() || quien.extension,
           contexto,
+          color_toner: CLAVES_TONER.includes(problema.clave) ? dto.color_toner!.trim() : null,
+          modelo_traslado: problema.clave === 'IMPA-09' ? dto.modelo_traslado!.trim() : null,
           texto_libre: problema.requiere_texto ? dto.texto!.trim() : null,
         },
         { transaction: tx },

@@ -47,6 +47,18 @@ export class CrearTicketDto {
   @MaxLength(2000)
   texto?: string;
 
+  /** Solo aplica cuando el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  color_toner?: string;
+
+  /** Solo aplica cuando el problema es IMPA-09 (traslado): que modelo se traslada. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  modelo_traslado?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(10)

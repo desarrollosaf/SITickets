@@ -55,6 +55,10 @@ export interface Ticket {
   prioridad: string;
   estatus: EstatusClave;
   contexto: string | null;
+  /** Solo aplica a IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
+  color_toner: string | null;
+  /** Solo aplica a IMPA-09 (traslado): que modelo se traslada. */
+  modelo_traslado: string | null;
   solicitante_id: number;
   solicitante: string;
   /** Solo trae valor cuando un admin/gestor registro el ticket a nombre de otro. */
