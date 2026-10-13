@@ -128,8 +128,10 @@
           }
         </div>
       }
+      @if (p.campo_adicional || esColorToner()) {
+      <div class="row g-3 mb-3">
       @if (p.campo_adicional) {
-        <div class="mb-3">
+        <div [class]="esColorToner() ? 'col-md-6' : 'col-12'">
           <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
           @if (esCorreo()) {
             <div class="form-check mb-2">
@@ -282,11 +284,21 @@
         </div>
       }
       @if (esColorToner()) {
-        <div class="mb-3">
-          <label class="form-label small fw-semibold" for="n-color-toner">Color de tóner a cambiar</label>
-          <input id="n-color-toner" class="form-control" [(ngModel)]="colorToner" name="colorToner"
-                 placeholder="Ej. negro, cyan, magenta, amarillo…" />
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Color de tóner a cambiar</label>
+          <div class="border rounded p-2">
+            @for (c of coloresToner; track c) {
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'n-color-' + c"
+                       [checked]="coloresElegidos.includes(c)" (change)="alternarColorToner(c)" />
+                <label class="form-check-label small" [for]="'n-color-' + c">{{ c }}</label>
+              </div>
+            }
+          </div>
+          <div class="form-text">Puedes marcar más de uno.</div>
         </div>
+      }
+      </div>
       }
 
       @if (p.requiere_texto) {
