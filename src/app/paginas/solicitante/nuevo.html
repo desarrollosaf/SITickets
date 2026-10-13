@@ -88,6 +88,46 @@
     </div>
 
     @if (problema(); as p) {
+      @if (esTrasladoImpa()) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="n-modelo-traslado">Modelo de impresora</label>
+          @if (cargandoModelos()) {
+            <div class="form-text">
+              <span class="spinner-border spinner-border-sm me-2"></span>
+              Consultando los modelos registrados…
+            </div>
+          } @else if (modelosImpresora().length) {
+            @if (modeloElegido(); as modelo) {
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-control" [value]="modelo" disabled />
+                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
+                  Cambiar
+                </button>
+              </div>
+            } @else {
+              <input id="n-modelo-traslado" class="form-control" [(ngModel)]="modeloBusqueda" name="modeloTraslado"
+                     placeholder="Escribe para buscar el modelo…" autocomplete="off" />
+              <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
+                @for (m of modelosFiltrados(); track m) {
+                  <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
+                          (click)="elegirModelo(m)">
+                    {{ m }}
+                  </button>
+                } @empty {
+                  <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
+                }
+              </div>
+            }
+          } @else {
+            <input id="n-modelo-traslado" class="form-control" [ngModel]="modeloElegido()"
+                   (ngModelChange)="modeloElegido.set($event)" name="modeloTraslado"
+                   placeholder="Modelo de impresora" />
+            <div class="form-text">
+              No se pudo consultar el catálogo de modelos. Captúralo a mano.
+            </div>
+          }
+        </div>
+      }
       @if (p.campo_adicional) {
         <div class="mb-3">
           <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
@@ -192,7 +232,7 @@
                 {{ motivoBienes() || 'Captura el número de inventario que aparece en la etiqueta.' }}
               </div>
             }
-          } @else if (esModeloImpresora()) {
+          } @else if (esModeloImpresoraCatalogo()) {
             @if (cargandoModelos()) {
               <div class="form-text">
                 <span class="spinner-border spinner-border-sm me-2"></span>
@@ -227,6 +267,9 @@
                 No se pudo consultar el catálogo de modelos. Captúralo a mano.
               </div>
             }
+          } @else if (esModeloImpresoraLibre()) {
+            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                   placeholder="Modelo de impresora" autocomplete="off" />
           } @else if (esCantidadEquipos()) {
             <input id="n-ctx" class="form-control" type="number" inputmode="numeric" min="1" step="1"
                    autocomplete="off"
@@ -236,6 +279,13 @@
             <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
                    [placeholder]="p.campo_adicional" />
           }
+        </div>
+      }
+      @if (esColorToner()) {
+        <div class="mb-3">
+          <label class="form-label small fw-semibold" for="n-color-toner">Color de tóner a cambiar</label>
+          <input id="n-color-toner" class="form-control" [(ngModel)]="colorToner" name="colorToner"
+                 placeholder="Ej. negro, cyan, magenta, amarillo…" />
         </div>
       }
 

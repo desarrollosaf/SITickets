@@ -149,6 +149,14 @@ export class Ticket extends Model {
   @Column(DataType.STRING(160))
   declare contexto: string | null;
 
+  /** Solo cuando el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
+  @Column(DataType.STRING(60))
+  declare color_toner: string | null;
+
+  /** Solo cuando el problema es IMPA-09 (traslado): contexto ya es la ubicacion destino. */
+  @Column(DataType.STRING(120))
+  declare modelo_traslado: string | null;
+
   /** Solo cuando el problema es la opcion Otro. */
   @Column(DataType.TEXT)
   declare texto_libre: string | null;
