@@ -50,6 +50,40 @@ export class Bandeja implements OnDestroy {
     () => this.abiertos().find((t) => ['ASIGNADO', 'EN_ATENCION'].includes(t.estatus)) ?? null,
   );
 
+  /* Pendientes e historial se paginan por separado: son listas independientes. */
+  readonly porPagina = 10;
+  readonly paginaPendientes = signal(1);
+  readonly paginaHistorial = signal(1);
+
+  readonly totalPaginasPendientes = computed(() =>
+    Math.max(1, Math.ceil(this.abiertos().length / this.porPagina)),
+  );
+  readonly pendientesPagina = computed(() => {
+    const inicio = (this.paginaPendientes() - 1) * this.porPagina;
+    return this.abiertos().slice(inicio, inicio + this.porPagina);
+  });
+
+  readonly totalPaginasHistorial = computed(() =>
+    Math.max(1, Math.ceil(this.cerrados().length / this.porPagina)),
+  );
+  readonly historialPagina = computed(() => {
+    const inicio = (this.paginaHistorial() - 1) * this.porPagina;
+    return this.cerrados().slice(inicio, inicio + this.porPagina);
+  });
+
+  paginaPendientesAnterior() {
+    this.paginaPendientes.update((p) => Math.max(1, p - 1));
+  }
+  paginaPendientesSiguiente() {
+    this.paginaPendientes.update((p) => Math.min(this.totalPaginasPendientes(), p + 1));
+  }
+  paginaHistorialAnterior() {
+    this.paginaHistorial.update((p) => Math.max(1, p - 1));
+  }
+  paginaHistorialSiguiente() {
+    this.paginaHistorial.update((p) => Math.min(this.totalPaginasHistorial(), p + 1));
+  }
+
   constructor() {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
     void this.revisaPermisoGeo();
@@ -64,6 +98,8 @@ export class Bandeja implements OnDestroy {
     this.api.listar({ turnados: 'true' }).subscribe({
       next: (t) => {
         this.tickets.set(t);
+        this.paginaPendientes.set(1);
+        this.paginaHistorial.set(1);
         this.buscaRelojActivo(t);
       },
       error: (e) => this.error.set(mensajeError(e)),
