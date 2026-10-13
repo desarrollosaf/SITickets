@@ -88,15 +88,49 @@
 
 <h2 class="h6 mb-2">Pendientes</h2>
 <app-tabla-tickets
-  [tickets]="abiertos()"
+  [tickets]="pendientesPagina()"
   [sinTecnico]="true"
   vacio="Sin pendientes"
   ayudaVacio="No tienes tickets turnados en este momento."
   (abrir)="abierto.set($event)" />
 
+@if (totalPaginasPendientes() > 1) {
+  <div class="d-flex align-items-center justify-content-between mt-2">
+    <span class="sub small">Página {{ paginaPendientes() }} de {{ totalPaginasPendientes() }}</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaPendientes() === 1"
+              (click)="paginaPendientesAnterior()">
+        <i class="bi bi-chevron-left"></i> Anterior
+      </button>
+      <button class="btn btn-outline-secondary btn-sm"
+              [disabled]="paginaPendientes() === totalPaginasPendientes()"
+              (click)="paginaPendientesSiguiente()">
+        Siguiente <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+}
+
 @if (cerrados().length) {
   <h2 class="h6 mb-2 mt-4">Historial</h2>
-  <app-tabla-tickets [tickets]="cerrados()" [sinTecnico]="true" (abrir)="abierto.set($event)" />
+  <app-tabla-tickets [tickets]="historialPagina()" [sinTecnico]="true" (abrir)="abierto.set($event)" />
+
+  @if (totalPaginasHistorial() > 1) {
+    <div class="d-flex align-items-center justify-content-between mt-2">
+      <span class="sub small">Página {{ paginaHistorial() }} de {{ totalPaginasHistorial() }}</span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaHistorial() === 1"
+                (click)="paginaHistorialAnterior()">
+          <i class="bi bi-chevron-left"></i> Anterior
+        </button>
+        <button class="btn btn-outline-secondary btn-sm"
+                [disabled]="paginaHistorial() === totalPaginasHistorial()"
+                (click)="paginaHistorialSiguiente()">
+          Siguiente <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  }
 }
 
 <app-detalle-ticket

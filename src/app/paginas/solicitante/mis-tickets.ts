@@ -32,11 +32,27 @@ import type { Catalogos, Ticket } from '../../core/modelos';
     }
 
     <app-tabla-tickets
-      [tickets]="tickets()"
+      [tickets]="ticketsPagina()"
       [pedirConfirmacion]="true"
       vacio="Aún no has registrado tickets"
       ayudaVacio="Cuando reportes algo aparecerá aquí con su seguimiento."
       (abrir)="abierto.set($event)" />
+
+    @if (totalPaginas() > 1) {
+      <div class="d-flex align-items-center justify-content-between mt-2">
+        <span class="sub small">Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
+                  (click)="paginaAnterior()">
+            <i class="bi bi-chevron-left"></i> Anterior
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
+                  (click)="paginaSiguiente()">
+            Siguiente <i class="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    }
 
     <app-detalle-ticket
       [ticketId]="abierto()"
@@ -55,6 +71,26 @@ export class MisTickets {
 
   readonly porValidar = () => this.tickets().filter((t) => t.estatus === 'RESUELTO');
 
+  readonly porPagina = 10;
+  readonly paginaActual = signal(1);
+
+  totalPaginas() {
+    return Math.max(1, Math.ceil(this.tickets().length / this.porPagina));
+  }
+
+  ticketsPagina() {
+    const inicio = (this.paginaActual() - 1) * this.porPagina;
+    return this.tickets().slice(inicio, inicio + this.porPagina);
+  }
+
+  paginaAnterior() {
+    this.paginaActual.update((p) => Math.max(1, p - 1));
+  }
+
+  paginaSiguiente() {
+    this.paginaActual.update((p) => Math.min(this.totalPaginas(), p + 1));
+  }
+
   constructor() {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
     this.cargar();
@@ -62,7 +98,10 @@ export class MisTickets {
 
   cargar() {
     this.api.listar({ propios: 'true' }).subscribe({
-      next: (t) => this.tickets.set(t),
+      next: (t) => {
+        this.tickets.set(t);
+        this.paginaActual.set(1);
+      },
       error: (e) => this.error.set(mensajeError(e)),
     });
   }
