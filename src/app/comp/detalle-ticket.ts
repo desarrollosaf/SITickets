@@ -81,6 +81,8 @@ export class DetalleTicket {
   readonly ocupado = signal(false);
   /** Aviso si SIASAF no respondio al avisar la asignacion temporal del equipo. */
   readonly avisoCustodia = signal<string | null>(null);
+  /** true un momento despues de copiar los datos, para el aviso visual del boton. */
+  readonly copiado = signal(false);
 
   readonly motivosEspera = MOTIVOS_ESPERA;
   readonly dur = duracion;
@@ -155,6 +157,41 @@ export class DetalleTicket {
 
   estatus(t: TicketDetalle) {
     return etiquetaEstatus(t, this.esSolicitante());
+  }
+
+  /**
+   * Copia al portapapeles los datos que el admin/operador suele tener que
+   * pegar en otro lado (bitacora externa, correo, etc.): folio, solicitante,
+   * problema, area y modelo de impresora cuando aplica.
+   */
+  async copiarDatos() {
+    const t = this.ticket();
+    if (!t) return;
+    /* El modelo vive en contexto cuando ese es el campo adicional del
+       problema (IMP/IMPA, salvo el traslado), o en modelo_traslado cuando
+       el problema es IMPA-09 (ahi contexto es la ubicacion destino). */
+    const modelo = t.campo_adicional === 'Modelo de impresora' ? t.contexto : t.modelo_traslado;
+    const lineas = [
+      `Folio: ${t.folio}`,
+      `Solicitante: ${t.solicitante}`,
+      `Problema: ${t.problema}`,
+      modelo ? `Modelo: ${modelo}` : null,
+      t.color_toner ? `Color de tóner: ${t.color_toner}` : null,
+      /** Solo cuando el problema elegido es «Otro»: ahi el detalle real va en texto_libre, no en contexto. */
+      t.texto_libre ? `Descripción: ${t.texto_libre}` : null,
+      /** Siempre al final. */
+      `Departamento/área: ${t.departamento_saf || '—'}`,
+    ].filter((l): l is string => !!l);
+    const texto = lineas.join('\n');
+    try {
+      await navigator.clipboard.writeText(texto);
+    } catch {
+      /* Algunos navegadores/contextos bloquean la API: se ignora, el
+         boton simplemente no da el aviso de "Copiado". */
+      return;
+    }
+    this.copiado.set(true);
+    setTimeout(() => this.copiado.set(false), 2000);
   }
 
   /**

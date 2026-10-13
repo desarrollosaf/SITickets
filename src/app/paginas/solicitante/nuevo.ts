@@ -158,7 +158,15 @@ export class Nuevo {
   readonly esColorToner = computed(() =>
     ['IMP-01', 'IMPA-01'].includes(this.problema()?.clave ?? ''),
   );
-  colorToner = '';
+  readonly coloresToner = ['Negro', 'Cyan', 'Magenta', 'Amarillo'];
+  /** Puede ser mas de un color (ej. se acaban negro y cyan a la vez). */
+  coloresElegidos: string[] = [];
+
+  alternarColorToner(color: string) {
+    this.coloresElegidos = this.coloresElegidos.includes(color)
+      ? this.coloresElegidos.filter((c) => c !== color)
+      : [...this.coloresElegidos, color];
+  }
 
   /* ---------------- traslado de impresora arrendada (IMPA-09) ---------------- */
 
@@ -371,7 +379,7 @@ export class Nuevo {
     this.correoLibre.set(false);
     this.modeloElegido.set('');
     this.modeloBusqueda.set('');
-    this.colorToner = '';
+    this.coloresElegidos = [];
   }
 
   /** Boton "Limpiar": reinicia todo el formulario, no solo el contexto del problema actual. */
@@ -427,8 +435,8 @@ export class Nuevo {
       this.error.set('Describe el problema.');
       return;
     }
-    if (this.esColorToner() && !this.colorToner.trim()) {
-      this.error.set('Indica que color de toner se va a cambiar.');
+    if (this.esColorToner() && !this.coloresElegidos.length) {
+      this.error.set('Indica que color(es) de toner se van a cambiar.');
       return;
     }
     if (this.esTrasladoImpa() && !this.modeloElegido().trim()) {
@@ -447,7 +455,7 @@ export class Nuevo {
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
         correo_libre: this.esCorreo() ? this.correoLibre() : undefined,
-        color_toner: this.esColorToner() ? this.colorToner.trim() : undefined,
+        color_toner: this.esColorToner() ? this.coloresElegidos.join(', ') : undefined,
         modelo_traslado: this.esTrasladoImpa() ? this.modeloElegido().trim() : undefined,
         a_nombre_de: this.puedeElegirUsuario()
           ? (this.usuarioElegido()?.id_usuario_saf ?? undefined)

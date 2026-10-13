@@ -561,7 +561,19 @@
 
         <!-- Datos del reporte -->
         <div class="tarjeta p-3 mb-3">
-          <h3 class="h6 mb-3">Datos del reporte</h3>
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h3 class="h6 mb-0">Datos del reporte</h3>
+            @if (esAdminUOperador()) {
+              <button type="button" class="btn btn-sm btn-outline-secondary no-imprimir"
+                      (click)="copiarDatos()">
+                @if (copiado()) {
+                  <i class="bi bi-check2"></i> Copiado
+                } @else {
+                  <i class="bi bi-clipboard"></i> Copiar datos
+                }
+              </button>
+            }
+          </div>
           <dl class="row mb-0 small">
             <dt class="col-5 sub fw-normal">Tipo de servicio</dt>
             <dd class="col-7">{{ t.servicio }}</dd>
@@ -585,6 +597,14 @@
             @if (t.texto_libre) {
               <dt class="col-5 sub fw-normal">Descripción</dt>
               <dd class="col-7">{{ t.texto_libre }}</dd>
+            }
+            @if (t.color_toner) {
+              <dt class="col-5 sub fw-normal">Color de tóner</dt>
+              <dd class="col-7">{{ t.color_toner }}</dd>
+            }
+            @if (t.modelo_traslado) {
+              <dt class="col-5 sub fw-normal">Modelo a trasladar</dt>
+              <dd class="col-7">{{ t.modelo_traslado }}</dd>
             }
 
             <dt class="col-5 sub fw-normal">{{ t.interno ? 'Generado por' : 'Solicitante' }}</dt>
