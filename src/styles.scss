@@ -90,10 +90,110 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
 }
+
+.rail .nav-link .bi { width: 1.1rem; text-align: center; flex-shrink: 0; }
 
 .rail .nav-link:hover { background: #f1f4f8; color: var(--tinta); }
 .rail .nav-link.activo { background: #e8f0fa; color: var(--p3); font-weight: 600; }
+
+/* Scroll del menu: delgado y discreto, nada de barra ancha ni horizontal. */
+.rail nav.nav {
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #d7dee6 transparent;
+}
+.rail nav.nav::-webkit-scrollbar { width: 6px; }
+.rail nav.nav::-webkit-scrollbar-thumb { background: #d7dee6; border-radius: 3px; }
+.rail nav.nav::-webkit-scrollbar-thumb:hover { background: #b9c3cf; }
+
+/* Boton "Catalogos": encabezado de grupo, no un link mas. */
+.rail .toggle-grupo {
+  color: var(--tinta-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 0.35rem;
+}
+.rail .toggle-grupo .bi:first-child { font-size: 0.95rem; }
+.rail .toggle-grupo:hover { background: #f1f4f8; color: var(--tinta); }
+.rail .toggle-grupo .chevron-grupo { transition: transform 0.15s ease; font-size: 0.7rem; }
+.rail .toggle-grupo.abierto .chevron-grupo { transform: rotate(90deg); }
+
+/* Items del grupo: indentados y con una guia vertical para que se note la jerarquia. */
+.rail .item-grupo {
+  margin-left: 0.95rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--linea);
+  border-radius: 0 0.45rem 0.45rem 0;
+  font-size: 0.84rem;
+}
+.rail .item-grupo.activo { border-left-color: var(--p3); }
+
+/* -------------------------------------------------------------------
+   Menu movil (pantallas chicas): avatar + panel flotante tipo tarjeta
+   ------------------------------------------------------------------- */
+.avatar-iniciales {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1d3552;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.menu-movil {
+  position: fixed;
+  top: 58px;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 1045;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 32px rgba(18, 26, 38, 0.18);
+  padding: 0.5rem;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.menu-movil .nav-link {
+  color: var(--tinta-2);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  font-size: 0.9rem;
+}
+.menu-movil .nav-link .bi { width: 1.1rem; text-align: center; flex-shrink: 0; }
+.menu-movil .nav-link:hover { background: #f1f4f8; color: var(--tinta); }
+.menu-movil .nav-link.activo { background: var(--p3); color: #fff; font-weight: 600; }
+.menu-movil .toggle-grupo {
+  color: var(--tinta-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.menu-movil .toggle-grupo .chevron-grupo { transition: transform 0.15s ease; font-size: 0.7rem; }
+.menu-movil .toggle-grupo.abierto .chevron-grupo { transform: rotate(90deg); }
+.menu-movil .item-grupo {
+  margin-left: 0.95rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--linea);
+  border-radius: 0 0.55rem 0.55rem 0;
+  font-size: 0.86rem;
+}
+.menu-movil .item-grupo.activo { border-left-color: var(--p3); }
 
 .folio {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

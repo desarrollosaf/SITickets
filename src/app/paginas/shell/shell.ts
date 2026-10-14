@@ -35,6 +35,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     icono: 'bi-list-check', grupo: 'Catálogos' },
     { ruta: '/prioridades', etiqueta: 'Prioridades',
     icono: 'bi-speedometer2', grupo: 'Catálogos' },
+    { ruta: '/catalogo-roles', etiqueta: 'Catálogo de roles',
+    icono: 'bi-person-badge', grupo: 'Catálogos' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
     { ruta: '/reportes', etiqueta: 'Reporte de tickets', icono: 'bi-file-earmark-excel' },
     { ruta: '/bajas', etiqueta: 'Equipos dados de baja', icono: 'bi-pc-display-horizontal' },
@@ -111,6 +113,12 @@ export class Shell {
   readonly nombreRol = computed(() => (this.auth.rol() ? NOMBRE_ROL[this.auth.rol()!] : ''));
   readonly railAbierto = signal(false);
   readonly catalogosAbierto = signal(false);
+
+  /** Iniciales para el avatar del menu movil: primeras dos palabras del nombre. */
+  readonly iniciales = computed(() => {
+    const partes = (this.usuario()?.nombre ?? '').trim().split(/\s+/).filter(Boolean);
+    return partes.slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+  });
 
   /** Cuantos tickets tiene el validador esperando en "Tickets por validar". */
   readonly pendientesValidar = signal(0);
