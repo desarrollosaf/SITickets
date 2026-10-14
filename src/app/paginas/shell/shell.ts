@@ -1,9 +1,11 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { filter } from 'rxjs';
 import { API } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
+import { TicketsService } from '../../core/tickets.service';
 import { mensajeError } from '../../core/formato';
 import type { Rol } from '../../core/modelos';
 
@@ -29,6 +31,7 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/catalogo-problemas', etiqueta: 'Catálogo de problemas', icono: 'bi-list-check' },
     { ruta: '/prioridades', etiqueta: 'Prioridades', icono: 'bi-speedometer2' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
+    { ruta: '/catalogo-roles', etiqueta: 'Catálogo de roles', icono: 'bi-person-badge' },
     { ruta: '/reportes', etiqueta: 'Reporte de tickets', icono: 'bi-file-earmark-excel' },
     { ruta: '/bajas', etiqueta: 'Equipos dados de baja', icono: 'bi-pc-display-horizontal' },
     { manual: 'administrador', etiqueta: 'Manual del administrador', icono: 'bi-question-circle' },
@@ -66,6 +69,13 @@ const MENUS: Record<Rol, Opcion[]> = {
   gestor: [
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
     { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+    { ruta: '/tickets', etiqueta: 'Tickets generados', icono: 'bi-inboxes' },
+  ],
+  validador: [
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+    { ruta: '/tickets-por-validar', etiqueta: 'Tickets por validar', icono: 'bi-patch-check' },
+    { ruta: '/tickets', etiqueta: 'Tickets generados', icono: 'bi-inboxes' },
   ],
 };
 
@@ -77,6 +87,7 @@ const NOMBRE_ROL: Record<Rol, string> = {
   solicitante: 'Solicitante',
   operador: 'Operador',
   gestor: 'Gestor',
+  validador: 'Validador',
 };
 
 @Component({
@@ -87,11 +98,39 @@ const NOMBRE_ROL: Record<Rol, string> = {
 export class Shell {
   readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
+  private readonly api = inject(TicketsService);
+  private readonly router = inject(Router);
 
   readonly usuario = this.auth.usuario;
-  readonly menu = computed(() => (this.auth.rol() ? MENUS[this.auth.rol()!] : []));
+  /* Un rol del catalogo sin menu programado (ver CatalogoRol) no truena: */
+  readonly menu = computed(() => (this.auth.rol() ? (MENUS[this.auth.rol()!] ?? []) : []));
   readonly nombreRol = computed(() => (this.auth.rol() ? NOMBRE_ROL[this.auth.rol()!] : ''));
   readonly railAbierto = signal(false);
+
+  /** Cuantos tickets tiene el validador esperando en "Tickets por validar". */
+  readonly pendientesValidar = signal(0);
+
+  constructor() {
+    if (this.auth.rol() === 'validador') {
+      this.cargarPendientesValidar();
+      /* Se refresca al navegar (p.ej. tras aprobar/rechazar y volver) y cada
+         minuto, por si le llega un ticket nuevo de otro gestor sin que el
+         navegue el mismo a ningun lado. */
+      this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
+        this.cargarPendientesValidar();
+      });
+      setInterval(() => this.cargarPendientesValidar(), 60_000);
+    }
+  }
+
+  private cargarPendientesValidar() {
+    this.api.porValidar().subscribe({
+      next: (t) => this.pendientesValidar.set(t.length),
+      error: () => {
+        /* Si falla, simplemente no se muestra el indicador: no es critico. */
+      },
+    });
+  }
 
   /** Abre el manual en pdf en una pestaña nueva. */
   abrirManual(tipo: 'solicitante' | 'tecnico' | 'administrador') {

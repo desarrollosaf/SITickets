@@ -175,9 +175,14 @@ export class Ticket extends Model {
   @Column(DataType.DATEONLY)
   declare fecha_plan: string | null;
 
+  /**
+   * Null mientras el ticket esta pendiente_validacion: el reloj de SLA no
+   * arranca hasta que un validador lo aprueba (ver §16 mas abajo). Para
+   * cualquier otro ticket se llena solo, igual que siempre.
+   */
   @Default(DataType.NOW)
   @Column(DataType.DATE)
-  declare f_registro: Date;
+  declare f_registro: Date | null;
 
   @Column(DataType.DATE)
   declare f_asignacion: Date | null;
@@ -193,6 +198,30 @@ export class Ticket extends Model {
 
   @Column(DataType.DATE)
   declare f_cancelacion: Date | null;
+
+  /* ------------------------------------------------------------------
+     §16 · validacion previa (gestor -> validador, ver DependenciaValidador)
+     ------------------------------------------------------------------ */
+
+  /** true mientras espera revision de un validador: no se turna a tecnico ni cuenta para escalamiento. */
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare pendiente_validacion: boolean;
+
+  /** Fecha real en que el gestor lo capturo, aunque el SLA (f_registro) arranque despues. Solo informativa. */
+  @Column(DataType.DATE)
+  declare f_captura: Date | null;
+
+  @ForeignKey(() => Usuario)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare validado_por: number | null;
+
+  @Column(DataType.STRING(120))
+  declare validado_por_nombre: string | null;
+
+  /** Si no es null, el ticket fue rechazado en validacion: nunca aparece en "Tickets generados". */
+  @Column(DataType.STRING(400))
+  declare motivo_rechazo_validacion: string | null;
 
   /** Inicio de la pausa vigente. */
   @Column(DataType.DATE)

@@ -6,6 +6,7 @@ import { dominioInstitucional } from '../common/correo';
 import {
   Area,
   CatalogoProblema,
+  CatalogoRol,
   Dependencia,
   Estatus,
   MotivoReasignacion,
@@ -20,6 +21,7 @@ import {
 import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema.dto';
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { AgregarUsuarioPermitidoDto, ActualizarServicioDto, CrearServicioDto } from './dto/servicio.dto';
+import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 /**
@@ -43,6 +45,7 @@ export class CatalogosService {
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidos: typeof ServicioUsuarioPermitido,
+    @InjectModel(CatalogoRol) private readonly rolesM: typeof CatalogoRol,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     private readonly config: ConfigService,
   ) {}
@@ -194,6 +197,41 @@ export class CatalogosService {
       }
       throw e;
     }
+  }
+
+  /* ------------------------------------------------------------------
+     Catalogo de roles (ver CatalogoRol): solo etiquetas, sin permisos.
+     ------------------------------------------------------------------ */
+
+  /** Activos e inactivos: es la pantalla de administracion del catalogo. */
+  async roles() {
+    return this.rolesM.findAll({ order: [['id', 'ASC']] });
+  }
+
+  async crearRol(dto: CrearRolDto) {
+    try {
+      return await this.rolesM.create({
+        clave: dto.clave.trim().toLowerCase(),
+        nombre: dto.nombre.trim(),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un rol con esa clave');
+      }
+      throw e;
+    }
+  }
+
+  /** La clave queda fuera: @Roles(...)/guardRol(...) en el codigo la usan tal cual. */
+  async actualizarRol(id: number, dto: ActualizarRolDto) {
+    const rol = await this.rolesM.findByPk(id);
+    if (!rol) throw new NotFoundException('El rol no existe');
+
+    await rol.update({
+      ...(dto.nombre !== undefined && { nombre: dto.nombre.trim() }),
+      ...(dto.activo !== undefined && { activo: dto.activo }),
+    });
+    return rol;
   }
 
   /** Alta de un nuevo tipo de servicio. Nace activo; el resto de banderas por defecto en false. */

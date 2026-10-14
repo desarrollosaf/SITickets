@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth.service';
+import { CopiadosService } from '../core/copiados.service';
 import { TicketsService } from '../core/tickets.service';
 import { QrCode } from './qr-code';
 import {
@@ -56,6 +57,7 @@ const MOTIVOS_ESPERA = [
 export class DetalleTicket {
   private readonly api = inject(TicketsService);
   private readonly auth = inject(AuthService);
+  readonly copiados = inject(CopiadosService);
 
   /** Id del ticket abierto. null cierra el cajon. */
   readonly ticketId = input.required<number | null>();
@@ -191,6 +193,7 @@ export class DetalleTicket {
       return;
     }
     this.copiado.set(true);
+    this.copiados.marcar(t.id);
     setTimeout(() => this.copiado.set(false), 2000);
   }
 

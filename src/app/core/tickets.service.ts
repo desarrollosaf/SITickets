@@ -16,12 +16,14 @@ import type {
   Problema,
   ProblemaForm,
   ReporteDatos,
+  RolCatalogo,
   Servicio,
   Tablero,
   Tecnico,
   Ticket,
   TicketAtendidoCmp,
   TicketDetalle,
+  TicketPorValidar,
   UsuarioPermitido,
 } from './modelos';
 
@@ -124,6 +126,23 @@ export class TicketsService {
   /** Solo el administrador: usuarios activos de saf para registrar a nombre de otro (§2). */
   buscarSolicitantes(q: string) {
     return this.http.get<CandidatoSaf[]>(`${API}/tickets/solicitantes`, { params: { q } });
+  }
+
+  /* ---------------- §16 validacion previa (rol validador) ---------------- */
+
+  /** Bandeja del validador: tickets pendientes de sus dependencias asignadas. */
+  porValidar() {
+    return this.http.get<Ticket[]>(`${API}/tickets/por-validar`);
+  }
+  aprobarValidacion(id: number) {
+    return this.http.post<{ id: number }>(`${API}/tickets/${id}/aprobar-validacion`, {});
+  }
+  rechazarValidacion(id: number, motivo: string) {
+    return this.http.post<{ id: number }>(`${API}/tickets/${id}/rechazar-validacion`, { motivo });
+  }
+  /** Lo que el gestor registro y sigue (o quedo) en validacion. Sin folio. */
+  misPorValidar() {
+    return this.http.get<TicketPorValidar[]>(`${API}/tickets/mis-por-validar`);
   }
 
   crearInterno(datos: {
@@ -319,6 +338,18 @@ export class TicketsService {
     datos: { nombre?: string; minutos_respuesta?: number; minutos_resolucion?: number },
   ) {
     return this.http.patch<Prioridad>(`${API}/catalogos/prioridades/${clave}`, datos);
+  }
+
+  /* ---------------- catalogo de roles ---------------- */
+
+  roles() {
+    return this.http.get<RolCatalogo[]>(`${API}/catalogos/roles`);
+  }
+  crearRol(datos: { clave: string; nombre: string }) {
+    return this.http.post<RolCatalogo>(`${API}/catalogos/roles`, datos);
+  }
+  actualizarRol(id: number, datos: Partial<{ nombre: string; activo: boolean }>) {
+    return this.http.patch<RolCatalogo>(`${API}/catalogos/roles/${id}`, datos);
   }
   monitor() {
     return this.http.get<Monitor>(`${API}/monitor`);

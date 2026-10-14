@@ -292,6 +292,8 @@ export class ReglasService {
    * ser ajena (refaccion, autorizacion, usuario ausente).
    */
   static minutosActivos(t: Ticket): number {
+    /* f_registro es null mientras pendiente_validacion: el SLA todavia no arranca. */
+    if (!t.f_registro) return 0;
     const fin = t.f_resolucion ? new Date(t.f_resolucion).getTime() : Date.now();
     const ciclo = fin - new Date(t.f_registro).getTime();
     const espera =
@@ -301,6 +303,7 @@ export class ReglasService {
   }
 
   static minutosCiclo(t: Ticket): number {
+    if (!t.f_registro) return 0;
     const fin = t.f_resolucion ? new Date(t.f_resolucion).getTime() : Date.now();
     return Math.max(0, Math.round((fin - new Date(t.f_registro).getTime()) / 60_000));
   }

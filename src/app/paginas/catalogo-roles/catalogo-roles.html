@@ -1,0 +1,92 @@
+<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Catálogo de roles</h1>
+    <p class="sub mb-0">
+      Agrega o renombra roles disponibles para "Registrar usuario". Un rol nuevo no trae pantallas ni
+      permisos por sí solo: eso se programa aparte.
+    </p>
+  </div>
+  <button class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+    <i class="bi bi-plus-lg"></i> Nuevo rol
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
+}
+
+<div class="tarjeta mb-3 overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr class="sub">
+          <th style="width: 140px">Clave</th>
+          <th>Nombre</th>
+          <th style="width: 90px">Estado</th>
+          <th style="width: 180px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of roles(); track r.id) {
+          <tr [class.text-muted]="!r.activo">
+            <td class="mono sub">{{ r.clave }}</td>
+            <td>{{ r.nombre }}</td>
+            <td>
+              @if (r.activo) {
+                <span class="badge text-bg-success-subtle text-success-emphasis">Activo</span>
+              } @else {
+                <span class="badge text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+              }
+            </td>
+            <td class="text-end">
+              <button class="btn btn-outline-secondary btn-sm" (click)="abrirEditar(r)">Editar</button>
+              <button class="btn btn-sm ms-1"
+                      [class.btn-outline-danger]="r.activo"
+                      [class.btn-outline-success]="!r.activo"
+                      (click)="alternarActivo(r)">
+                {{ r.activo ? 'Dar de baja' : 'Reactivar' }}
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (mostrarForm()) {
+  <div class="cajon-fondo" (click)="cancelar()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(480px, 94vw)">
+    <h2 class="h6 mb-3">{{ editandoId() ? 'Editar rol' : 'Nuevo rol' }}</h2>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-5">
+        <label class="form-label small fw-semibold" for="rl-clave">Clave</label>
+        <input id="rl-clave" class="form-control" [(ngModel)]="rClave" name="rlClave" maxlength="30"
+               [disabled]="!!editandoId()" />
+        @if (editandoId()) {
+          <div class="form-text">La clave no se puede cambiar: el código la usa tal cual.</div>
+        }
+      </div>
+      <div class="col-md-7">
+        <label class="form-label small fw-semibold" for="rl-nombre">Nombre</label>
+        <input id="rl-nombre" class="form-control" [(ngModel)]="rNombre" name="rlNombre" maxlength="60" />
+      </div>
+    </div>
+
+    @if (errorForm()) {
+      <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar
+      </button>
+    </div>
+  </div>
+}

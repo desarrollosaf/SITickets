@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import {
   Area,
+  CatalogoRol,
   Dependencia,
+  DependenciaValidador,
   SDependencia,
   Servicio,
   SUsuario,
@@ -14,7 +16,15 @@ import { UsuariosService } from './usuarios.service';
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([Usuario, Dependencia, Area, Servicio, TecnicoServicio]),
+    SequelizeModule.forFeature([
+      Usuario,
+      Dependencia,
+      Area,
+      Servicio,
+      TecnicoServicio,
+      CatalogoRol,
+      DependenciaValidador,
+    ]),
     SequelizeModule.forFeature([SUsuario, SDependencia], 'saf'),
   ],
   controllers: [UsuariosController],

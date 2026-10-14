@@ -101,6 +101,31 @@ body {
   color: var(--tinta-2);
 }
 
+/** Indica que ya se usó "Copiar datos" en este ticket (ver CopiadosService). */
+.punto-copiado {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #22a35a;
+  margin-right: 0.4rem;
+}
+
+/** Aviso de tickets pendientes en el menu (p.ej. "Tickets por validar"). */
+.punto-parpadeante {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #e0393e;
+  animation: parpadeo 1.4s ease-in-out infinite;
+}
+
+@keyframes parpadeo {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(224, 57, 62, 0.5); }
+  50% { opacity: 0.35; box-shadow: 0 0 0 0.3rem rgba(224, 57, 62, 0); }
+}
+
 .sub { color: var(--tinta-2); font-size: 0.8rem; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 

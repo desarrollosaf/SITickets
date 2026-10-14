@@ -1,23 +1,24 @@
 import {
   IsBoolean,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
   ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-
-const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
 /**
  * Edicion de personal ya registrado. rfc y nombre no se tocan (vienen de
  * saf); aqui solo se corrige rol, contacto, servicio y alta/baja.
  */
 export class ActualizarUsuarioDto {
-  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin, proveedor, operador o gestor' })
-  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
+  /** Se valida contra el catalogo de roles (CatalogoRol) en el service, no aqui con una lista fija. */
+  @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  rol!: string;
 
   /** '' limpia el campo. Sin @IsEmail estricto: solo se valida si viene algo. */
   @IsOptional()
@@ -36,6 +37,12 @@ export class ActualizarUsuarioDto {
   @Type(() => Number)
   @IsInt({ each: true })
   servicio_ids?: number[];
+
+  /** Solo aplica si rol es validador; sin valor (o []) quita todas las dependencias. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  dependencia_ids?: number[];
 
   @IsOptional()
   @IsBoolean()

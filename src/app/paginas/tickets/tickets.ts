@@ -22,8 +22,9 @@ export class Tickets {
   readonly cargando = signal(true);
   readonly error = signal('');
 
-  /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». Esta vista ya está
-   * restringida a admin/operador por el guard de la ruta (app.routes.ts), así que el buscador
+  /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». Esta vista esta
+   * restringida a admin/operador/gestor/validador por el guard de la ruta (app.routes.ts); el
+   * backend acota lo que cada rol ve (alcance() en tickets.service.ts), así que el buscador
    * por folio no necesita gating adicional aquí. */
   filtros: FiltrosTicket = { servicio: '', estatus: '', prioridad: '', tecnico: '', folio: '' };
 

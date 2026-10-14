@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/sequelize';
-import { SUsuario, Usuario } from '../database/models';
+import { SUsuario, Usuario, type Rol } from '../database/models';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 export interface JwtPayload {
@@ -38,7 +38,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         attributes: ['id', 'nombre', 'rol', 'correo', 'activo'],
       });
       if (!u || !u.activo) throw new UnauthorizedException('Sesion invalida');
-      return { id: u.id, nombre: u.nombre, rol: u.rol, correo: u.correo, externo: false };
+      /* u.rol es string (ver CatalogoRol): un rol dado de alta en el catalogo
+         pero sin permisos programados simplemente no calza con ningun
+         @Roles(...)/guardRol(...) y esa persona no ve nada, sin tronar. */
+      return { id: u.id, nombre: u.nombre, rol: u.rol as Rol, correo: u.correo, externo: false };
     }
 
     const s = await this.usuariosSaf.findByPk(payload.sub);

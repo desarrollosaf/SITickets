@@ -30,14 +30,14 @@ export class BienesController {
    * inventario a mostrar es el de esa persona, no el de quien esta armando
    * el ticket. Mismos roles que pueden usar a_nombre_de en POST /tickets.
    */
-  @Roles('admin', 'operador', 'gestor')
+  @Roles('admin', 'operador', 'gestor', 'validador')
   @Get('de/:idUsuarioSaf')
   deOtro(@Param('idUsuarioSaf', ParseIntPipe) idUsuarioSaf: number) {
     return this.bienes.deSaf(idUsuarioSaf);
   }
 
   /** Igual que /de/:idUsuarioSaf, pero para EQUIPO DE COMPUTO. */
-  @Roles('admin', 'operador', 'gestor')
+  @Roles('admin', 'operador', 'gestor', 'validador')
   @Get('de/:idUsuarioSaf/cmp')
   deOtroCmp(@Param('idUsuarioSaf', ParseIntPipe) idUsuarioSaf: number) {
     return this.bienes.deSafCmp(idUsuarioSaf);

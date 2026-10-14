@@ -53,10 +53,24 @@ export class TicketsController {
    * nombre de quien registra un ticket (§2). Va antes de ':id' para que no se
    * confunda "solicitantes" con un identificador de ticket.
    */
-  @Roles('admin', 'operador', 'gestor')
+  @Roles('admin', 'operador', 'gestor', 'validador')
   @Get('solicitantes')
   buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.buscarSolicitantes(q, usuario);
+  }
+
+  /** Bandeja del validador: tickets pendientes de sus dependencias asignadas. */
+  @Roles('validador')
+  @Get('por-validar')
+  porValidar(@UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.porValidar(usuario);
+  }
+
+  /** Lo que el gestor registro y sigue (o quedo) en validacion. Sin folio: ver TicketsService.misPorValidar. */
+  @Roles('gestor')
+  @Get('mis-por-validar')
+  misPorValidar(@UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.misPorValidar(usuario);
   }
 
   /**
@@ -121,16 +135,34 @@ export class TicketsController {
   }
 
   /** Nivel de tóner de las impresoras arrendadas de la direccion del solicitante (solo IMPA). */
-  @Roles('admin', 'operador', 'tecnico', 'jefe', 'proveedor', 'gestor')
+  @Roles('admin', 'operador', 'tecnico', 'jefe', 'proveedor', 'gestor', 'validador')
   @Get(':id/nivel-toner')
   nivelTonerDelTicket(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.nivelTonerDelTicket(id, usuario);
   }
 
-  @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor')
+  @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor', 'validador')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.crear(dto, usuario);
+  }
+
+  /** Aprueba un ticket pendiente de validacion: arranca el SLA y entra al flujo normal. */
+  @Roles('validador')
+  @Post(':id/aprobar-validacion')
+  aprobarValidacion(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.aprobarValidacion(id, usuario);
+  }
+
+  /** Rechaza un ticket pendiente de validacion: nunca aparece en "Tickets generados". */
+  @Roles('validador')
+  @Post(':id/rechazar-validacion')
+  rechazarValidacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: MotivoDto,
+    @UsuarioActual() usuario: UsuarioToken,
+  ) {
+    return this.tickets.rechazarValidacion(id, dto.motivo, usuario);
   }
 
   /**
