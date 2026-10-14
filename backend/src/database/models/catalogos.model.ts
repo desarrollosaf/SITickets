@@ -111,7 +111,37 @@ export type Rol =
   | 'admin'
   | 'proveedor'
   | 'operador'
-  | 'gestor';
+  | 'gestor'
+  | 'validador';
+
+/**
+ * Catalogo de roles administrable (pantalla de admin): el admin puede dar de
+ * alta un rol nuevo (clave + nombre) sin tocar codigo, PERO eso solo lo deja
+ * seleccionable y asignable a un usuario. Un rol nuevo no trae paginas,
+ * guards ni permisos: eso se sigue programando aparte (@Roles(...) en los
+ * controladores, guardRol(...) en las rutas del frontend) — el tipo `Rol` de
+ * arriba sigue siendo la lista cerrada que esos guards reconocen.
+ */
+@Table({ tableName: 'rol', timestamps: false })
+export class CatalogoRol extends Model {
+  @PrimaryKey
+  @AutoIncrement
+  @Column(DataType.SMALLINT.UNSIGNED)
+  declare id: number;
+
+  @Unique
+  @AllowNull(false)
+  @Column(DataType.STRING(30))
+  declare clave: string;
+
+  @AllowNull(false)
+  @Column(DataType.STRING(60))
+  declare nombre: string;
+
+  @Default(true)
+  @Column(DataType.BOOLEAN)
+  declare activo: boolean;
+}
 
 @Table({ tableName: 'usuario', timestamps: false })
 export class Usuario extends Model {
@@ -147,10 +177,16 @@ export class Usuario extends Model {
   @Column(DataType.STRING(10))
   declare extension: string | null;
 
+  /**
+   * STRING, no ENUM: el catalogo de roles (CatalogoRol, tabla `rol`) permite
+   * dar de alta claves nuevas desde la pantalla de admin, y un ENUM de MySQL
+   * las rechazaria de entrada. Las que el codigo SI reconoce para permisos
+   * siguen siendo las del tipo `Rol` de arriba.
+   */
   @Index('ix_usuario_rol')
   @Default('solicitante')
-  @Column(DataType.ENUM('solicitante', 'tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'))
-  declare rol: Rol;
+  @Column(DataType.STRING(30))
+  declare rol: string;
 
   @Default(true)
   @Column(DataType.BOOLEAN)
@@ -164,6 +200,10 @@ export class Usuario extends Model {
 
   @HasMany(() => TecnicoServicio)
   declare especialidades: TecnicoServicio[];
+
+  /** Solo rol validador: dependencias que revisa (ver DependenciaValidador). */
+  @HasMany(() => DependenciaValidador)
+  declare validaciones: DependenciaValidador[];
 }
 
 /** §3 · tipos de servicio. */
@@ -247,6 +287,39 @@ export class ServicioUsuarioPermitido extends Model {
 
   @BelongsTo(() => Servicio)
   declare servicio: Servicio;
+}
+
+/**
+ * §16 · a que dependencia(s) valida cada usuario con rol validador. Si una
+ * dependencia tiene al menos una fila aqui, los tickets que un gestor
+ * registre para gente de esa dependencia quedan pendientes de validacion
+ * (ver TicketsService.crear). Administrable: nada hardcodeado por nombre de
+ * dependencia, igual criterio que ServicioUsuarioPermitido.
+ */
+@Table({ tableName: 'dependencia_validador', timestamps: false })
+export class DependenciaValidador extends Model {
+  @PrimaryKey
+  @AutoIncrement
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare id: number;
+
+  @ForeignKey(() => Dependencia)
+  @AllowNull(false)
+  @Unique('uq_dependencia_validador')
+  @Column(DataType.SMALLINT.UNSIGNED)
+  declare dependencia_id: number;
+
+  @ForeignKey(() => Usuario)
+  @AllowNull(false)
+  @Unique('uq_dependencia_validador')
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare usuario_id: number;
+
+  @BelongsTo(() => Dependencia)
+  declare dependencia: Dependencia;
+
+  @BelongsTo(() => Usuario)
+  declare usuario: Usuario;
 }
 
 /** §7 · especialidad del tecnico. */

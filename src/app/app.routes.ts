@@ -14,20 +14,39 @@ export const routes: Routes = [
     children: [
       {
         path: 'tickets',
-        canActivate: [guardRol('admin', 'operador')],
+        canActivate: [guardRol('admin', 'operador', 'gestor', 'validador')],
         loadComponent: () => import('./paginas/tickets/tickets').then((m) => m.Tickets),
       },
       {
         path: 'nuevo',
         canActivate: [
-          guardRol('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor'),
+          guardRol(
+            'solicitante',
+            'admin',
+            'operador',
+            'gestor',
+            'validador',
+            'tecnico',
+            'jefe',
+            'proveedor',
+          ),
         ],
         loadComponent: () => import('./paginas/solicitante/nuevo').then((m) => m.Nuevo),
       },
       {
         path: 'mis-tickets',
-        canActivate: [guardRol('solicitante', 'admin', 'gestor', 'tecnico', 'jefe', 'proveedor')],
+        canActivate: [
+          guardRol('solicitante', 'admin', 'gestor', 'validador', 'tecnico', 'jefe', 'proveedor'),
+        ],
         loadComponent: () => import('./paginas/solicitante/mis-tickets').then((m) => m.MisTickets),
+      },
+      {
+        path: 'tickets-por-validar',
+        canActivate: [guardRol('validador')],
+        loadComponent: () =>
+          import('./paginas/tickets-por-validar/tickets-por-validar').then(
+            (m) => m.TicketsPorValidar,
+          ),
       },
       {
         path: 'bandeja',
@@ -75,6 +94,12 @@ export const routes: Routes = [
         path: 'usuarios',
         canActivate: [guardRol('admin')],
         loadComponent: () => import('./paginas/usuarios/usuarios').then((m) => m.Usuarios),
+      },
+      {
+        path: 'catalogo-roles',
+        canActivate: [guardRol('admin')],
+        loadComponent: () =>
+          import('./paginas/catalogo-roles/catalogo-roles').then((m) => m.CatalogoRoles),
       },
       {
         path: 'prioridades',

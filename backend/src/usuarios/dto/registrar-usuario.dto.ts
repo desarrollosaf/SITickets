@@ -1,7 +1,5 @@
-import { IsEmail, IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
-
-const ROLES_STAFF = ['tecnico', 'jefe', 'admin', 'proveedor', 'operador', 'gestor'];
 
 /**
  * Alta de personal interno. El nombre, rfc y dependencia NO vienen del
@@ -24,12 +22,21 @@ export class RegistrarUsuarioDto {
   @MaxLength(10)
   extension?: string;
 
-  @IsIn(ROLES_STAFF, { message: 'El rol debe ser tecnico, jefe, admin, proveedor, operador o gestor' })
-  rol!: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
+  /** Se valida contra el catalogo de roles (CatalogoRol) en el service, no aqui con una lista fija. */
+  @IsString()
+  @MinLength(2)
+  @MaxLength(30)
+  rol!: string;
 
   /** Servicios de los que sera tecnico (tecnico_servicio), uno o varios. Solo aplica si rol es tecnico. */
   @IsOptional()
   @Type(() => Number)
   @IsInt({ each: true })
   servicio_ids?: number[];
+
+  /** Dependencias que valida (dependencia_validador), una o varias. Solo aplica si rol es validador. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  dependencia_ids?: number[];
 }

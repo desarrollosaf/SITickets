@@ -15,6 +15,7 @@ import {
   Area,
   CatalogoProblema,
   Dependencia,
+  DependenciaValidador,
   ESTATUS,
   ESTATUS_FINALES,
   EstatusClave,
@@ -102,6 +103,8 @@ export class TicketsService {
     @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
+    @InjectModel(DependenciaValidador)
+    private readonly dependenciaValidador: typeof DependenciaValidador,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     @InjectModel(SDireccion, 'saf') private readonly sDirecciones: typeof SDireccion,
@@ -144,17 +147,38 @@ export class TicketsService {
     modo: 'todo' | 'propios' | 'turnados' = 'todo',
   ): Promise<Record<string, unknown>> {
     /** El operador ve todo, igual que el administrador, pero no administra catalogos. */
-    if (usuario.rol === 'admin' || usuario.rol === 'operador') return {};
+    if (usuario.rol === 'admin' || usuario.rol === 'operador') {
+      if (modo === 'propios') {
+        return {
+          [Op.or]: [{ solicitante_id: usuario.id }, { registrado_por: usuario.id }],
+        };
+      }
+      return {};
+    }
     if (usuario.rol === 'solicitante') return { solicitante_id: usuario.id };
     /**
-     * El gestor ve su propio historico (lo que registro para si mismo) y lo
-     * que registro a nombre de otros (ahi solicitante_id es el id de esa
-     * otra persona, no el suyo; por eso se busca tambien por registrado_por).
+     * "Mis tickets" (modo 'propios'): solo lo que el gestor/validador
+     * registro a su propio nombre, como cualquier solicitante — no lo que
+     * registro a nombre de otros, eso vive en "Tickets generados". Lo que
+     * tiene en validacion (a su nombre o a nombre de otro) sigue aparte, en
+     * misPorValidar().
+     *
+     * "Tickets generados" (modo 'todo'): todo lo de su(s) dependencia(s)
+     * —de cualquier solicitante, lo haya registrado el o no— igual que el
+     * patron ya usado en porValidar(): para el validador, las dependencias
+     * que tiene asignadas en dependencia_validador; para el gestor, la suya
+     * propia (resuelta via saf).
      */
-    if (usuario.rol === 'gestor') {
-      return {
-        [Op.or]: [{ solicitante_id: usuario.id }, { registrado_por: usuario.id }],
-      };
+    if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
+      if (modo === 'todo') {
+        const dependenciaIds =
+          usuario.rol === 'validador'
+            ? await this.dependenciasDe(usuario.id)
+            : await this.dependenciasDelGestor(usuario.id);
+        if (!dependenciaIds.length) return { id: null };
+        return { dependencia_id: { [Op.in]: dependenciaIds } };
+      }
+      return { solicitante_id: usuario.id };
     }
     if (ROLES_TECNICOS.includes(usuario.rol)) {
       /*
@@ -200,6 +224,15 @@ export class TicketsService {
     const modo =
       filtros.propios === 'true' ? 'propios' : filtros.turnados === 'true' ? 'turnados' : 'todo';
     const where: Record<string | symbol, unknown> = { ...(await this.alcance(usuario, modo)) };
+
+    /*
+     * §16 pendientes de validacion (o rechazados ahi) nunca aparecen en
+     * ningun listado normal —"Tickets generados", "Mis tickets", bandeja—.
+     * El gestor los ve aparte en mis-por-validar(); el validador en
+     * por-validar(). Ninguna de esas dos pasa por construyeFiltro().
+     */
+    where.pendiente_validacion = false;
+    where.motivo_rechazo_validacion = { [Op.is]: null };
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;
@@ -381,8 +414,11 @@ export class TicketsService {
       const servicio = t.servicio?.nombre ?? 'Sin clasificar';
       porServicio.set(servicio, (porServicio.get(servicio) ?? 0) + 1);
       if (ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440)) vencidos++;
-      const mes = new Date(t.f_registro).toISOString().slice(0, 7);
-      porMes.set(mes, (porMes.get(mes) ?? 0) + 1);
+      /* Pendiente de validacion: f_registro aun no existe, no cuenta por mes todavia. */
+      if (t.f_registro) {
+        const mes = new Date(t.f_registro).toISOString().slice(0, 7);
+        porMes.set(mes, (porMes.get(mes) ?? 0) + 1);
+      }
 
       if (esHoy(t.f_registro)) recibidosHoy++;
       if (t.estatus === ESTATUS.EN_ATENCION) enCurso++;
@@ -531,6 +567,7 @@ export class TicketsService {
       problema_id: t.problema_id,
       problema: t.problema?.descripcion ?? 'Sin clasificar',
       problema_clave: t.problema?.clave ?? '',
+      campo_adicional: t.problema?.campo_adicional ?? null,
       prioridad: t.prioridad,
       estatus: t.estatus,
       contexto: t.contexto,
@@ -557,6 +594,10 @@ export class TicketsService {
       tecnico: t.tecnico?.nombre ?? null,
       interno: t.interno,
       f_registro: t.f_registro,
+      pendiente_validacion: t.pendiente_validacion,
+      f_captura: t.f_captura,
+      validado_por_nombre: t.validado_por_nombre,
+      motivo_rechazo_validacion: t.motivo_rechazo_validacion,
       en_cola: t.en_cola,
       escalado: t.escalado,
       reclasificado: t.reclasificado,
@@ -600,9 +641,13 @@ export class TicketsService {
       const quien = await this.usuarios.findByPk(usuario.id);
       if (!quien) throw new ForbiddenException('Sesion invalida');
       const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
+      /* Usuario.dependencia_id es solo la foto del alta: se resuelve de
+         nuevo via saf (rfc) y esa gana; si no se puede identificar en saf
+         (sin rfc, o sin match), se usa la columna local como respaldo. */
+      const dependenciaSaf = await this.dependenciaLocalSafDe(quien.id);
       return {
         nombre: quien.nombre,
-        dependencia_id: quien.dependencia_id,
+        dependencia_id: dependenciaSaf ?? quien.dependencia_id,
         area_id: quien.area_id,
         sede_id: area?.sede_id ?? null,
         extension: quien.extension,
@@ -666,7 +711,7 @@ export class TicketsService {
     if (texto.length < 3) return [];
 
     const where: Record<string, unknown> = { Estado: 1, Nombre: { [Op.like]: `%${texto}%` } };
-    if (usuario.rol === 'gestor') {
+    if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
       const dependenciaSaf = await this.dependenciaSafDeGestor(usuario.id);
       if (!dependenciaSaf) return [];
       where.id_Dependencia = dependenciaSaf;
@@ -759,7 +804,7 @@ export class TicketsService {
      * solicitante_nombre en vez de confiar en el join. registrado_por deja
      * rastro de quien lo dio de alta realmente (siempre un usuario.id local).
      */
-    const ROLES_A_NOMBRE_DE = ['admin', 'operador', 'gestor'];
+    const ROLES_A_NOMBRE_DE = ['admin', 'operador', 'gestor', 'validador'];
     let quien: {
       nombre: string;
       dependencia_id: number | null;
@@ -786,8 +831,8 @@ export class TicketsService {
       const datos = await this.datosSaf(dto.a_nombre_de);
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
 
-      /* El gestor solo registra a nombre de gente de su misma dependencia (saf). */
-      if (usuario.rol === 'gestor') {
+      /* El gestor (y el validador, que ve lo mismo) solo registra a nombre de gente de su misma dependencia (saf). */
+      if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
         const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([
           this.dependenciaSafDeGestor(usuario.id),
           this.sUsuarios.findByPk(dto.a_nombre_de),
@@ -807,6 +852,17 @@ export class TicketsService {
       quien = await this.resolverQuien(usuario);
       solicitanteId = usuario.id;
     }
+
+    /*
+     * §16 validacion previa (rol validador, ver DependenciaValidador): si
+     * quien registra es gestor y la dependencia del solicitante tiene al
+     * menos un validador asignado, el ticket queda congelado —sin tecnico,
+     * sin SLA corriendo— hasta que un validador lo revise.
+     */
+    const requiereValidacion =
+      usuario.rol === 'gestor' &&
+      !!quien.dependencia_id &&
+      (await this.dependenciaValidador.count({ where: { dependencia_id: quien.dependencia_id } })) > 0;
 
     const ticket = await this.db.transaction(async (tx) => {
       /*
@@ -839,6 +895,9 @@ export class TicketsService {
           color_toner: CLAVES_TONER.includes(problema.clave) ? dto.color_toner!.trim() : null,
           modelo_traslado: problema.clave === 'IMPA-09' ? dto.modelo_traslado!.trim() : null,
           texto_libre: problema.requiere_texto ? dto.texto!.trim() : null,
+          pendiente_validacion: requiereValidacion,
+          f_captura: new Date(),
+          f_registro: requiereValidacion ? null : new Date(),
         },
         { transaction: tx },
       );
@@ -864,12 +923,168 @@ export class TicketsService {
         `Prioridad ${problema.prioridad} asignada por catalogo (${problema.clave}). El usuario no la eligio.`,
       );
 
-      await this.reglas.revisaEscalamiento(t, tx);
-      await this.reglas.asignar(t, tx);
+      if (requiereValidacion) {
+        await this.reglas.anota(
+          t.id,
+          usuario.id,
+          'Pendiente de validacion',
+          'Este ticket requiere revision de un validador antes de turnarse a tecnico.',
+          tx,
+        );
+        this.traza.registra('§16', `Ticket ${folio} queda pendiente de validacion.`);
+      } else {
+        await this.reglas.revisaEscalamiento(t, tx);
+        await this.reglas.asignar(t, tx);
+      }
       return t;
     });
 
     return this.detalle(ticket.id, usuario);
+  }
+
+  /* ==================================================================
+     §16 · validacion previa (rol validador)
+     ================================================================== */
+
+  /** Dependencias que este usuario valida. Vacio si no tiene ninguna asignada. */
+  private async dependenciasDe(usuarioId: number): Promise<number[]> {
+    const filas = await this.dependenciaValidador.findAll({ where: { usuario_id: usuarioId } });
+    return filas.map((f) => f.dependencia_id);
+  }
+
+  /**
+   * Dependencia que un gestor atiende: no es Usuario.dependencia_id (esa es
+   * donde el gestor mismo trabaja, p.ej. "Area de informatica"), sino la
+   * dependencia (saf) de la gente a la que registra tickets — el mismo
+   * calculo que ya limita a quien puede buscar en buscarSolicitantes().
+   * Vacio si no se le puede identificar dependencia (sin rfc o sin match).
+   */
+  private async dependenciasDelGestor(usuarioId: number): Promise<number[]> {
+    const local = await this.dependenciaLocalSafDe(usuarioId);
+    return local ? [local] : [];
+  }
+
+  /**
+   * Dependencia (id local) de cualquier usuario local, resuelta siempre via
+   * saf (rfc -> s_usuario.id_Dependencia -> nombre -> dependencia local).
+   * Usuario.dependencia_id es una copia que se fija solo una vez, al dar de
+   * alta (ver UsuariosService.registrar()), y no se actualiza si la persona
+   * cambia de dependencia en saf despues — por eso no es la fuente de verdad.
+   * Null si no se le puede identificar en saf (sin rfc o sin match).
+   */
+  private async dependenciaLocalSafDe(usuarioId: number): Promise<number | null> {
+    const idSaf = await this.dependenciaSafDeGestor(usuarioId);
+    return this.resolverDependenciaSaf(idSaf);
+  }
+
+  /** Bandeja del validador: tickets pendientes de las dependencias que tiene asignadas. */
+  async porValidar(usuario: UsuarioToken) {
+    const dependenciaIds = await this.dependenciasDe(usuario.id);
+    if (!dependenciaIds.length) return [];
+
+    const filas = await this.tickets.findAll({
+      where: { pendiente_validacion: true, dependencia_id: { [Op.in]: dependenciaIds } },
+      include: INCLUDES,
+      order: [['f_captura', 'ASC']],
+    });
+    const objetivos = await this.reglas.objetivos();
+    return filas.map((t) => this.resumen(t, objetivos, 0));
+  }
+
+  /**
+   * Lo que un gestor registro y sigue (o quedo) en validacion. Sin folio:
+   * mientras no se apruebe no es un ticket real para efectos del gestor,
+   * solo un aviso de en que quedo su solicitud.
+   */
+  async misPorValidar(usuario: UsuarioToken) {
+    const filas = await this.tickets.findAll({
+      where: {
+        [Op.and]: [
+          { [Op.or]: [{ solicitante_id: usuario.id }, { registrado_por: usuario.id }] },
+          {
+            [Op.or]: [
+              { pendiente_validacion: true },
+              { motivo_rechazo_validacion: { [Op.ne]: null } },
+            ],
+          },
+        ],
+      },
+      include: INCLUDES,
+      order: [['f_captura', 'DESC']],
+    });
+    return filas.map((t) => ({
+      id: t.id,
+      problema: t.problema?.descripcion ?? 'Sin clasificar',
+      servicio: t.servicio?.nombre ?? '—',
+      contexto: t.contexto,
+      f_captura: t.f_captura,
+      pendiente_validacion: t.pendiente_validacion,
+      motivo_rechazo_validacion: t.motivo_rechazo_validacion,
+    }));
+  }
+
+  private async ticketPendienteDeMiDependencia(id: number, usuario: UsuarioToken): Promise<Ticket> {
+    const t = await this.tickets.findByPk(id);
+    if (!t) throw new NotFoundException('El ticket no existe');
+    if (!t.pendiente_validacion) {
+      throw new BadRequestException('Ese ticket ya no esta pendiente de validacion');
+    }
+    const dependenciaIds = await this.dependenciasDe(usuario.id);
+    if (!t.dependencia_id || !dependenciaIds.includes(t.dependencia_id)) {
+      throw new ForbiddenException('No validas tickets de esa dependencia');
+    }
+    return t;
+  }
+
+  async aprobarValidacion(id: number, usuario: UsuarioToken) {
+    const t = await this.ticketPendienteDeMiDependencia(id, usuario);
+
+    await this.db.transaction(async (tx) => {
+      await t.update(
+        {
+          pendiente_validacion: false,
+          f_registro: new Date(),
+          validado_por: usuario.id,
+          validado_por_nombre: usuario.nombre,
+        },
+        { transaction: tx },
+      );
+      await this.reglas.anota(
+        t.id,
+        usuario.id,
+        'Validado',
+        'El ticket paso la revision y entra al flujo normal.',
+        tx,
+      );
+      await this.reglas.revisaEscalamiento(t, tx);
+      await this.reglas.asignar(t, tx);
+    });
+    this.traza.registra('§16', `Ticket ${t.folio} validado por ${usuario.nombre}.`);
+
+    /* No this.detalle(id, usuario): el validador deja de tener alcance sobre
+       el ticket en cuanto deja de estar pendiente (su alcance es el mismo
+       que el de un gestor, por solicitante_id/registrado_por). */
+    return { id: t.id };
+  }
+
+  async rechazarValidacion(id: number, motivo: string, usuario: UsuarioToken) {
+    const t = await this.ticketPendienteDeMiDependencia(id, usuario);
+    const limpio = motivo.trim();
+    if (!limpio) throw new BadRequestException('Indica el motivo del rechazo');
+
+    await t.update({
+      pendiente_validacion: false,
+      estatus: ESTATUS.CANCELADO,
+      f_cancelacion: new Date(),
+      motivo_cancelacion: limpio,
+      motivo_rechazo_validacion: limpio,
+      validado_por: usuario.id,
+      validado_por_nombre: usuario.nombre,
+    });
+    await this.reglas.anota(t.id, usuario.id, 'Rechazado en validacion', limpio);
+    this.traza.registra('§16', `Ticket ${t.folio} rechazado en validacion por ${usuario.nombre}: ${limpio}`);
+
+    return { id: t.id };
   }
 
   /* ==================================================================

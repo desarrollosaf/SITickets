@@ -3,8 +3,16 @@ import { FormsModule } from '@angular/forms';
 import { UsuariosService } from '../../core/usuarios.service';
 import { TicketsService } from '../../core/tickets.service';
 import { mensajeError, quitarAcentos } from '../../core/formato';
-import type { CandidatoSaf, Servicio, UsuarioStaff } from '../../core/modelos';
+import type { CandidatoSaf, RolCatalogo, Servicio, UsuarioStaff } from '../../core/modelos';
 
+interface DependenciaOpcion {
+  id: number;
+  nombre: string;
+}
+
+/* Mapa de respaldo para roles historicos: un rol nuevo del catalogo (ver
+ * RolCatalogo) usa directamente su `nombre` y el estilo por omision del
+ * badge, sin necesidad de tocar este mapa. */
 const NOMBRE_ROL: Record<string, string> = {
   tecnico: 'Técnico',
   jefe: 'Jefe de departamento',
@@ -75,22 +83,37 @@ export class Usuarios {
 
   correo = '';
   extension = '';
-  rol: '' | 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = '';
+  rol = '';
   servicioIds: number[] = [];
+  dependenciaIds: number[] = [];
 
   /* ---------------- tipo(s) de servicio (solo si rol es tecnico) ---------------- */
 
   readonly servicios = signal<Servicio[]>([]);
+  /** Activos y distintos de "solicitante": lo que puede elegirse al dar de alta personal. */
+  readonly roles = signal<RolCatalogo[]>([]);
+  /** Solo rol validador: dependencias que puede revisar antes de turnar a tecnico. */
+  readonly dependencias = signal<DependenciaOpcion[]>([]);
 
   /** Metodo normal, no computed(): rol es una propiedad plana que cambia por ngModel. */
   mostrarServicio() {
     return this.rol === 'tecnico';
   }
 
+  mostrarDependencias() {
+    return this.rol === 'validador';
+  }
+
   alternarServicio(id: number) {
     this.servicioIds = this.servicioIds.includes(id)
       ? this.servicioIds.filter((s) => s !== id)
       : [...this.servicioIds, id];
+  }
+
+  alternarDependencia(id: number) {
+    this.dependenciaIds = this.dependenciaIds.includes(id)
+      ? this.dependenciaIds.filter((d) => d !== id)
+      : [...this.dependenciaIds, id];
   }
 
   /* ---------------- personal ya registrado ---------------- */
@@ -102,6 +125,10 @@ export class Usuarios {
 
   constructor() {
     this.tickets.catalogos().subscribe({ next: (c) => this.servicios.set(c.servicios) });
+    this.tickets.roles().subscribe({
+      next: (r) => this.roles.set(r.filter((x) => x.activo && x.clave !== 'solicitante')),
+    });
+    this.tickets.organizacion().subscribe({ next: (o) => this.dependencias.set(o.dependencias) });
     this.cargarStaff();
   }
 
@@ -156,6 +183,7 @@ export class Usuarios {
     this.extension = '';
     this.rol = '';
     this.servicioIds = [];
+    this.dependenciaIds = [];
     this.errorForm.set('');
     this.aviso.set('');
   }
@@ -182,6 +210,8 @@ export class Usuarios {
         extension: this.extension.trim() || undefined,
         rol: this.rol,
         servicio_ids: this.mostrarServicio() && this.servicioIds.length ? this.servicioIds : undefined,
+        dependencia_ids:
+          this.mostrarDependencias() && this.dependenciaIds.length ? this.dependenciaIds : undefined,
       })
       .subscribe({
         next: (r) => {
@@ -203,13 +233,18 @@ export class Usuarios {
   readonly guardandoEdicion = signal(false);
   readonly errorEdicion = signal('');
 
-  editRol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor' = 'tecnico';
+  editRol = 'tecnico';
   editCorreo = '';
   editExtension = '';
   editServicioIds: number[] = [];
+  editDependenciaIds: number[] = [];
 
   mostrarServicioEdicion() {
     return this.editRol === 'tecnico';
+  }
+
+  mostrarDependenciasEdicion() {
+    return this.editRol === 'validador';
   }
 
   alternarServicioEdicion(id: number) {
@@ -218,12 +253,19 @@ export class Usuarios {
       : [...this.editServicioIds, id];
   }
 
+  alternarDependenciaEdicion(id: number) {
+    this.editDependenciaIds = this.editDependenciaIds.includes(id)
+      ? this.editDependenciaIds.filter((d) => d !== id)
+      : [...this.editDependenciaIds, id];
+  }
+
   abrirEditar(u: UsuarioStaff) {
     this.editando.set(u);
-    this.editRol = u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
+    this.editRol = u.rol;
     this.editCorreo = u.correo ?? '';
     this.editExtension = u.extension ?? '';
     this.editServicioIds = [...u.servicio_ids];
+    this.editDependenciaIds = [...u.dependencia_ids_validador];
     this.errorEdicion.set('');
   }
 
@@ -242,6 +284,7 @@ export class Usuarios {
         correo: this.editCorreo.trim() || undefined,
         extension: this.editExtension.trim() || undefined,
         servicio_ids: this.mostrarServicioEdicion() ? this.editServicioIds : undefined,
+        dependencia_ids: this.mostrarDependenciasEdicion() ? this.editDependenciaIds : undefined,
         activo: u.activo,
       })
       .subscribe({
@@ -261,10 +304,11 @@ export class Usuarios {
   alternarActivo(u: UsuarioStaff) {
     this.api
       .actualizar(u.id, {
-        rol: u.rol as 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor',
+        rol: u.rol,
         correo: u.correo ?? undefined,
         extension: u.extension ?? undefined,
         servicio_ids: u.servicio_ids,
+        dependencia_ids: u.dependencia_ids_validador,
         activo: !u.activo,
       })
       .subscribe({

@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 import { AuthService } from '../core/auth.service';
+import { CopiadosService } from '../core/copiados.service';
 import { banderas, duracion, etiquetaEstatus } from '../core/formato';
 import type { Ticket } from '../core/modelos';
 
@@ -53,6 +54,9 @@ import type { Ticket } from '../core/modelos';
                 <tr (click)="abrir.emit(t.id)"
                     [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'">
                   <td>
+                    @if (esAdminUOperador() && copiados.estaCopiado(t.id)) {
+                      <span class="punto-copiado" title="Datos copiados"></span>
+                    }
                     <span class="folio">{{ esSolicitante() ? t.folio_general : t.folio }}</span>
                     @if (t.reclasificado) {
                       <div class="sub" style="font-size: 0.7rem">prefijo original</div>
@@ -111,6 +115,7 @@ import type { Ticket } from '../core/modelos';
 })
 export class TablaTickets {
   private readonly auth = inject(AuthService);
+  readonly copiados = inject(CopiadosService);
 
   readonly tickets = input.required<Ticket[]>();
   readonly sinTecnico = input(false);

@@ -1,0 +1,89 @@
+<div class="mb-3">
+  <h1 class="h5 mb-1">Tickets por validar</h1>
+  <p class="sub mb-0">
+    Lo que un gestor registró para tu(s) dependencia(s). Mientras no lo apruebes, no se turna a
+    técnico ni cuenta el tiempo de atención.
+  </p>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+@if (cargando()) {
+  <div class="tarjeta p-5 text-center">
+    <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+  </div>
+} @else if (!tickets().length) {
+  <div class="tarjeta p-5 text-center">
+    <i class="bi bi-patch-check fs-2 sub d-block mb-2"></i>
+    <div class="fw-semibold">Sin pendientes</div>
+    <div class="sub">No hay tickets esperando tu revisión.</div>
+  </div>
+} @else {
+  <div class="d-flex flex-column gap-2">
+    @for (t of tickets(); track t.id) {
+      <div class="tarjeta p-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-semibold">{{ t.problema }}</div>
+            <div class="sub" style="font-size: 0.85rem">
+              {{ t.servicio }} · {{ t.solicitante }} · {{ t.dependencia }}
+            </div>
+            @if (modelo(t)) {
+              <div class="sub" style="font-size: 0.82rem">Modelo: {{ modelo(t) }}</div>
+            }
+            @if (t.color_toner) {
+              <div class="sub" style="font-size: 0.82rem">Color de tóner: {{ t.color_toner }}</div>
+            }
+            @if (t.contexto && t.campo_adicional && t.campo_adicional !== 'Modelo de impresora') {
+              <div class="sub" style="font-size: 0.82rem">{{ t.campo_adicional }}: {{ t.contexto }}</div>
+            }
+            <div class="sub" style="font-size: 0.78rem">Capturado {{ fmt(t.f_captura) }}</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-danger btn-sm" [disabled]="ocupado() === t.id"
+                    (click)="abrirRechazo(t)">
+              Rechazar
+            </button>
+            <button class="btn btn-primary btn-sm" [disabled]="ocupado() === t.id" (click)="aprobar(t)">
+              @if (ocupado() === t.id) {
+                <span class="spinner-border spinner-border-sm me-1"></span>
+              }
+              Aprobar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+@if (mostrarRechazo()) {
+  <div class="cajon-fondo" (click)="cerrarRechazo()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(480px, 94vw)">
+    <h2 class="h6 mb-1">Rechazar ticket</h2>
+    <p class="sub small mb-3">
+      {{ ticketARechazar()?.problema }} · {{ ticketARechazar()?.solicitante }}
+    </p>
+
+    <label class="form-label small fw-semibold" for="rv-motivo">Motivo del rechazo</label>
+    <textarea id="rv-motivo" class="form-control" rows="3" [(ngModel)]="motivo" name="motivo"
+              placeholder="Explica por que no procede…"></textarea>
+
+    @if (errorRechazo()) {
+      <div class="alert alert-danger py-2 small mt-2">{{ errorRechazo() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end mt-3">
+      <button class="btn btn-outline-secondary" (click)="cerrarRechazo()">Cancelar</button>
+      <button class="btn btn-danger" [disabled]="guardandoRechazo()" (click)="confirmarRechazo()">
+        @if (guardandoRechazo()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Rechazar
+      </button>
+    </div>
+  </div>
+}

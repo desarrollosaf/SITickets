@@ -116,7 +116,8 @@ export class MonitorService {
         .sort((a, b) => {
           const d = ORDEN_PRI[a.prioridad] - ORDEN_PRI[b.prioridad];
           if (d !== 0) return d;
-          return new Date(a.f_registro).getTime() - new Date(b.f_registro).getTime();
+          /* f_registro solo es null en pendiente_validacion, que nunca llega a ASIGNADO/en_cola. */
+          return new Date(a.f_registro!).getTime() - new Date(b.f_registro!).getTime();
         })
         .map(async (t, i) => {
           /* Departamento del solicitante en saf, no el dependencia_id local
@@ -131,7 +132,7 @@ export class MonitorService {
             servicio: t.servicio?.nombre ?? '—',
             departamento: org.departamento ?? '—',
             tecnico: t.tecnico?.nombre ?? null,
-            min_espera: Math.round((Date.now() - new Date(t.f_registro).getTime()) / 60_000),
+            min_espera: Math.round((Date.now() - new Date(t.f_registro!).getTime()) / 60_000),
           };
         }),
     );

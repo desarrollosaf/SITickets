@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/c
 import { InjectModel } from '@nestjs/sequelize';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { Area, Dependencia, SUsuario, Usuario, UserSaf } from '../database/models';
+import { Area, Dependencia, SDependencia, SUsuario, Usuario, UserSaf } from '../database/models';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
 import { CambiarPasswordDto, LoginDto } from './dto/auth.dto';
@@ -31,8 +31,10 @@ export interface SesionRespuesta {
 export class AuthService {
   constructor(
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
+    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(UserSaf, 'saf') private readonly usuariosSaf: typeof UserSaf,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
+    @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     private readonly jwt: JwtService,
   ) {}
 
@@ -69,7 +71,7 @@ export class AuthService {
     if (local?.activo) {
       return {
         token: this.jwt.sign({ sub: local.id, rol: local.rol, externo: false }),
-        usuario: this.resumen(local),
+        usuario: await this.resumen(local),
       };
     }
 
@@ -136,19 +138,39 @@ export class AuthService {
       include: [Dependencia, Area],
     });
     if (!local) throw new UnauthorizedException('Sesion invalida');
-    return this.resumen(local);
+    return await this.resumen(local);
   }
 
-  private resumen(usuario: Usuario) {
+  /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
+  private async resolverDependenciaSaf(idSaf: number | null): Promise<Dependencia | null> {
+    if (!idSaf) return null;
+    const sDep = await this.sDependencias.findByPk(idSaf);
+    if (!sDep) return null;
+    return this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
+  }
+
+  private async resumen(usuario: Usuario) {
+    /*
+     * Usuario.dependencia_id es solo la foto del alta (ver
+     * UsuariosService.registrar()): si la persona cambia de dependencia en
+     * saf despues esa columna se queda atrasada. Se resuelve de nuevo via
+     * saf (rfc); si no se puede (sin rfc o sin match), se usa la columna
+     * local como respaldo.
+     */
+    const sUsuario = usuario.rfc
+      ? await this.sUsuarios.findOne({ where: { N_Usuario: usuario.rfc } })
+      : null;
+    const dependenciaSaf = await this.resolverDependenciaSaf(sUsuario?.id_Dependencia ?? null);
+
     return {
       id: usuario.id,
       nombre: usuario.nombre,
       correo: usuario.correo,
       rol: usuario.rol,
       extension: usuario.extension,
-      dependencia: usuario.dependencia?.nombre ?? null,
+      dependencia: dependenciaSaf?.nombre ?? usuario.dependencia?.nombre ?? null,
       area: usuario.area?.nombre ?? null,
-      dependencia_id: usuario.dependencia_id,
+      dependencia_id: dependenciaSaf?.id ?? usuario.dependencia_id,
       area_id: usuario.area_id,
       siempreANombrePropio: !!usuario.rfc && RFC_SIEMPRE_A_NOMBRE_PROPIO.includes(usuario.rfc),
     };

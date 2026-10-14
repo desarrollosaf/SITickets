@@ -19,6 +19,7 @@ import {
   AgregarUsuarioPermitidoDto,
   CrearServicioDto,
 } from './dto/servicio.dto';
+import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -109,8 +110,28 @@ export class CatalogosController {
     return this.catalogos.actualizarPrioridad(clave, dto);
   }
 
-  /** Padron de tecnicos: lo consulta el admin/operador para reasignar. */
-  @Roles('admin', 'jefe', 'operador')
+  /* ---------------- catalogo de roles ---------------- */
+
+  @Roles('admin')
+  @Get('roles')
+  roles() {
+    return this.catalogos.roles();
+  }
+
+  @Roles('admin')
+  @Post('roles')
+  crearRol(@Body() dto: CrearRolDto) {
+    return this.catalogos.crearRol(dto);
+  }
+
+  @Roles('admin')
+  @Patch('roles/:id')
+  actualizarRol(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarRolDto) {
+    return this.catalogos.actualizarRol(id, dto);
+  }
+
+  /** Padron de tecnicos: lo consulta el admin/operador para reasignar, y gestor/validador para filtrar su bandeja de "Tickets generados". */
+  @Roles('admin', 'jefe', 'operador', 'gestor', 'validador')
   @Get('tecnicos')
   tecnicos() {
     return this.catalogos.tecnicos();

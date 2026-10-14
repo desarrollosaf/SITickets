@@ -3,8 +3,9 @@ import { RouterLink } from '@angular/router';
 import { TablaTickets } from '../../comp/tabla-tickets';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import { TicketsService } from '../../core/tickets.service';
-import { mensajeError } from '../../core/formato';
-import type { Catalogos, Ticket } from '../../core/modelos';
+import { AuthService } from '../../core/auth.service';
+import { fecha, mensajeError } from '../../core/formato';
+import type { Catalogos, Ticket, TicketPorValidar } from '../../core/modelos';
 
 @Component({
   selector: 'app-mis-tickets',
@@ -24,10 +25,38 @@ import type { Catalogos, Ticket } from '../../core/modelos';
       <div class="alert alert-danger py-2 small">{{ error() }}</div>
     }
 
-    @if (porValidar().length) {
+    @if (porConfirmar().length) {
       <div class="alert alert-primary py-2 small">
-        Tienes <b>{{ porValidar().length }}</b> ticket(s) marcados como resueltos esperando tu
+        Tienes <b>{{ porConfirmar().length }}</b> ticket(s) marcados como resueltos esperando tu
         confirmación. Si no respondes en 3 días, el sistema los cierra por omisión.
+      </div>
+    }
+
+    @if (enValidacion().length) {
+      <div class="tarjeta p-3 mb-3">
+        <h2 class="h6 mb-2">En validación</h2>
+        <p class="sub small mb-3">
+          Lo que registraste y todavía no pasa por tu validador (o fue rechazado). Sin folio: mientras
+          no se apruebe no es un ticket real todavía.
+        </p>
+        <div class="d-flex flex-column gap-2">
+          @for (t of enValidacion(); track t.id) {
+            <div class="d-flex justify-content-between align-items-start gap-2 border-bottom pb-2">
+              <div>
+                <div class="fw-semibold" style="font-size: 0.9rem">{{ t.problema }}</div>
+                <div class="sub" style="font-size: 0.8rem">
+                  {{ t.servicio }}@if (t.contexto) { · {{ t.contexto }} }
+                </div>
+                <div class="sub" style="font-size: 0.75rem">Capturado {{ fmt(t.f_captura) }}</div>
+              </div>
+              @if (t.motivo_rechazo_validacion) {
+                <span class="chip chip-bandera">Rechazado: {{ t.motivo_rechazo_validacion }}</span>
+              } @else {
+                <span class="badge text-bg-warning-subtle text-warning-emphasis">Pendiente</span>
+              }
+            </div>
+          }
+        </div>
       </div>
     }
 
@@ -63,13 +92,18 @@ import type { Catalogos, Ticket } from '../../core/modelos';
 })
 export class MisTickets {
   private readonly api = inject(TicketsService);
+  private readonly auth = inject(AuthService);
 
   readonly tickets = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);
   readonly abierto = signal<number | null>(null);
   readonly error = signal('');
+  readonly fmt = fecha;
 
-  readonly porValidar = () => this.tickets().filter((t) => t.estatus === 'RESUELTO');
+  readonly porConfirmar = () => this.tickets().filter((t) => t.estatus === 'RESUELTO');
+
+  /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
+  readonly enValidacion = signal<TicketPorValidar[]>([]);
 
   readonly porPagina = 10;
   readonly paginaActual = signal(1);
@@ -93,6 +127,9 @@ export class MisTickets {
 
   constructor() {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
+    if (this.auth.rol() === 'gestor') {
+      this.api.misPorValidar().subscribe({ next: (r) => this.enValidacion.set(r) });
+    }
     this.cargar();
   }
 

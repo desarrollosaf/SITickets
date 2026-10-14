@@ -3,6 +3,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import {
   Area,
   CatalogoProblema,
+  CatalogoRol,
   Dependencia,
   Estatus,
   MotivoReasignacion,
@@ -31,6 +32,7 @@ import { CatalogosService } from './catalogos.service';
       Sede,
       Usuario,
       TecnicoServicio,
+      CatalogoRol,
     ]),
     SequelizeModule.forFeature([SUsuario], 'saf'),
   ],

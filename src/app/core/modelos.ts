@@ -9,7 +9,8 @@ export type Rol =
   | 'admin'
   | 'proveedor'
   | 'operador'
-  | 'gestor';
+  | 'gestor'
+  | 'validador';
 
 export type EstatusClave =
   | 'REGISTRADO'
@@ -39,6 +40,21 @@ export interface Sesion {
   usuario: UsuarioSesion;
 }
 
+/**
+ * §16 · lo que el gestor ve de sus propios tickets en validacion. Sin folio
+ * a proposito: mientras no se apruebe no es un ticket real para el, solo un
+ * aviso de en que quedo su solicitud.
+ */
+export interface TicketPorValidar {
+  id: number;
+  problema: string;
+  servicio: string;
+  contexto: string | null;
+  f_captura: string | null;
+  pendiente_validacion: boolean;
+  motivo_rechazo_validacion: string | null;
+}
+
 export interface Ticket {
   id: number;
   /** El vigente: TK/DI/N hasta el cierre real, luego TK/{servicio}/N. */
@@ -52,6 +68,8 @@ export interface Ticket {
   problema_id: number | null;
   problema: string;
   problema_clave: string;
+  /** Nombre del campo adicional del catalogo (ej. "Modelo de impresora"), o null si no aplica. */
+  campo_adicional: string | null;
   prioridad: string;
   estatus: EstatusClave;
   contexto: string | null;
@@ -80,7 +98,13 @@ export interface Ticket {
   tecnico_id: number | null;
   tecnico: string | null;
   interno: boolean;
-  f_registro: string;
+  /** null mientras pendiente_validacion: el SLA todavia no arranca. */
+  f_registro: string | null;
+  /** §16 validacion previa (rol validador). */
+  pendiente_validacion: boolean;
+  f_captura: string | null;
+  validado_por_nombre: string | null;
+  motivo_rechazo_validacion: string | null;
   en_cola: boolean;
   escalado: boolean;
   reclasificado: boolean;
@@ -176,6 +200,14 @@ export interface ProblemaForm {
   requiere_texto?: boolean;
   orden?: number;
   activo?: boolean;
+}
+
+/** Catalogo de roles administrable: solo etiqueta, sin permisos (ver CatalogoRol en backend). */
+export interface RolCatalogo {
+  id: number;
+  clave: string;
+  nombre: string;
+  activo: boolean;
 }
 
 export interface Servicio {
@@ -427,11 +459,15 @@ export interface UsuarioStaff {
   id: number;
   rfc: string | null;
   nombre: string;
-  rol: Rol;
+  /** string, no Rol: el catalogo de roles admite claves nuevas (ver RolCatalogo). */
+  rol: string;
   correo: string | null;
   extension: string | null;
   servicios: string[];
   servicio_ids: number[];
+  /** Solo rol validador: dependencias que revisa antes de turnar a tecnico. */
+  dependencias_validador: string[];
+  dependencia_ids_validador: number[];
   dependencia: string | null;
   area: string | null;
   activo: boolean;
@@ -441,16 +477,21 @@ export interface RegistrarUsuarioForm {
   id_usuario_saf: number;
   correo?: string;
   extension?: string;
-  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
+  /** Clave del catalogo de roles (ver RolCatalogo), no una lista cerrada. */
+  rol: string;
   /** Servicios de los que sera tecnico (tecnico_servicio), uno o varios. Solo aplica si rol es tecnico. */
   servicio_ids?: number[];
+  /** Dependencias que valida, una o varias. Solo aplica si rol es validador. */
+  dependencia_ids?: number[];
 }
 
 /** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
 export interface ActualizarUsuarioForm {
-  rol: 'tecnico' | 'jefe' | 'admin' | 'proveedor' | 'operador' | 'gestor';
+  /** Clave del catalogo de roles (ver RolCatalogo), no una lista cerrada. */
+  rol: string;
   correo?: string;
   extension?: string;
   servicio_ids?: number[];
+  dependencia_ids?: number[];
   activo?: boolean;
 }
