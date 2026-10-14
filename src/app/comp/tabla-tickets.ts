@@ -25,7 +25,7 @@ import type { Ticket } from '../core/modelos';
                 }
                 <th>Asunto</th>
                 <th style="width: 130px">Servicio</th>
-                @if (!esSolicitante()) {
+                @if (!esSolicitante() && !ocultaPrioTiempo()) {
                   <th style="width: 60px" [class.ordenable]="ordenable()" (click)="ordenable() && ordenar.emit('prioridad')">
                     Prio
                     @if (ordenable()) {
@@ -39,14 +39,16 @@ import type { Ticket } from '../core/modelos';
                 @if (!sinTecnico()) {
                   <th style="width: 150px">Técnico</th>
                 }
-                <th style="width: 110px" [class.ordenable]="ordenable()" (click)="ordenable() && ordenar.emit('tiempo')">
-                  Tiempo
-                  @if (ordenable()) {
-                    <i class="bi" [class.bi-caret-up-fill]="ordenPor() === 'tiempo' && ordenDir() === 'asc'"
-                       [class.bi-caret-down-fill]="ordenPor() !== 'tiempo' || ordenDir() === 'desc'"
-                       [class.activo]="ordenPor() === 'tiempo'"></i>
-                  }
-                </th>
+                @if (!ocultaPrioTiempo()) {
+                  <th style="width: 110px" [class.ordenable]="ordenable()" (click)="ordenable() && ordenar.emit('tiempo')">
+                    Tiempo
+                    @if (ordenable()) {
+                      <i class="bi" [class.bi-caret-up-fill]="ordenPor() === 'tiempo' && ordenDir() === 'asc'"
+                         [class.bi-caret-down-fill]="ordenPor() !== 'tiempo' || ordenDir() === 'desc'"
+                         [class.activo]="ordenPor() === 'tiempo'"></i>
+                    }
+                  </th>
+                }
               </tr>
             </thead>
             <tbody>
@@ -91,7 +93,7 @@ import type { Ticket } from '../core/modelos';
                     }
                   </td>
                   <td class="sub">{{ t.servicio }}</td>
-                  @if (!esSolicitante()) {
+                  @if (!esSolicitante() && !ocultaPrioTiempo()) {
                     <td><span class="chip" [class]="'chip-' + t.prioridad">{{ t.prioridad }}</span></td>
                   }
                   <td>
@@ -100,10 +102,12 @@ import type { Ticket } from '../core/modelos';
                   @if (!sinTecnico()) {
                     <td class="sub">{{ t.tecnico || 'Por definir' }}</td>
                   }
-                  <td class="sub">
-                    <span [class.vencido]="t.vencido">{{ dur(t.min_activo) }}</span>
-                    <div class="sub" style="font-size: 0.7rem">meta {{ dur(t.minutos_objetivo) }}</div>
-                  </td>
+                  @if (!ocultaPrioTiempo()) {
+                    <td class="sub">
+                      <span [class.vencido]="t.vencido">{{ dur(t.min_activo) }}</span>
+                      <div class="sub" style="font-size: 0.7rem">meta {{ dur(t.minutos_objetivo) }}</div>
+                    </td>
+                  }
                 </tr>
               }
             </tbody>
@@ -140,6 +144,10 @@ export class TablaTickets {
   /** Admin/operador ven ademas el folio general (TK/DI/N), aparte del folio vigente. */
   readonly esAdminUOperador = computed(() =>
     ['admin', 'operador'].includes(this.auth.rol() ?? ''),
+  );
+  /** Gestor/validador no gestionan la operacion tecnica: Prio y Tiempo no les sirven. */
+  readonly ocultaPrioTiempo = computed(() =>
+    ['gestor', 'validador'].includes(this.auth.rol() ?? ''),
   );
 
   estatus(t: Ticket) {

@@ -1,8 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { TablaTickets } from '../../comp/tabla-tickets';
 import { DetalleTicket } from '../../comp/detalle-ticket';
+import { AuthService } from '../../core/auth.service';
 import { TicketsService, type FiltrosTicket } from '../../core/tickets.service';
 import { mensajeError, quitarAcentos } from '../../core/formato';
 import type { Catalogos, Tecnico, Ticket } from '../../core/modelos';
@@ -14,6 +15,10 @@ import type { Catalogos, Tecnico, Ticket } from '../../core/modelos';
 })
 export class Tickets {
   private readonly api = inject(TicketsService);
+  private readonly auth = inject(AuthService);
+
+  /** Gestor/validador solo buscan por nombre/folio: el resto de filtros es jerga operativa que no les toca. */
+  readonly esAdminUOperador = computed(() => ['admin', 'operador'].includes(this.auth.rol() ?? ''));
 
   readonly tickets = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);

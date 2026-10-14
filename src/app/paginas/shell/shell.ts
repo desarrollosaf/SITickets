@@ -16,6 +16,8 @@ interface Opcion {
   manual?: 'solicitante' | 'tecnico' | 'administrador';
   etiqueta: string;
   icono: string;
+  grupo?: 'Tickets' | 'Operación' | 'Catálogos' |
+          'Administración' | 'Reportes' | 'Ayuda';
 }
 
 /** Menu por rol. Cada perfil ve solo las pantallas de su trabajo. */
@@ -27,11 +29,13 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
     { ruta: '/disponibilidad', etiqueta: 'Disponibilidad', icono: 'bi-calendar3' },
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
-    { ruta: '/catalogo-servicios', etiqueta: 'Catálogo de servicios', icono: 'bi-diagram-3' },
-    { ruta: '/catalogo-problemas', etiqueta: 'Catálogo de problemas', icono: 'bi-list-check' },
-    { ruta: '/prioridades', etiqueta: 'Prioridades', icono: 'bi-speedometer2' },
+    { ruta: '/catalogo-servicios', etiqueta: 'Catálogo de servicios',
+    icono: 'bi-diagram-3', grupo: 'Catálogos' },
+    { ruta: '/catalogo-problemas', etiqueta: 'Catálogo de problemas',
+    icono: 'bi-list-check', grupo: 'Catálogos' },
+    { ruta: '/prioridades', etiqueta: 'Prioridades',
+    icono: 'bi-speedometer2', grupo: 'Catálogos' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
-    { ruta: '/catalogo-roles', etiqueta: 'Catálogo de roles', icono: 'bi-person-badge' },
     { ruta: '/reportes', etiqueta: 'Reporte de tickets', icono: 'bi-file-earmark-excel' },
     { ruta: '/bajas', etiqueta: 'Equipos dados de baja', icono: 'bi-pc-display-horizontal' },
     { manual: 'administrador', etiqueta: 'Manual del administrador', icono: 'bi-question-circle' },
@@ -77,8 +81,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/tickets-por-validar', etiqueta: 'Tickets por validar', icono: 'bi-patch-check' },
     { ruta: '/tickets', etiqueta: 'Tickets generados', icono: 'bi-inboxes' },
   ],
-};
 
+};
 const NOMBRE_ROL: Record<Rol, string> = {
   admin: 'Administrador',
   tecnico: 'Técnico',
@@ -106,6 +110,7 @@ export class Shell {
   readonly menu = computed(() => (this.auth.rol() ? (MENUS[this.auth.rol()!] ?? []) : []));
   readonly nombreRol = computed(() => (this.auth.rol() ? NOMBRE_ROL[this.auth.rol()!] : ''));
   readonly railAbierto = signal(false);
+  readonly catalogosAbierto = signal(false);
 
   /** Cuantos tickets tiene el validador esperando en "Tickets por validar". */
   readonly pendientesValidar = signal(0);
