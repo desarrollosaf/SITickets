@@ -13,12 +13,57 @@
       </div>
     </div>
 
-    <nav class="nav flex-column gap-1 mb-auto" style="overflow-y: auto; min-height: 0">
-      @for (o of menu(); track o.etiqueta) {
+  <nav class="nav flex-column gap-1 mb-auto">
+
+    @for (o of menu(); track o.etiqueta; let i = $index) {
+
+      <!-- Inicio del grupo Catálogos -->
+      @if (
+        o.grupo === 'Catálogos' &&
+        (i === 0 || menu()[i - 1].grupo !== 'Catálogos')
+      ) {
+
+        <button
+          type="button"
+          class="nav-link border-0 bg-transparent w-100 d-flex align-items-center"
+          (click)="catalogosAbierto.set(!catalogosAbierto())">
+
+          <span class="fw-semibold">
+            Catálogos
+          </span>
+
+          <i
+            class="bi ms-auto"
+            [class.bi-chevron-down]="!catalogosAbierto()"
+            [class.bi-chevron-up]="catalogosAbierto()">
+          </i>
+
+        </button>
+      }
+
+      <!-- Opciones de Catálogos -->
+      @if (o.grupo === 'Catálogos') {
+
+        @if (catalogosAbierto()) {
+          <a
+            class="nav-link ps-4"
+            [routerLink]="o.ruta"
+            routerLinkActive="activo">
+
+            <i class="bi" [class]="o.icono"></i>
+            {{ o.etiqueta }}
+
+          </a>
+        }
+
+      } @else {
+
+        <!-- Resto del menú normal -->
         @if (o.manual) {
           <a class="nav-link" role="button" (click)="abrirManual(o.manual)">
             <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
           </a>
+
         } @else {
           <a class="nav-link d-flex align-items-center" [routerLink]="o.ruta" routerLinkActive="activo">
             <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
@@ -28,7 +73,8 @@
           </a>
         }
       }
-    </nav>
+    }
+  </nav>
 
     <div class="border-top pt-3 mt-3">
       <div class="fw-semibold text-truncate" style="font-size: 0.82rem">{{ usuario()?.nombre }}</div>
@@ -63,16 +109,65 @@
     </header>
 
     @if (railAbierto()) {
-      <nav class="d-lg-none bg-white border-bottom p-2 no-imprimir">
-        @for (o of menu(); track o.etiqueta) {
-          @if (o.manual) {
+
+  <nav class="d-lg-none bg-white border-bottom p-2 no-imprimir">
+
+    @for (o of menu(); track o.etiqueta; let i = $index) {
+
+      <!-- Inicio Catálogos -->
+      @if (
+        o.grupo === 'Catálogos' &&
+        (i === 0 || menu()[i - 1].grupo !== 'Catálogos')
+      ) {
+
+        <button
+          type="button"
+          class="nav-link border-0 bg-transparent w-100 d-flex align-items-center"
+          (click)="catalogosAbierto.set(!catalogosAbierto())">
+
+          <span class="fw-semibold">
+            Catálogos
+          </span>
+
+          <i
+            class="bi ms-auto"
+            [class.bi-chevron-down]="!catalogosAbierto()"
+            [class.bi-chevron-up]="catalogosAbierto()">
+          </i>
+
+        </button>
+      }
+
+      <!-- Opciones Catálogos -->
+      @if (o.grupo === 'Catálogos') {
+
+        @if (catalogosAbierto()) {
+
+          <a
+            class="nav-link ps-4"
+            [routerLink]="o.ruta"
+            routerLinkActive="activo"
+            (click)="railAbierto.set(false)">
+
+            <i class="bi" [class]="o.icono"></i>
+            {{ o.etiqueta }}
+
+          </a>
+
+        }
+
+      } @else {
+
+        <!-- Manual -->
+        @if (o.manual) {
             <a class="nav-link" role="button"
-               (click)="abrirManual(o.manual); railAbierto.set(false)">
+            (click)="abrirManual(o.manual); railAbierto.set(false)">
               <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
-            </a>
-          } @else {
+          </a>
+
+        } @else {
             <a class="nav-link d-flex align-items-center" [routerLink]="o.ruta" routerLinkActive="activo"
-               (click)="railAbierto.set(false)">
+            (click)="railAbierto.set(false)">
               <i class="bi" [class]="o.icono"></i>{{ o.etiqueta }}
               @if (o.ruta === '/tickets-por-validar' && pendientesValidar() > 0) {
                 <span class="punto-parpadeante ms-auto" [title]="pendientesValidar() + ' por validar'"></span>
@@ -80,8 +175,9 @@
             </a>
           }
         }
+      }
       </nav>
-    }
+}
 
     <main class="flex-grow-1 p-3 p-lg-4" style="min-width: 0">
       <router-outlet />

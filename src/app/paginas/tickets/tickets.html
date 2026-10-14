@@ -29,47 +29,49 @@
         </button>
       </div>
     </div>
-    <div class="col-12 col-lg-4">
-      <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
-      <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico"
-              name="ftec" (change)="cargar()">
-        <option value="">Todos</option>
-        @for (t of tecnicos(); track t.id) {
-          <option [value]="t.id">{{ t.nombre }}</option>
-        }
-      </select>
-    </div>
-    <div class="col-12 col-lg-4">
-      <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
-      <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio"
-              name="fsrv" (change)="cargar()">
-        <option value="">Todos</option>
-        @for (s of catalogos()?.servicios ?? []; track s.id) {
-          <option [value]="s.id">{{ s.nombre }}</option>
-        }
-      </select>
-    </div>
-    <div class="col-12 col-lg-4">
-      <label class="form-label small fw-semibold" for="f-est">Estatus</label>
-      <select id="f-est" class="form-select form-select-sm" [(ngModel)]="filtros.estatus"
-              name="fest" (change)="cargar()">
-        <option value="">Todos</option>
-        <option value="EN_COLA">En cola (sin técnico)</option>
-        @for (e of catalogos()?.estatus ?? []; track e.clave) {
-          <option [value]="e.clave">{{ e.nombre }}</option>
-        }
-      </select>
-    </div>
-    <div class="col-12 col-lg-4">
-      <label class="form-label small fw-semibold" for="f-pri">Prioridad</label>
-      <select id="f-pri" class="form-select form-select-sm" [(ngModel)]="filtros.prioridad"
-              name="fpri" (change)="cargar()">
-        <option value="">Todas</option>
-        @for (p of catalogos()?.prioridades ?? []; track p.clave) {
-          <option [value]="p.clave">{{ p.clave }} · {{ p.nombre }}</option>
-        }
-      </select>
-    </div>
+    @if (esAdminUOperador()) {
+      <div class="col-12 col-lg-4">
+        <label class="form-label small fw-semibold" for="f-tec">Técnico</label>
+        <select id="f-tec" class="form-select form-select-sm" [(ngModel)]="filtros.tecnico"
+                name="ftec" (change)="cargar()">
+          <option value="">Todos</option>
+          @for (t of tecnicos(); track t.id) {
+            <option [value]="t.id">{{ t.nombre }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label small fw-semibold" for="f-srv">Tipo de servicio</label>
+        <select id="f-srv" class="form-select form-select-sm" [(ngModel)]="filtros.servicio"
+                name="fsrv" (change)="cargar()">
+          <option value="">Todos</option>
+          @for (s of catalogos()?.servicios ?? []; track s.id) {
+            <option [value]="s.id">{{ s.nombre }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label small fw-semibold" for="f-est">Estatus</label>
+        <select id="f-est" class="form-select form-select-sm" [(ngModel)]="filtros.estatus"
+                name="fest" (change)="cargar()">
+          <option value="">Todos</option>
+          <option value="EN_COLA">En cola (sin técnico)</option>
+          @for (e of catalogos()?.estatus ?? []; track e.clave) {
+            <option [value]="e.clave">{{ e.nombre }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-12 col-lg-4">
+        <label class="form-label small fw-semibold" for="f-pri">Prioridad</label>
+        <select id="f-pri" class="form-select form-select-sm" [(ngModel)]="filtros.prioridad"
+                name="fpri" (change)="cargar()">
+          <option value="">Todas</option>
+          @for (p of catalogos()?.prioridades ?? []; track p.clave) {
+            <option [value]="p.clave">{{ p.clave }} · {{ p.nombre }}</option>
+          }
+        </select>
+      </div>
+    }
   </div>
 </div>
 
