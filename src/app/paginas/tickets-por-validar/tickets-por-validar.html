@@ -30,6 +30,11 @@
             <div class="sub" style="font-size: 0.85rem">
               {{ t.servicio }} · {{ t.solicitante }} · {{ t.dependencia }}
             </div>
+            @if (t.registrado_por_nombre) {
+              <div class="sub" style="font-size: 0.82rem">
+                Capturado por {{ t.registrado_por_nombre }}
+              </div>
+            }
             @if (modelo(t)) {
               <div class="sub" style="font-size: 0.82rem">Modelo: {{ modelo(t) }}</div>
             }
