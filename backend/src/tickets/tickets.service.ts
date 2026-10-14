@@ -302,7 +302,9 @@ export class TicketsService {
      * igual que en detalle() y nivelTonerDelTicket().
      */
     const orgs = await Promise.all(
-      filas.map((t) => this.datosOrganizacionalesDelSolicitante(t.solicitante_id)),
+      filas.map((t) =>
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
+      ),
     );
 
     const libro = new ExcelJS.Workbook();
@@ -491,7 +493,10 @@ export class TicketsService {
      * dependencia_id/area_id local del ticket): es solo informativa, nunca
      * se corrige a mano. Mismo dato que ya usa el dictamen de baja.
      */
-    const orgSaf = await this.datosOrganizacionalesDelSolicitante(ticket.solicitante_id);
+    const orgSaf = await this.datosOrganizacionalesDelSolicitante(
+      ticket.solicitante_id,
+      !!ticket.registrado_por,
+    );
 
     return {
       ...this.resumen(ticket, objetivos, sesiones.length),
@@ -1209,7 +1214,7 @@ export class TicketsService {
   ): Promise<void> {
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(ticket.tecnico_id!, { attributes: ['rfc'] }),
-      this.rfcDelSolicitante(ticket.solicitante_id),
+      this.rfcDelSolicitante(ticket.solicitante_id, !!ticket.registrado_por),
     ]);
     if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
 
@@ -1332,13 +1337,24 @@ export class TicketsService {
 
   /**
    * rfc de quien solicito el ticket. solicitante_id no vive siempre en el
-   * mismo espacio de ids (ver comentario en el modelo Ticket): primero se
-   * busca como usuario.id local; si no hay fila ahi, se asume que es un
-   * id_Usuario de saf.s_usuario (externo o registrado "a nombre de otro").
+   * mismo espacio de ids (ver comentario en el modelo Ticket): si el ticket
+   * se registro "a nombre de otro" (ticket.registrado_por != null, ver
+   * crear()), solicitante_id SIEMPRE es un id_Usuario de saf.s_usuario, sin
+   * ambiguedad — nunca hay que tocar la tabla local, forzarSaf evita el
+   * riesgo real de que ese numero choque por casualidad con el id local de
+   * otra persona (p. ej. del propio gestor que lo registro) y se le adjudique
+   * el rfc equivocado. Sin forzarSaf, se mantiene el criterio dual de
+   * siempre: primero usuario local, si no hay fila ahi se asume saf (caso
+   * del solicitante externo registrando su propio ticket).
    */
-  private async rfcDelSolicitante(solicitanteId: number): Promise<string | null> {
-    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
-    if (local?.rfc) return local.rfc;
+  private async rfcDelSolicitante(
+    solicitanteId: number,
+    forzarSaf = false,
+  ): Promise<string | null> {
+    if (!forzarSaf) {
+      const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
+      if (local?.rfc) return local.rfc;
+    }
     const externo = await this.sUsuarios.findByPk(solicitanteId);
     return externo?.N_Usuario ?? null;
   }
@@ -1346,12 +1362,14 @@ export class TicketsService {
   /**
    * Dependencia/direccion/departamento del solicitante, solo para el
    * dictamen de baja (§ EQUIPO DE COMPUTO): se resuelven al momento desde
-   * saf, no se guardan en ticketsv2. Mismo criterio dual que
-   * rfcDelSolicitante: primero usuario local (por su rfc), si no existe se
-   * asume que solicitante_id ya es un id_Usuario de saf.
+   * saf, no se guardan en ticketsv2. Mismo criterio dual (y el mismo
+   * forzarSaf) que rfcDelSolicitante: ver ahi el porque.
    */
   /** Publico: tambien lo usa MonitorService para la cola de "en turno". */
-  async datosOrganizacionalesDelSolicitante(solicitanteId: number): Promise<{
+  async datosOrganizacionalesDelSolicitante(
+    solicitanteId: number,
+    forzarSaf = false,
+  ): Promise<{
     dependencia: string | null;
     direccion: string | null;
     departamento: string | null;
@@ -1368,7 +1386,9 @@ export class TicketsService {
       direccionCompleta: null,
     };
 
-    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
+    const local = forzarSaf
+      ? null
+      : await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
     const sUsuario = local?.rfc
       ? await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } })
       : await this.sUsuarios.findByPk(solicitanteId);
@@ -1415,7 +1435,7 @@ export class TicketsService {
       return { bien: null, motivo: 'El ticket no tiene un número de inventario capturado.' };
     }
 
-    const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+    const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
     if (!rfc) {
       return { bien: null, motivo: 'No se pudo identificar el RFC del solicitante.' };
     }
@@ -1438,7 +1458,7 @@ export class TicketsService {
     if (t.servicio?.clave !== 'IMPA') {
       return { impresoras: [], motivo: 'Este ticket no es de Impresoras arrendadas.' };
     }
-    const org = await this.datosOrganizacionalesDelSolicitante(t.solicitante_id);
+    const org = await this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por);
     return this.impresorasSrv.nivelToner(org.direccionCompleta, usuario);
   }
 
@@ -1470,7 +1490,7 @@ export class TicketsService {
       return { bienes: [], motivo: 'Este ticket no captura número de inventario.' };
     }
 
-    const rfc = await this.rfcDelSolicitante(ticket.solicitante_id);
+    const rfc = await this.rfcDelSolicitante(ticket.solicitante_id, !!ticket.registrado_por);
     if (!rfc) {
       return { bienes: [], motivo: 'No se pudo identificar el RFC del solicitante.' };
     }
@@ -1547,7 +1567,7 @@ export class TicketsService {
 
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
-      this.rfcDelSolicitante(t.solicitante_id),
+      this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por),
     ]);
     if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
 
@@ -1591,12 +1611,12 @@ export class TicketsService {
   private async generarCedulaSalida(t: Ticket, usuario: UsuarioToken): Promise<void> {
     try {
       if (!t.contexto) return;
-      const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
       if (!rfc) return;
 
       const [{ bienes }, org] = await Promise.all([
         this.bienesSrv.porRfcCmp(rfc),
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
       ]);
       const bien = bienes.find((b) => b.inventario === t.contexto);
       const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
@@ -1680,12 +1700,12 @@ export class TicketsService {
   private async generarCedulaEntrada(t: Ticket, usuario: UsuarioToken): Promise<void> {
     try {
       if (!t.contexto) return;
-      const rfc = await this.rfcDelSolicitante(t.solicitante_id);
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
       if (!rfc) return;
 
       const [{ bienes }, org] = await Promise.all([
         this.bienesSrv.porRfcCmp(rfc),
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
       ]);
       const bien = bienes.find((b) => b.inventario === t.contexto);
       const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
@@ -1816,7 +1836,7 @@ export class TicketsService {
     if (t.contexto && this.esTicketDeInventarioCmp(t)) {
       const [tecnicoLocal, rfcSolicitante] = await Promise.all([
         this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
-        this.rfcDelSolicitante(t.solicitante_id),
+        this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por),
       ]);
       if (rfcSolicitante) {
         const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
@@ -1840,7 +1860,7 @@ export class TicketsService {
     if (!reparado) {
       const [detalleBien, org] = await Promise.all([
         bienId ? this.bienesSrv.detalleBien(bienId, bienEsBc) : null,
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
       ]);
 
       const pdf = await this.dictamenSrv.generar({
