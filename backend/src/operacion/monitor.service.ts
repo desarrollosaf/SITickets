@@ -122,7 +122,10 @@ export class MonitorService {
         .map(async (t, i) => {
           /* Departamento del solicitante en saf, no el dependencia_id local
              del ticket: ese catalogo a veces sale vacio o desactualizado. */
-          const org = await this.ticketsSrv.datosOrganizacionalesDelSolicitante(t.solicitante_id);
+          const org = await this.ticketsSrv.datosOrganizacionalesDelSolicitante(
+            t.solicitante_id,
+            !!t.registrado_por,
+          );
           return {
             turno: i + 1,
             id: t.id,
