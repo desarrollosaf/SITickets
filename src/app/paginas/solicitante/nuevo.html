@@ -60,6 +60,13 @@
         <input id="n-ext" class="form-control" [(ngModel)]="extension" name="extension" />
         <div class="form-text">Precargada de tu perfil.</div>
       </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold" for="n-edificio">
+          Edificio o ubicación donde se atenderá el reporte
+        </label>
+        <input id="n-edificio" class="form-control" [(ngModel)]="edificioAtencion" name="edificioAtencion"
+               maxlength="160" placeholder="Opcional, p. ej. edificio, piso, oficina…" />
+      </div>
     </div>
 
     <div class="row g-3 mb-3">

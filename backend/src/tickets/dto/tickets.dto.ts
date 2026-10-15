@@ -64,6 +64,12 @@ export class CrearTicketDto {
   @MaxLength(10)
   extension?: string;
 
+  /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  edificio_atencion?: string;
+
   /** Solo lo usan admin/gestor: registra el ticket a nombre de este usuario de saf. */
   @IsOptional()
   @IsInt()
@@ -87,6 +93,11 @@ export class DatosGeneralesDto {
   @IsString()
   @MaxLength(10)
   extension?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  edificio_atencion?: string;
 }
 
 export class CrearInternoDto {

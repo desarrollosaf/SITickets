@@ -39,6 +39,7 @@ export class Nuevo {
   readonly contextoV = signal('');
   texto = '';
   extension = '';
+  edificioAtencion = '';
 
   readonly dur = duracion;
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
@@ -387,6 +388,7 @@ export class Nuevo {
     this.servicioId.set(null);
     this.claveProblema.set('');
     this.extension = this.auth.usuario()?.extension ?? '';
+    this.edificioAtencion = '';
     this.error.set('');
     this.limpiar();
   }
@@ -454,6 +456,7 @@ export class Nuevo {
           : this.contextoFinal() || undefined,
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
+        edificio_atencion: this.edificioAtencion.trim() || undefined,
         correo_libre: this.esCorreo() ? this.correoLibre() : undefined,
         color_toner: this.esColorToner() ? this.coloresElegidos.join(', ') : undefined,
         modelo_traslado: this.esTrasladoImpa() ? this.modeloElegido().trim() : undefined,

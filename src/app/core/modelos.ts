@@ -47,9 +47,11 @@ export interface Sesion {
  */
 export interface TicketPorValidar {
   id: number;
+  folio: string;
   problema: string;
   servicio: string;
   contexto: string | null;
+  edificio_atencion: string | null;
   f_captura: string | null;
   pendiente_validacion: boolean;
   motivo_rechazo_validacion: string | null;
@@ -94,6 +96,8 @@ export interface Ticket {
   dependencia_id: number | null;
   area_id: number | null;
   extension: string | null;
+  /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
+  edificio_atencion: string | null;
   sede: string | null;
   tecnico_id: number | null;
   tecnico: string | null;
@@ -105,6 +109,8 @@ export interface Ticket {
   f_captura: string | null;
   validado_por_nombre: string | null;
   motivo_rechazo_validacion: string | null;
+  /** Admin/operador ya usaron "Copiar datos" en este ticket (grabado en el backend, no por navegador). */
+  datos_copiados: boolean;
   en_cola: boolean;
   escalado: boolean;
   reclasificado: boolean;

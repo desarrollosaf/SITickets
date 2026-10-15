@@ -26,6 +26,7 @@
       <div class="tarjeta p-3">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
           <div>
+            <div class="folio" style="font-size: 0.78rem">{{ t.folio }}</div>
             <div class="fw-semibold">{{ t.problema }}</div>
             <div class="sub" style="font-size: 0.85rem">
               {{ t.servicio }} · {{ t.solicitante }} · {{ t.dependencia }}
@@ -40,6 +41,11 @@
             }
             @if (t.color_toner) {
               <div class="sub" style="font-size: 0.82rem">Color de tóner: {{ t.color_toner }}</div>
+            }
+            @if (t.edificio_atencion) {
+              <div class="sub" style="font-size: 0.82rem">
+                <i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}
+              </div>
             }
             @if (t.contexto && t.campo_adicional && t.campo_adicional !== 'Modelo de impresora') {
               <div class="sub" style="font-size: 0.82rem">{{ t.campo_adicional }}: {{ t.contexto }}</div>

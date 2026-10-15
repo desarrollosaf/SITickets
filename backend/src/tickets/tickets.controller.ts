@@ -147,6 +147,13 @@ export class TicketsController {
     return this.tickets.crear(dto, usuario);
   }
 
+  /** Marca que ya se uso "Copiar datos" en este ticket, para todos, no solo en este navegador. */
+  @Roles('admin', 'operador')
+  @Post(':id/marcar-copiado')
+  marcarCopiado(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.marcarCopiado(id, usuario);
+  }
+
   /** Aprueba un ticket pendiente de validacion: arranca el SLA y entra al flujo normal. */
   @Roles('validador')
   @Post(':id/aprobar-validacion')
