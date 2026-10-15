@@ -36,17 +36,23 @@ import type { Catalogos, Ticket, TicketPorValidar } from '../../core/modelos';
       <div class="tarjeta p-3 mb-3">
         <h2 class="h6 mb-2">En validación</h2>
         <p class="sub small mb-3">
-          Lo que registraste y todavía no pasa por tu validador (o fue rechazado). Sin folio: mientras
-          no se apruebe no es un ticket real todavía.
+          Lo que registraste y todavía no pasa por tu validador (o fue rechazado). Mientras no se
+          apruebe, no se turna a técnico ni cuenta el tiempo de atención.
         </p>
         <div class="d-flex flex-column gap-2">
           @for (t of enValidacion(); track t.id) {
             <div class="d-flex justify-content-between align-items-start gap-2 border-bottom pb-2">
               <div>
+                <div class="folio" style="font-size: 0.75rem">{{ t.folio }}</div>
                 <div class="fw-semibold" style="font-size: 0.9rem">{{ t.problema }}</div>
                 <div class="sub" style="font-size: 0.8rem">
                   {{ t.servicio }}@if (t.contexto) { · {{ t.contexto }} }
                 </div>
+                @if (t.edificio_atencion) {
+                  <div class="sub" style="font-size: 0.75rem">
+                    <i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}
+                  </div>
+                }
                 <div class="sub" style="font-size: 0.75rem">Capturado {{ fmt(t.f_captura) }}</div>
               </div>
               @if (t.motivo_rechazo_validacion) {

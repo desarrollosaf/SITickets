@@ -26,6 +26,14 @@ const UMBRAL_ESCALAMIENTO = 2;
 /** §10 · dias naturales que tiene el solicitante para validar antes del cierre. */
 const DIAS_CIERRE_POR_OMISION = 3;
 
+/**
+ * Dependencia local de OSFEM. saf.t_dependencia.id_Dependencia=3 es
+ * "ÓRGANO SUPERIOR DE FISCALIZACIÓN"; resuelta por nombre (ver
+ * resolverDependenciaSaf en TicketsService) queda en Dependencia.id=1 del
+ * catalogo local — el id que de verdad se graba en Ticket.dependencia_id.
+ */
+const DEPENDENCIA_OSFEM_ID = 1;
+
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
 
 @Injectable()
@@ -73,9 +81,15 @@ export class ReglasService {
     return `TK/${servicio.prefijo_folio}/${consecutivo}/${anio}`;
   }
 
-  /** Igual que siguienteFolio, pero sin servicio: es el folio general (TK/DI/N) que trae todo ticket al registrarse. */
-  async siguienteFolioGeneral(tx: Transaction): Promise<string> {
-    const prefijo = 'DI';
+  /**
+   * Igual que siguienteFolio, pero sin servicio: es el folio general que
+   * trae todo ticket al registrarse (TK/DI/N para el resto, TK/OSF/N para
+   * OSFEM, con su propio consecutivo, independiente del de TK/DI). OSFEM es
+   * la dependencia local DEPENDENCIA_OSFEM_ID, resuelta via saf a partir de
+   * saf.t_dependencia.id_Dependencia=3 ("ÓRGANO SUPERIOR DE FISCALIZACIÓN").
+   */
+  async siguienteFolioGeneral(tx: Transaction, dependenciaId: number | null = null): Promise<string> {
+    const prefijo = dependenciaId === DEPENDENCIA_OSFEM_ID ? 'OSF' : 'DI';
     const anio = new Date().getFullYear();
     const [serie] = await this.series.findOrCreate({
       where: { prefijo, anio },

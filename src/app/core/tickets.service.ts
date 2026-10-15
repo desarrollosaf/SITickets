@@ -112,6 +112,8 @@ export class TicketsService {
     contexto?: string;
     texto?: string;
     extension?: string;
+    /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
+    edificio_atencion?: string;
     /** Solo si el campo adicional es «Cuenta de correo»: no exige el dominio institucional. */
     correo_libre?: boolean;
     /** Solo si el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
@@ -140,7 +142,7 @@ export class TicketsService {
   rechazarValidacion(id: number, motivo: string) {
     return this.http.post<{ id: number }>(`${API}/tickets/${id}/rechazar-validacion`, { motivo });
   }
-  /** Lo que el gestor registro y sigue (o quedo) en validacion. Sin folio. */
+  /** Lo que el gestor registro y sigue (o quedo) en validacion. */
   misPorValidar() {
     return this.http.get<TicketPorValidar[]>(`${API}/tickets/mis-por-validar`);
   }
@@ -158,7 +160,7 @@ export class TicketsService {
    * Corrige los datos generales del reporte. El ticket en si —problema,
    * prioridad, tecnico— no se toca por aqui.
    */
-  datos(id: number, d: { contexto?: string; extension?: string }) {
+  datos(id: number, d: { contexto?: string; extension?: string; edificio_atencion?: string }) {
     return this.http.post<TicketDetalle>(`${API}/tickets/${id}/datos`, d);
   }
 
@@ -170,6 +172,10 @@ export class TicketsService {
 
   iniciar(id: number) {
     return this.accion(id, 'iniciar');
+  }
+  /** Admin/operador usaron "Copiar datos": queda grabado en el ticket, no solo en este navegador. */
+  marcarCopiado(id: number) {
+    return this.accion<void>(id, 'marcar-copiado');
   }
   espera(id: number, motivo: string) {
     return this.accion(id, 'espera', { motivo });

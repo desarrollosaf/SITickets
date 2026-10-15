@@ -1,7 +1,6 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../core/auth.service';
-import { CopiadosService } from '../core/copiados.service';
 import { TicketsService } from '../core/tickets.service';
 import { QrCode } from './qr-code';
 import {
@@ -57,7 +56,6 @@ const MOTIVOS_ESPERA = [
 export class DetalleTicket {
   private readonly api = inject(TicketsService);
   private readonly auth = inject(AuthService);
-  readonly copiados = inject(CopiadosService);
 
   /** Id del ticket abierto. null cierra el cajon. */
   readonly ticketId = input.required<number | null>();
@@ -97,6 +95,7 @@ export class DetalleTicket {
   /* --- correccion de datos generales --- */
   readonly dContexto = signal('');
   readonly dExtension = signal('');
+  readonly dEdificioAtencion = signal('');
 
   /* --- correccion del numero de inventario: mismo mecanismo que al registrar --- */
   readonly esInventarioTicket = computed(() => esCampoInventario(this.ticket()?.campo_adicional));
@@ -181,6 +180,7 @@ export class DetalleTicket {
       t.color_toner ? `Color de tóner: ${t.color_toner}` : null,
       /** Solo cuando el problema elegido es «Otro»: ahi el detalle real va en texto_libre, no en contexto. */
       t.texto_libre ? `Descripción: ${t.texto_libre}` : null,
+      t.edificio_atencion ? `Edificio o ubicación: ${t.edificio_atencion}` : null,
       /** Siempre al final. */
       `Departamento/área: ${t.departamento_saf || '—'}`,
     ].filter((l): l is string => !!l);
@@ -193,8 +193,11 @@ export class DetalleTicket {
       return;
     }
     this.copiado.set(true);
-    this.copiados.marcar(t.id);
     setTimeout(() => this.copiado.set(false), 2000);
+    if (!t.datos_copiados) {
+      this.ticket.update((actual) => (actual ? { ...actual, datos_copiados: true } : actual));
+      this.api.marcarCopiado(t.id).subscribe({ next: () => this.cambio.emit() });
+    }
   }
 
   /**
@@ -326,6 +329,7 @@ export class DetalleTicket {
     this.dContexto.set(t.contexto ?? '');
     this.dSeleccion.set(t.contexto ? t.contexto.split(',').map((s) => s.trim()).filter(Boolean) : []);
     this.dExtension.set(t.extension ?? '');
+    this.dEdificioAtencion.set(t.edificio_atencion ?? '');
     this.error.set('');
     this.formulario.set('datos');
     this.dBienes.set([]);
@@ -367,7 +371,11 @@ export class DetalleTicket {
     if (!t) return;
     this.ocupado.set(true);
     this.api
-      .datos(t.id, { contexto: this.dContextoFinal(), extension: this.dExtension().trim() })
+      .datos(t.id, {
+        contexto: this.dContextoFinal(),
+        extension: this.dExtension().trim(),
+        edificio_atencion: this.dEdificioAtencion().trim(),
+      })
       .subscribe({ next: (r) => this.aplicar(r), error: (e) => this.falla(e) });
   }
 

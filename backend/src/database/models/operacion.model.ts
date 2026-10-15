@@ -140,6 +140,10 @@ export class Ticket extends Model {
   @Column(DataType.STRING(10))
   declare extension: string | null;
 
+  /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
+  @Column(DataType.STRING(160))
+  declare edificio_atencion: string | null;
+
   /** §16 sede esperada del servicio, para verificar la ubicacion del reloj. */
   @ForeignKey(() => Sede)
   @Column(DataType.SMALLINT.UNSIGNED)
@@ -222,6 +226,11 @@ export class Ticket extends Model {
   /** Si no es null, el ticket fue rechazado en validacion: nunca aparece en "Tickets generados". */
   @Column(DataType.STRING(400))
   declare motivo_rechazo_validacion: string | null;
+
+  /** Admin/operador ya usaron "Copiar datos" en este ticket (ver tickets.controller marcar-copiado). */
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare datos_copiados: boolean;
 
   /** Inicio de la pausa vigente. */
   @Column(DataType.DATE)

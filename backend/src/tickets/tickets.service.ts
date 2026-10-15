@@ -456,6 +456,13 @@ export class TicketsService {
     };
   }
 
+  /** Admin/operador dieron clic en "Copiar datos": queda grabado, no solo en su navegador. */
+  async marcarCopiado(id: number, usuario: UsuarioToken): Promise<void> {
+    const ticket = await this.tickets.findOne({ where: { id, ...(await this.alcance(usuario)) } });
+    if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
+    if (!ticket.datos_copiados) await ticket.update({ datos_copiados: true });
+  }
+
   async detalle(id: number, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
       where: { id, ...(await this.alcance(usuario)) },
@@ -596,6 +603,7 @@ export class TicketsService {
       dependencia_id: t.dependencia_id,
       area_id: t.area_id,
       extension: t.extension,
+      edificio_atencion: t.edificio_atencion,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
       tecnico: t.tecnico?.nombre ?? null,
@@ -605,6 +613,7 @@ export class TicketsService {
       f_captura: t.f_captura,
       validado_por_nombre: t.validado_por_nombre,
       motivo_rechazo_validacion: t.motivo_rechazo_validacion,
+      datos_copiados: t.datos_copiados,
       en_cola: t.en_cola,
       escalado: t.escalado,
       reclasificado: t.reclasificado,
@@ -876,9 +885,9 @@ export class TicketsService {
        * El folio por servicio (TK/CMP/N, TK/TEL/N…) se asigna hasta que el
        * ticket cierra de verdad (ver ReglasService.asignaFolioDeCierre). En
        * lo que tanto, el ticket se identifica con el folio general
-       * (TK/DI/N), el mismo para cualquier servicio.
+       * (TK/DI/N, o TK/OSF/N para OSFEM), el mismo para cualquier servicio.
        */
-      const folio = await this.reglas.siguienteFolioGeneral(tx);
+      const folio = await this.reglas.siguienteFolioGeneral(tx, quien.dependencia_id);
 
       const t = await this.tickets.create(
         {
@@ -898,6 +907,7 @@ export class TicketsService {
           area_id: quien.area_id,
           sede_id: quien.sede_id,
           extension: dto.extension?.trim() || quien.extension,
+          edificio_atencion: dto.edificio_atencion?.trim() || null,
           contexto,
           color_toner: CLAVES_TONER.includes(problema.clave) ? dto.color_toner!.trim() : null,
           modelo_traslado: problema.clave === 'IMPA-09' ? dto.modelo_traslado!.trim() : null,
@@ -999,9 +1009,10 @@ export class TicketsService {
   }
 
   /**
-   * Lo que un gestor registro y sigue (o quedo) en validacion. Sin folio:
-   * mientras no se apruebe no es un ticket real para efectos del gestor,
-   * solo un aviso de en que quedo su solicitud.
+   * Lo que un gestor registro y sigue (o quedo) en validacion. El folio ya
+   * existe desde que se capturo (ver crear()), aunque mientras no se apruebe
+   * no cuenta el tiempo de atencion ni se turna a tecnico — por eso se
+   * expone aqui, para que el gestor lo tenga a la mano desde ya.
    */
   async misPorValidar(usuario: UsuarioToken) {
     const filas = await this.tickets.findAll({
@@ -1021,9 +1032,11 @@ export class TicketsService {
     });
     return filas.map((t) => ({
       id: t.id,
+      folio: t.folio,
       problema: t.problema?.descripcion ?? 'Sin clasificar',
       servicio: t.servicio?.nombre ?? '—',
       contexto: t.contexto,
+      edificio_atencion: t.edificio_atencion,
       f_captura: t.f_captura,
       pendiente_validacion: t.pendiente_validacion,
       motivo_rechazo_validacion: t.motivo_rechazo_validacion,
@@ -1155,6 +1168,13 @@ export class TicketsService {
       }
     }
 
+    if (dto.edificio_atencion !== undefined) {
+      const edificioAtencion = dto.edificio_atencion.trim() || null;
+      if (edificioAtencion !== ticket.edificio_atencion) {
+        anota('Edificio o ubicacion', ticket.edificio_atencion, edificioAtencion);
+        nuevos.edificio_atencion = edificioAtencion;
+      }
+    }
 
     if (!cambios.length) throw new BadRequestException('No hay ningun cambio que guardar');
 

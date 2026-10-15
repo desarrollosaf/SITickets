@@ -245,6 +245,12 @@
                        name="dExtension" maxlength="10" />
               }
 
+              <label class="form-label small fw-semibold" for="fm-edificio">
+                Edificio o ubicación donde se atenderá el reporte
+              </label>
+              <input id="fm-edificio" class="form-control form-control-sm mb-2" [(ngModel)]="dEdificioAtencion"
+                     name="dEdificioAtencion" maxlength="160" />
+
               <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
                 <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarDatos()">
@@ -613,6 +619,11 @@
             @if (t.registrado_por_nombre) {
               <dt class="col-5 sub fw-normal">Registrado por</dt>
               <dd class="col-7">{{ t.registrado_por_nombre }}</dd>
+            }
+
+            @if (t.edificio_atencion) {
+              <dt class="col-5 sub fw-normal">Edificio o ubicación</dt>
+              <dd class="col-7">{{ t.edificio_atencion }}</dd>
             }
 
             @if (!t.interno) {
