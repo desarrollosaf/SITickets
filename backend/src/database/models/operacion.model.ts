@@ -13,15 +13,7 @@ import {
   HasMany,
   Index,
 } from 'sequelize-typescript';
-import {
-  Area,
-  CatalogoProblema,
-  Dependencia,
-  Prioridad,
-  Sede,
-  Servicio,
-  Usuario,
-} from './catalogos.model';
+import { Area, CatalogoProblema, Prioridad, Sede, Servicio, Usuario } from './catalogos.model';
 
 /* =====================================================================
    Operacion. Equivale a la seccion 2 de 01_esquema_mysql.sql.
@@ -129,7 +121,12 @@ export class Ticket extends Model {
   @Column(DataType.STRING(120))
   declare registrado_por_nombre: string | null;
 
-  @ForeignKey(() => Dependencia)
+  /**
+   * Id de dependencia DE SAF (saf.t_dependencia.id_Dependencia), no de la
+   * tabla local `Dependencia` — ya no es @ForeignKey hacia ella (esa tabla
+   * quedo deprecada como fuente de verdad). Se resuelve en vivo desde saf al
+   * crear el ticket (ver TicketsService.resolverQuien()/datosSaf()).
+   */
   @Column(DataType.SMALLINT.UNSIGNED)
   declare dependencia_id: number | null;
 
@@ -323,9 +320,6 @@ export class Ticket extends Model {
 
   @BelongsTo(() => Usuario, 'tecnico_id')
   declare tecnico: Usuario;
-
-  @BelongsTo(() => Dependencia)
-  declare dependencia: Dependencia;
 
   @BelongsTo(() => Area)
   declare area: Area;

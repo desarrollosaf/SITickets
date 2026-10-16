@@ -9,7 +9,6 @@ import { Op, UniqueConstraintError } from 'sequelize';
 import {
   Area,
   CatalogoRol,
-  Dependencia,
   DependenciaValidador,
   SDependencia,
   Servicio,
@@ -24,7 +23,6 @@ import { RegistrarUsuarioDto } from './dto/registrar-usuario.dto';
 export class UsuariosService {
   constructor(
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
-    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(Servicio) private readonly servicios: typeof Servicio,
     @InjectModel(TecnicoServicio) private readonly tecnicoServicio: typeof TecnicoServicio,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
@@ -44,15 +42,6 @@ export class UsuariosService {
     }
     const rol = await this.roles.findOne({ where: { clave, activo: true } });
     if (!rol) throw new BadRequestException('Ese rol no existe o esta inactivo');
-  }
-
-  /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
-  private async resolverDependenciaSaf(idSaf: number | null): Promise<number | null> {
-    if (!idSaf) return null;
-    const sDep = await this.sDependencias.findByPk(idSaf);
-    if (!sDep) return null;
-    const local = await this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
-    return local?.id ?? null;
   }
 
   /**
@@ -85,16 +74,20 @@ export class UsuariosService {
       dependencia_id: number | null;
       dependencia: string | null;
     }[] = [];
+    const idsSafBusqueda = [...new Set(candidatos.map((s) => s.id_Dependencia).filter((id): id is number => !!id))];
+    const sDepsBusqueda = idsSafBusqueda.length
+      ? await this.sDependencias.findAll({ where: { id_Dependencia: { [Op.in]: idsSafBusqueda } } })
+      : [];
+    const nombrePorIdSafBusqueda = new Map(sDepsBusqueda.map((d) => [d.id_Dependencia, d.Nombre.trim()]));
+
     for (const s of candidatos) {
       if (yaRegistrado.has(s.N_Usuario)) continue;
-      const dependenciaId = await this.resolverDependenciaSaf(s.id_Dependencia);
-      const dependencia = dependenciaId ? await this.dependencias.findByPk(dependenciaId) : null;
       resultado.push({
         id_usuario_saf: s.id_Usuario,
         nombre: s.Nombre,
         rfc: s.N_Usuario,
-        dependencia_id: dependenciaId,
-        dependencia: dependencia?.nombre ?? null,
+        dependencia_id: s.id_Dependencia,
+        dependencia: s.id_Dependencia ? (nombrePorIdSafBusqueda.get(s.id_Dependencia) ?? null) : null,
       });
     }
     return resultado;
@@ -104,12 +97,7 @@ export class UsuariosService {
   async listar() {
     const filas = await this.usuarios.findAll({
       where: { rol: { [Op.ne]: 'solicitante' } },
-      include: [
-        Dependencia,
-        Area,
-        { model: TecnicoServicio, include: [Servicio] },
-        { model: DependenciaValidador, include: [Dependencia] },
-      ],
+      include: [Area, { model: TecnicoServicio, include: [Servicio] }, DependenciaValidador],
       order: [
         ['rol', 'ASC'],
         ['nombre', 'ASC'],
@@ -128,7 +116,13 @@ export class UsuariosService {
       ? await this.sUsuarios.findAll({ where: { N_Usuario: { [Op.in]: rfcs } } })
       : [];
     const idSafPorRfc = new Map(sUsuarios.map((s) => [s.N_Usuario, s.id_Dependencia]));
-    const idsSaf = [...new Set(sUsuarios.map((s) => s.id_Dependencia).filter((id): id is number => !!id))];
+    const idsValidador = filas.flatMap((u) => (u.validaciones ?? []).map((v) => v.dependencia_id));
+    const idsSaf = [
+      ...new Set([
+        ...sUsuarios.map((s) => s.id_Dependencia).filter((id): id is number => !!id),
+        ...idsValidador,
+      ]),
+    ];
     const sDependenciasPorId = idsSaf.length
       ? await this.sDependencias.findAll({ where: { id_Dependencia: { [Op.in]: idsSaf } } })
       : [];
@@ -149,10 +143,10 @@ export class UsuariosService {
         servicio_ids: (u.especialidades ?? []).map((e) => e.servicio_id),
         /** Solo rol validador: dependencias que revisa antes de turnar a tecnico. */
         dependencias_validador: (u.validaciones ?? [])
-          .map((v) => v.dependencia?.nombre)
+          .map((v) => nombrePorIdSaf.get(v.dependencia_id))
           .filter(Boolean),
         dependencia_ids_validador: (u.validaciones ?? []).map((v) => v.dependencia_id),
-        dependencia: dependenciaSaf ?? u.dependencia?.nombre ?? null,
+        dependencia: dependenciaSaf ?? null,
         area: u.area?.nombre ?? null,
         activo: u.activo,
       };
@@ -180,7 +174,9 @@ export class UsuariosService {
     if (rol !== 'validador') {
       throw new BadRequestException('Solo el rol validador puede traer dependencias a validar');
     }
-    const encontradas = await this.dependencias.count({ where: { id: { [Op.in]: dependenciaIds } } });
+    const encontradas = await this.sDependencias.count({
+      where: { id_Dependencia: { [Op.in]: dependenciaIds } },
+    });
     if (encontradas !== new Set(dependenciaIds).size) {
       throw new BadRequestException('Alguna de las dependencias elegidas no existe');
     }
@@ -201,15 +197,13 @@ export class UsuariosService {
     await this.validarServicios(dto.servicio_ids, dto.rol);
     await this.validarDependenciasValidador(dto.dependencia_ids, dto.rol);
 
-    const dependenciaId = await this.resolverDependenciaSaf(sUsuario.id_Dependencia);
-
     try {
       const creado = await this.usuarios.create({
         rfc,
         nombre: sUsuario.Nombre.trim(),
         correo: dto.correo?.trim().toLowerCase() || null,
         extension: dto.extension?.trim() || null,
-        dependencia_id: dependenciaId,
+        dependencia_id: sUsuario.id_Dependencia,
         area_id: null,
         rol: dto.rol,
         activo: true,

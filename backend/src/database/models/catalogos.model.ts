@@ -166,7 +166,16 @@ export class Usuario extends Model {
   @Column(DataType.STRING(72))
   declare password_hash: string | null;
 
-  @ForeignKey(() => Dependencia)
+  /**
+   * Id de dependencia DE SAF (saf.t_dependencia.id_Dependencia), no de la
+   * tabla local `Dependencia` — por eso ya no es @ForeignKey hacia ella: esa
+   * tabla local quedo deprecada como fuente de verdad (ids ficticios, sin
+   * relacion 1:1 real con saf). Nada en el codigo lee esta columna para
+   * resolver la dependencia del usuario: siempre se resuelve en vivo via
+   * rfc -> saf.s_usuario.id_Dependencia (ver AuthService.resumen(),
+   * UsuariosService.listar(), TicketsService.resolverQuien()). Se conserva
+   * solo como dato de respaldo/historico.
+   */
   @Column(DataType.SMALLINT.UNSIGNED)
   declare dependencia_id: number | null;
 
@@ -191,9 +200,6 @@ export class Usuario extends Model {
   @Default(true)
   @Column(DataType.BOOLEAN)
   declare activo: boolean;
-
-  @BelongsTo(() => Dependencia)
-  declare dependencia: Dependencia;
 
   @BelongsTo(() => Area)
   declare area: Area;
@@ -303,7 +309,7 @@ export class DependenciaValidador extends Model {
   @Column(DataType.INTEGER.UNSIGNED)
   declare id: number;
 
-  @ForeignKey(() => Dependencia)
+  /** Id de dependencia DE SAF (saf.t_dependencia.id_Dependencia) — ya no FK a la tabla local, deprecada. */
   @AllowNull(false)
   @Unique('uq_dependencia_validador')
   @Column(DataType.SMALLINT.UNSIGNED)
@@ -314,9 +320,6 @@ export class DependenciaValidador extends Model {
   @Unique('uq_dependencia_validador')
   @Column(DataType.INTEGER.UNSIGNED)
   declare usuario_id: number;
-
-  @BelongsTo(() => Dependencia)
-  declare dependencia: Dependencia;
 
   @BelongsTo(() => Usuario)
   declare usuario: Usuario;

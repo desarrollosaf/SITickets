@@ -345,12 +345,13 @@ export class MonitorService {
           LIMIT 10`,
         { type: QueryTypes.SELECT },
       ),
+      /* t.dependencia_id ya es el id de saf (saf.t_dependencia.id_Dependencia, no de la tabla local deprecada). */
       this.tickets.sequelize!.query<{ dependencia: string; tickets: number }>(
-        `SELECT d.nombre AS dependencia, COUNT(t.id) AS tickets
+        `SELECT td.Nombre AS dependencia, COUNT(t.id) AS tickets
            FROM ticket t
-           JOIN dependencia d ON d.id = t.dependencia_id
+           JOIN saf.t_dependencia td ON td.id_Dependencia = t.dependencia_id
           WHERE t.interno = 0
-          GROUP BY d.id
+          GROUP BY td.id_Dependencia
           ORDER BY tickets DESC`,
         { type: QueryTypes.SELECT },
       ),

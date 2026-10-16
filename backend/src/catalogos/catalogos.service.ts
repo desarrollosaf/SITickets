@@ -7,13 +7,13 @@ import {
   Area,
   CatalogoProblema,
   CatalogoRol,
-  Dependencia,
   Estatus,
   MotivoReasignacion,
   Prioridad,
   Sede,
   Servicio,
   ServicioUsuarioPermitido,
+  SDependencia,
   SUsuario,
   TecnicoServicio,
   Usuario,
@@ -39,7 +39,6 @@ export class CatalogosService {
     @InjectModel(Prioridad) private readonly prioridades: typeof Prioridad,
     @InjectModel(Estatus) private readonly estatus: typeof Estatus,
     @InjectModel(MotivoReasignacion) private readonly motivos: typeof MotivoReasignacion,
-    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
@@ -47,22 +46,28 @@ export class CatalogosService {
     private readonly permitidos: typeof ServicioUsuarioPermitido,
     @InjectModel(CatalogoRol) private readonly rolesM: typeof CatalogoRol,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
+    @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Dependencias: de saf (saf.t_dependencia), no del catalogo local
+   * deprecado — es lo que alimenta el selector de "dependencias que valida"
+   * al dar de alta/editar un validador (ver UsuariosService).
+   */
   async organizacion() {
-    const [dependencias, areas] = await Promise.all([
-      this.dependencias.findAll({
-        where: { activo: true },
-        attributes: ['id', 'nombre'],
-        order: [['nombre', 'ASC']],
-      }),
+    const [sDependencias, areas] = await Promise.all([
+      this.sDependencias.findAll({ order: [['Nombre', 'ASC']] }),
       this.areas.findAll({
         where: { activo: true },
         attributes: ['id', 'nombre', 'dependencia_id'],
         order: [['nombre', 'ASC']],
       }),
     ]);
+    const dependencias = sDependencias.map((d) => ({
+      id: d.id_Dependencia,
+      nombre: d.Nombre.trim(),
+    }));
     return { dependencias, areas };
   }
 

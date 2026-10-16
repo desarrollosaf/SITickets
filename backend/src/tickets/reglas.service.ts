@@ -27,12 +27,12 @@ const UMBRAL_ESCALAMIENTO = 2;
 const DIAS_CIERRE_POR_OMISION = 3;
 
 /**
- * Dependencia local de OSFEM. saf.t_dependencia.id_Dependencia=3 es
- * "ÓRGANO SUPERIOR DE FISCALIZACIÓN"; resuelta por nombre (ver
- * resolverDependenciaSaf en TicketsService) queda en Dependencia.id=1 del
- * catalogo local — el id que de verdad se graba en Ticket.dependencia_id.
+ * Dependencia de OSFEM EN SAF: saf.t_dependencia.id_Dependencia=3 es
+ * "ÓRGANO SUPERIOR DE FISCALIZACIÓN". Ticket.dependencia_id ya guarda el id
+ * de saf directo (la tabla local `Dependencia` quedo deprecada), asi que
+ * este es el mismo numero que se graba en el ticket — sin traduccion.
  */
-const DEPENDENCIA_OSFEM_ID = 1;
+const DEPENDENCIA_OSFEM_ID = 3;
 
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
 
