@@ -7,6 +7,7 @@ import {
   ESTATUS,
   ESTATUS_ABIERTOS,
   ESTATUS_FINALES,
+  SDependencia,
   Servicio,
   TecnicoServicio,
   Ticket,
@@ -33,6 +34,7 @@ export class MonitorService {
     @InjectModel(Servicio) private readonly servicios: typeof Servicio,
     @InjectModel(TecnicoServicio) private readonly especialidades: typeof TecnicoServicio,
     @InjectModel(CalendarioTecnico) private readonly calendario: typeof CalendarioTecnico,
+    @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     private readonly reglas: ReglasService,
     private readonly ticketsSrv: TicketsService,
   ) {}
@@ -329,7 +331,7 @@ export class MonitorService {
 
   async compras() {
     /* Agregados planos: son dos conteos, no vale la pena hidratar modelos. */
-    const [porProblema, porDependencia] = await Promise.all([
+    const [porProblema, conteoPorDependencia] = await Promise.all([
       this.tickets.sequelize!.query<{
         clave: string;
         descripcion: string;
@@ -345,21 +347,34 @@ export class MonitorService {
           LIMIT 10`,
         { type: QueryTypes.SELECT },
       ),
-      /* t.dependencia_id ya es el id de saf (saf.t_dependencia.id_Dependencia, no de la tabla local deprecada). */
-      this.tickets.sequelize!.query<{ dependencia: string; tickets: number }>(
-        `SELECT td.Nombre AS dependencia, COUNT(t.id) AS tickets
+      /*
+       * t.dependencia_id ya es el id de saf (saf.t_dependencia.id_Dependencia,
+       * no de la tabla local deprecada) — el conteo se queda en esta misma
+       * conexion/base (sin cruzar a saf en el SQL crudo, cuyo nombre de base
+       * cambia por ambiente); el nombre se resuelve aparte, via el modelo.
+       */
+      this.tickets.sequelize!.query<{ dependencia_id: number; tickets: number }>(
+        `SELECT t.dependencia_id, COUNT(t.id) AS tickets
            FROM ticket t
-           JOIN saf.t_dependencia td ON td.id_Dependencia = t.dependencia_id
-          WHERE t.interno = 0
-          GROUP BY td.id_Dependencia
+          WHERE t.interno = 0 AND t.dependencia_id IS NOT NULL
+          GROUP BY t.dependencia_id
           ORDER BY tickets DESC`,
         { type: QueryTypes.SELECT },
       ),
     ]);
 
+    const idsSaf = conteoPorDependencia.map((r) => r.dependencia_id);
+    const sDependencias = idsSaf.length
+      ? await this.sDependencias.findAll({ where: { id_Dependencia: { [Op.in]: idsSaf } } })
+      : [];
+    const nombrePorIdSaf = new Map(sDependencias.map((d) => [d.id_Dependencia, d.Nombre.trim()]));
+
     return {
       problemas: porProblema.map((r) => ({ ...r, tickets: Number(r.tickets) })),
-      dependencias: porDependencia.map((r) => ({ ...r, tickets: Number(r.tickets) })),
+      dependencias: conteoPorDependencia.map((r) => ({
+        dependencia: nombrePorIdSaf.get(r.dependencia_id) ?? '—',
+        tickets: Number(r.tickets),
+      })),
     };
   }
 

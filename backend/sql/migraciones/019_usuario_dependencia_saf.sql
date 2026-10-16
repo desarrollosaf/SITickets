@@ -24,6 +24,6 @@ DEALLOCATE PREPARE ejecutar;
 -- Reescribe dependencia_id con el id de saf (por rfc). Sin rfc, no hay forma
 -- de identificarlo en saf: queda tal cual estaba (no se toca).
 UPDATE usuario u
-JOIN saf.s_usuario su ON su.N_Usuario = u.rfc
+JOIN __SAF_DB__.s_usuario su ON su.N_Usuario = u.rfc
 SET u.dependencia_id = su.id_Dependencia
 WHERE u.rfc IS NOT NULL;

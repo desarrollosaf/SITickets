@@ -33,7 +33,7 @@ DEALLOCATE PREPARE ejecutar;
 -- para algo: traducir datos viejos, nunca para resolver nada nuevo).
 UPDATE dependencia_validador dv
 JOIN dependencia dl ON dl.id = dv.dependencia_id
-JOIN saf.t_dependencia td ON td.Nombre = dl.nombre
+JOIN __SAF_DB__.t_dependencia td ON td.Nombre = dl.nombre
 SET dv.dependencia_id = td.id_Dependencia;
 
 -- ticket.dependencia_id: mismo criterio dual que ya usa el codigo
@@ -46,7 +46,7 @@ SET dv.dependencia_id = td.id_Dependencia;
 UPDATE ticket t
 LEFT JOIN usuario ul
   ON ul.id = t.solicitante_id AND t.registrado_por IS NULL AND ul.nombre = t.solicitante_nombre
-LEFT JOIN saf.s_usuario su_local ON su_local.N_Usuario = ul.rfc
-LEFT JOIN saf.s_usuario su_directo ON su_directo.id_Usuario = t.solicitante_id AND ul.id IS NULL
+LEFT JOIN __SAF_DB__.s_usuario su_local ON su_local.N_Usuario = ul.rfc
+LEFT JOIN __SAF_DB__.s_usuario su_directo ON su_directo.id_Usuario = t.solicitante_id AND ul.id IS NULL
 SET t.dependencia_id = COALESCE(su_local.id_Dependencia, su_directo.id_Dependencia)
 WHERE COALESCE(su_local.id_Dependencia, su_directo.id_Dependencia) IS NOT NULL;
