@@ -29,6 +29,7 @@ export class CatalogoServicios {
   svOrigen: 'usuario' | 'administrador' = 'usuario';
   svExterno = false;
   svRestringido = false;
+  svPermiteANombreDe = false;
 
   /* ---------------- usuarios permitidos de un servicio restringido ---------------- */
 
@@ -62,6 +63,7 @@ export class CatalogoServicios {
     this.svOrigen = 'usuario';
     this.svExterno = false;
     this.svRestringido = false;
+    this.svPermiteANombreDe = false;
     this.errorFormServicio.set('');
     this.mostrarFormServicio.set(true);
   }
@@ -74,6 +76,7 @@ export class CatalogoServicios {
     this.svOrigen = s.origen;
     this.svExterno = s.externo;
     this.svRestringido = s.restringido;
+    this.svPermiteANombreDe = s.permite_a_nombre_de;
     this.errorFormServicio.set('');
     this.mostrarFormServicio.set(true);
   }
@@ -106,6 +109,7 @@ export class CatalogoServicios {
       origen: this.svOrigen,
       externo: this.svExterno,
       restringido: this.svRestringido,
+      permite_a_nombre_de: this.svPermiteANombreDe,
     };
     const peticion = id
       ? this.api.actualizarServicio(id, datos)

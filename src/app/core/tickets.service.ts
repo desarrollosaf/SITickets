@@ -316,6 +316,7 @@ export class TicketsService {
       origen: 'usuario' | 'administrador';
       externo: boolean;
       restringido: boolean;
+      permite_a_nombre_de: boolean;
       activo: boolean;
     }>,
   ) {

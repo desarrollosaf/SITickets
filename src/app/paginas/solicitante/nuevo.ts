@@ -233,17 +233,19 @@ export class Nuevo {
   /**
    * Admin, operador y gestor pueden elegir a nombre de quien registran el
    * ticket — excepto en un servicio restringido (administrable desde el
-   * catalogo, ver ServicioUsuarioPermitido en el backend): ahi el ticket
-   * siempre queda a nombre de quien esta en sesion, sin excepcion salvo el
-   * admin. Tambien queda descartado, sin importar el servicio, para quien
-   * trae marcado siempreANombrePropio (ver RFC_SIEMPRE_A_NOMBRE_PROPIO en
-   * el backend).
+   * catalogo, ver ServicioUsuarioPermitido en el backend) que no tenga
+   * permite_a_nombre_de habilitado: ahi el ticket siempre queda a nombre de
+   * quien esta en sesion, sin excepcion salvo el admin. Tambien queda
+   * descartado, sin importar el servicio, para quien trae marcado
+   * siempreANombrePropio (ver RFC_SIEMPRE_A_NOMBRE_PROPIO en el backend).
    */
   readonly puedeElegirUsuario = computed(
     () =>
       ['admin', 'operador', 'gestor', 'validador'].includes(this.auth.rol() ?? '') &&
       !this.auth.usuario()?.siempreANombrePropio &&
-      (this.esAdmin() || !this.servicioActual()?.restringido),
+      (this.esAdmin() ||
+        !this.servicioActual()?.restringido ||
+        !!this.servicioActual()?.permite_a_nombre_de),
   );
 
   busquedaUsuario = '';

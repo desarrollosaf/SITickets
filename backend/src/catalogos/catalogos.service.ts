@@ -29,7 +29,25 @@ import type { UsuarioToken } from '../common/usuario-actual.decorator';
  * importar el servicio — el ticket siempre queda a su propio nombre, aunque
  * su rol (gestor, en este caso) normalmente si tendria esa opcion.
  */
-export const RFC_SIEMPRE_A_NOMBRE_PROPIO = ['TOMJ820727', 'NATL830315', 'CACX680312'];
+export const RFC_SIEMPRE_A_NOMBRE_PROPIO = ['TOMJ820727', 'NATL830315'];
+
+/**
+ * Caso especial, solo esta persona: ademas de registrar como gestor, el
+ * tambien atiende los tickets de su(s) especialidad(es) (ver
+ * TecnicoServicio) — igual que cualquier tecnico, aunque su rol siga
+ * siendo gestor. Id local, no rfc: es lo que ya trae el token de sesion,
+ * sin tener que ir a buscarlo en cada ticket.
+ */
+export const USUARIOS_GESTOR_TAMBIEN_TECNICO = [1]; // CASTAÑEDA CABALLERO OSCAR GABRIEL (CACX680312)
+
+/**
+ * Caso especial, solo esta persona: en "Tickets generados" no ve toda su
+ * dependencia, solo los tickets del servicio indicado (clave del catalogo).
+ * Id local -> clave de servicio.
+ */
+export const USUARIOS_FILTRO_SERVICIO_GENERADOS: Record<number, string> = {
+  1: 'SIS', // CASTAÑEDA CABALLERO OSCAR GABRIEL (CACX680312) -> SISTEMAS (PROGRESS)
+};
 
 @Injectable()
 export class CatalogosService {
@@ -275,6 +293,9 @@ export class CatalogosService {
         ...(dto.origen !== undefined && { origen: dto.origen }),
         ...(dto.externo !== undefined && { externo: dto.externo }),
         ...(dto.restringido !== undefined && { restringido: dto.restringido }),
+        ...(dto.permite_a_nombre_de !== undefined && {
+          permite_a_nombre_de: dto.permite_a_nombre_de,
+        }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
       });
     } catch (e) {
@@ -393,7 +414,13 @@ export class CatalogosService {
   /** Padron con especialidad. Nunca incluye el hash de contrasena. */
   async tecnicos() {
     const filas = await this.usuarios.findAll({
-      where: { activo: true, rol: { [Op.in]: ['tecnico', 'proveedor', 'jefe'] } },
+      where: {
+        activo: true,
+        [Op.or]: [
+          { rol: { [Op.in]: ['tecnico', 'proveedor', 'jefe'] } },
+          { id: { [Op.in]: USUARIOS_GESTOR_TAMBIEN_TECNICO } },
+        ],
+      },
       attributes: ['id', 'nombre', 'rol'],
       include: [
         {

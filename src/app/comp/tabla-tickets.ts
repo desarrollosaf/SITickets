@@ -19,7 +19,7 @@ import type { Ticket } from '../core/modelos';
             <thead class="table-light">
               <tr class="sub">
                 <th style="width: 140px">Folio</th>
-                @if (esAdminUOperador()) {
+                @if (muestraFolioGeneral()) {
                   <th style="width: 140px">Folio general</th>
                 }
                 <th>Asunto</th>
@@ -63,7 +63,7 @@ import type { Ticket } from '../core/modelos';
                       <div class="sub" style="font-size: 0.7rem">prefijo original</div>
                     }
                   </td>
-                  @if (esAdminUOperador()) {
+                  @if (muestraFolioGeneral()) {
                     <td class="sub">{{ t.folio_general }}</td>
                   }
                   <td>
@@ -151,6 +151,10 @@ export class TablaTickets {
   /** Gestor/validador no gestionan la operacion tecnica: Prio y Tiempo no les sirven. */
   readonly ocultaPrioTiempo = computed(() =>
     ['gestor', 'validador'].includes(this.auth.rol() ?? ''),
+  );
+  /** Admin/operador/gestor/validador ven ademas el folio general (TK/DI/N), aparte del vigente. */
+  readonly muestraFolioGeneral = computed(() =>
+    ['admin', 'operador', 'gestor', 'validador'].includes(this.auth.rol() ?? ''),
   );
 
   estatus(t: Ticket) {

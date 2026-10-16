@@ -148,7 +148,17 @@ export class DetalleTicket {
   readonly esMiSolicitud = computed(
     () => this.ticket()?.solicitante_id === this.auth.usuario()?.id,
   );
-  readonly atiende = computed(() => ['tecnico', 'jefe', 'proveedor'].includes(this.rol() ?? ''));
+  /**
+   * Caso especial, solo esta persona (ver USUARIOS_GESTOR_TAMBIEN_TECNICO en
+   * el backend): ademas de registrar como gestor, el mismo atiende los
+   * tickets de su especialidad.
+   */
+  private readonly USUARIOS_GESTOR_TAMBIEN_TECNICO = [1];
+  readonly atiende = computed(
+    () =>
+      ['tecnico', 'jefe', 'proveedor'].includes(this.rol() ?? '') ||
+      this.USUARIOS_GESTOR_TAMBIEN_TECNICO.includes(this.auth.usuario()?.id ?? -1),
+  );
   readonly esAdmin = computed(() => this.rol() === 'admin');
   /** Oculta la mecanica interna de "EN COLA": al solicitante solo le importa que quedo registrado. */
   readonly esSolicitante = computed(() => this.rol() === 'solicitante');
