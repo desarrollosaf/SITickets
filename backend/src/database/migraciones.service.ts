@@ -68,7 +68,14 @@ export class MigracionesService implements OnApplicationBootstrap {
   }
 
   private async aplicar(carpeta: string, archivo: string) {
-    const sentencias = separar(readFileSync(join(carpeta, archivo), 'utf8'));
+    /*
+     * El nombre de la base de saf cambia por ambiente (en local es "saf",
+     * en produccion algo como "adminplem_saf"): las migraciones que cruzan
+     * a esa base nunca escriben el nombre literal, usan este marcador.
+     */
+    const safDb = this.config.get<string>('SAF_DB_NAME', 'saf');
+    const crudo = readFileSync(join(carpeta, archivo), 'utf8').replaceAll('__SAF_DB__', safDb);
+    const sentencias = separar(crudo);
 
     /*
      * Todo el archivo va por una sola conexion: las migraciones usan

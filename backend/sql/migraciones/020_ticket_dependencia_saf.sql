@@ -16,9 +16,9 @@
 UPDATE ticket t
 LEFT JOIN usuario ul
   ON ul.id = t.solicitante_id AND t.registrado_por IS NULL AND ul.nombre = t.solicitante_nombre
-LEFT JOIN saf.s_usuario su_local ON su_local.N_Usuario = ul.rfc
-LEFT JOIN saf.s_usuario su_directo ON su_directo.id_Usuario = t.solicitante_id AND ul.id IS NULL
-LEFT JOIN saf.t_dependencia td_real
+LEFT JOIN __SAF_DB__.s_usuario su_local ON su_local.N_Usuario = ul.rfc
+LEFT JOIN __SAF_DB__.s_usuario su_directo ON su_directo.id_Usuario = t.solicitante_id AND ul.id IS NULL
+LEFT JOIN __SAF_DB__.t_dependencia td_real
   ON td_real.id_Dependencia = COALESCE(su_local.id_Dependencia, su_directo.id_Dependencia)
 LEFT JOIN dependencia dl_real ON dl_real.nombre = td_real.Nombre
 SET t.dependencia_id = dl_real.id
