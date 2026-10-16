@@ -348,7 +348,9 @@ export class TicketsController {
 
   /* ---------------- §16 reloj checador ---------------- */
 
-  @Roles('tecnico', 'jefe', 'proveedor', 'admin')
+  /* gestor: caso especial, ver USUARIOS_GESTOR_TAMBIEN_TECNICO — RelojService
+     igual exige que el ticket sea suyo, asi que no abre nada a cualquier gestor. */
+  @Roles('tecnico', 'jefe', 'proveedor', 'admin', 'gestor')
   @HttpCode(200)
   @Post(':id/reloj/inicio')
   relojInicio(
@@ -359,7 +361,7 @@ export class TicketsController {
     return this.reloj.iniciar(id, dto, usuario);
   }
 
-  @Roles('tecnico', 'jefe', 'proveedor', 'admin')
+  @Roles('tecnico', 'jefe', 'proveedor', 'admin', 'gestor')
   @HttpCode(200)
   @Post(':id/reloj/fin')
   relojFin(

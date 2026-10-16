@@ -39,7 +39,11 @@ import { BienesService } from '../bienes/bienes.service';
 import { DictamenService } from './dictamen.service';
 import { CedulaCustodiaService } from './cedula-custodia.service';
 import { ImpresorasService } from '../impresoras/impresoras.service';
-import { RFC_SIEMPRE_A_NOMBRE_PROPIO } from '../catalogos/catalogos.service';
+import {
+  RFC_SIEMPRE_A_NOMBRE_PROPIO,
+  USUARIOS_FILTRO_SERVICIO_GENERADOS,
+  USUARIOS_GESTOR_TAMBIEN_TECNICO,
+} from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
 import {
@@ -96,6 +100,7 @@ export class TicketsService {
     @InjectModel(TicketSesion) private readonly sesiones: typeof TicketSesion,
     @InjectModel(TicketBitacora) private readonly bitacora: typeof TicketBitacora,
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
+    @InjectModel(Servicio) private readonly serviciosM: typeof Servicio,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(ServicioUsuarioPermitido)
@@ -147,12 +152,26 @@ export class TicketsService {
     if (usuario.rol === 'admin' || usuario.rol === 'operador') {
       if (modo === 'propios') {
         return {
-          [Op.or]: [{ solicitante_id: usuario.id }, { registrado_por: usuario.id }],
+          [Op.or]: [
+            /*
+             * solicitante_id vive en dos espacios de ids (local o saf, ver
+             * comentario del modelo Ticket): comparar solo por numero puede
+             * chocar por casualidad con el id de otra persona en el otro
+             * espacio (p.ej. el id local de un usuario de planta coincide
+             * con el id_Usuario de saf de alguien mas). El nombre, que el
+             * token siempre trae igual al que se grabo en el ticket al
+             * crearlo, desempata sin ambiguedad.
+             */
+            { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre },
+            { registrado_por: usuario.id },
+          ],
         };
       }
       return {};
     }
-    if (usuario.rol === 'solicitante') return { solicitante_id: usuario.id };
+    if (usuario.rol === 'solicitante') {
+      return { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre };
+    }
     /**
      * "Mis tickets" (modo 'propios'): solo lo que el gestor/validador
      * registro a su propio nombre, como cualquier solicitante — no lo que
@@ -173,9 +192,19 @@ export class TicketsService {
             ? await this.dependenciasDe(usuario.id)
             : await this.dependenciasDelGestor(usuario.id);
         if (!dependenciaIds.length) return { id: null };
-        return { dependencia_id: { [Op.in]: dependenciaIds } };
+        const where: Record<string, unknown> = { dependencia_id: { [Op.in]: dependenciaIds } };
+        /* Caso especial, solo quien este en la lista: aqui no ve toda la
+           dependencia, solo el servicio indicado. */
+        const claveServicio = USUARIOS_FILTRO_SERVICIO_GENERADOS[usuario.id];
+        if (claveServicio) {
+          const servicio = await this.serviciosM.findOne({ where: { clave: claveServicio } });
+          where.servicio_id = servicio?.id ?? null;
+        }
+        return where;
       }
-      return { solicitante_id: usuario.id };
+      /* Mismo desempate por nombre que arriba: evita que choque con el id de
+         otra persona en el otro espacio de ids. */
+      return { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre };
     }
     if (ROLES_TECNICOS.includes(usuario.rol)) {
       /*
@@ -193,7 +222,11 @@ export class TicketsService {
           if (sUsuario) solicitanteIds.push(sUsuario.id_Usuario);
         }
       }
-      const comoPropio = { solicitante_id: { [Op.in]: solicitanteIds } };
+      /* Mismo desempate por nombre que en las demas ramas de alcance(). */
+      const comoPropio = {
+        solicitante_id: { [Op.in]: solicitanteIds },
+        solicitante_nombre: usuario.nombre,
+      };
       const comoTurnado = {
         [Op.or]: [
           { tecnico_id: usuario.id },
@@ -804,8 +837,9 @@ export class TicketsService {
       if (!permitido) {
         throw new ForbiddenException('Tu perfil no puede registrar tickets de ese servicio');
       }
-      /* Aunque este en la lista, ahi nunca se registra a nombre de otro. */
-      if (dto.a_nombre_de) {
+      /* Por default, aunque este en la lista, ahi solo se registra a nombre
+         propio — salvo que el servicio lo tenga habilitado explicitamente. */
+      if (dto.a_nombre_de && !problema.servicio.permite_a_nombre_de) {
         throw new ForbiddenException('Ese servicio no se puede registrar a nombre de otro usuario');
       }
     }
@@ -1550,7 +1584,9 @@ export class TicketsService {
 
   private exigeTecnico(t: Ticket, usuario: UsuarioToken) {
     if (usuario.rol === 'admin') return;
-    if (!ROLES_TECNICOS.includes(usuario.rol) || !this.esTecnicoDe(t, usuario)) {
+    const esTecnico =
+      ROLES_TECNICOS.includes(usuario.rol) || USUARIOS_GESTOR_TAMBIEN_TECNICO.includes(usuario.id);
+    if (!esTecnico || !this.esTecnicoDe(t, usuario)) {
       throw new ForbiddenException('Solo el tecnico asignado puede mover este ticket');
     }
   }
@@ -2107,7 +2143,14 @@ export class TicketsService {
     }
 
     const destino = await this.usuarios.findOne({
-      where: { id: dto.tecnico, activo: true, rol: { [Op.in]: ROLES_TECNICOS } },
+      where: {
+        id: dto.tecnico,
+        activo: true,
+        [Op.or]: [
+          { rol: { [Op.in]: ROLES_TECNICOS } },
+          { id: { [Op.in]: USUARIOS_GESTOR_TAMBIEN_TECNICO } },
+        ],
+      },
     });
     if (!destino) throw new BadRequestException('El tecnico destino no existe o no esta activo');
 

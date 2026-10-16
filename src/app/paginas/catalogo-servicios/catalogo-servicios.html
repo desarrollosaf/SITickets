@@ -119,6 +119,15 @@
           Acceso restringido (solo usuarios permitidos)
         </label>
       </div>
+      @if (svRestringido) {
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="sv-anombrede" [(ngModel)]="svPermiteANombreDe"
+                 name="svPermiteANombreDe" />
+          <label class="form-check-label small" for="sv-anombrede">
+            Permite registrar a nombre de otro
+          </label>
+        </div>
+      }
     </div>
 
     @if (errorFormServicio()) {

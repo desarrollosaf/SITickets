@@ -227,6 +227,8 @@ export interface Servicio {
   activo: boolean;
   /** true: solo la gente en su lista de usuarios permitidos (mas el admin) lo registra. */
   restringido: boolean;
+  /** Solo aplica si restringido=true: habilita "a nombre de otro" para ese servicio. */
+  permite_a_nombre_de: boolean;
   /** false cuando restringido=true y tu perfil no esta en esa lista (ni eres admin). */
   puedeRegistrar: boolean;
 }

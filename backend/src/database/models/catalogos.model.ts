@@ -251,6 +251,17 @@ export class Servicio extends Model {
   @Column(DataType.BOOLEAN)
   declare restringido: boolean;
 
+  /**
+   * Solo aplica si restringido=true: por default (false) quien esta en la
+   * lista de permitidos solo puede registrar a su propio nombre, igual que
+   * cualquier otro servicio restringido. En true, se le habilita ademas
+   * "a nombre de otro" (con el mismo filtro de dependencia que ya aplica a
+   * cualquier gestor/validador).
+   */
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare permite_a_nombre_de: boolean;
+
   @HasMany(() => CatalogoProblema)
   declare problemas: CatalogoProblema[];
 

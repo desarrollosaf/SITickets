@@ -58,6 +58,11 @@ export class ActualizarServicioDto {
   @IsBoolean()
   restringido?: boolean;
 
+  /** Solo aplica si restringido=true: habilita "a nombre de otro" para ese servicio. */
+  @IsOptional()
+  @IsBoolean()
+  permite_a_nombre_de?: boolean;
+
   /** Alta/baja logica: false lo oculta del formulario de tickets sin borrarlo. */
   @IsOptional()
   @IsBoolean()
