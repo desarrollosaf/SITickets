@@ -116,6 +116,9 @@ export class DetalleTicket {
   diagnostico = '';
   solucion = '';
   refacciones = '';
+  /** Solo servicio CNA (Cartas de no adeudo): revision de los bienes del solicitante, en vez de diagnostico/solucion. */
+  revisionBienes: 'completa' | 'incompleta' | '' = '';
+  observacionesRevision = '';
   nota = '';
   tecnicoDestino: number | null = null;
   problemaDestino = '';
@@ -148,6 +151,23 @@ export class DetalleTicket {
   readonly esMiSolicitud = computed(
     () => this.ticket()?.solicitante_id === this.auth.usuario()?.id,
   );
+  /** Servicio CNA (Cartas de no adeudo): al resolver, revision completa/incompleta en vez de diagnostico/solucion. */
+  readonly esRevisionBienes = computed(() => this.ticket()?.servicio_clave === 'CNA');
+  /**
+   * Caso especial, solo para el servicio indicado (ver USUARIOS_CIERRE_SERVICIO
+   * en el backend): esta persona reemplaza al solicitante real para
+   * confirmar/rechazar/reabrir el ticket — no se suma a el, lo sustituye.
+   */
+  private readonly USUARIOS_CIERRE_SERVICIO: Record<string, number> = { CNA: 38 };
+  /** true si el servicio de este ticket tiene encargado especial (reemplaza al solicitante, no se suma). */
+  readonly tieneCierreEspecial = computed(() => {
+    const clave = this.ticket()?.servicio_clave;
+    return !!clave && clave in this.USUARIOS_CIERRE_SERVICIO;
+  });
+  readonly esCierreEspecial = computed(() => {
+    const clave = this.ticket()?.servicio_clave;
+    return !!clave && this.USUARIOS_CIERRE_SERVICIO[clave] === this.auth.usuario()?.id;
+  });
   /**
    * Caso especial, solo esta persona (ver USUARIOS_GESTOR_TAMBIEN_TECNICO en
    * el backend): ademas de registrar como gestor, el mismo atiende los
@@ -319,6 +339,8 @@ export class DetalleTicket {
     this.diagnostico = '';
     this.solucion = '';
     this.refacciones = '';
+    this.revisionBienes = '';
+    this.observacionesRevision = '';
     this.nota = '';
     this.tecnicoDestino = null;
     this.problemaDestino = '';
@@ -454,12 +476,34 @@ export class DetalleTicket {
   }
 
   enviarResolver() {
+    if (this.esRevisionBienes()) {
+      if (!this.revisionBienes) {
+        this.error.set('Indica si la revisión quedó completa o incompleta.');
+        return;
+      }
+      if (this.revisionBienes === 'incompleta' && !this.observacionesRevision.trim()) {
+        this.error.set('Captura las observaciones de la revisión incompleta.');
+        return;
+      }
+    } else {
+      if (!this.diagnostico.trim()) {
+        this.error.set('El diagnóstico es obligatorio.');
+        return;
+      }
+      if (!this.solucion.trim()) {
+        this.error.set('La solución es obligatoria.');
+        return;
+      }
+    }
+    this.error.set('');
     this.ocupado.set(true);
     this.api
       .resolver(this.id(), {
-        diagnostico: this.diagnostico,
-        solucion: this.solucion,
-        refacciones: this.refacciones || undefined,
+        diagnostico: this.esRevisionBienes() ? undefined : this.diagnostico,
+        solucion: this.esRevisionBienes() ? undefined : this.solucion,
+        refacciones: this.esRevisionBienes() ? undefined : this.refacciones || undefined,
+        revision: this.esRevisionBienes() ? (this.revisionBienes as 'completa' | 'incompleta') : undefined,
+        observaciones: this.esRevisionBienes() ? this.observacionesRevision.trim() || undefined : undefined,
       })
       .subscribe({ next: (t) => this.aplicar(t), error: (e) => this.falla(e) });
   }
@@ -562,6 +606,15 @@ export class DetalleTicket {
   enviarRechazar() {
     this.ocupado.set(true);
     this.api.rechazar(this.id(), this.motivo).subscribe({
+      next: (t) => this.aplicar(t),
+      error: (e) => this.falla(e),
+    });
+  }
+
+  /** Servicio CNA (Cartas de no adeudo): rechazar con un clic, sin pedir motivo. */
+  rechazarSinMotivo() {
+    this.ocupado.set(true);
+    this.api.rechazar(this.id()).subscribe({
       next: (t) => this.aplicar(t),
       error: (e) => this.falla(e),
     });

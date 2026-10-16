@@ -283,6 +283,14 @@ export class Ticket extends Model {
   @Column(DataType.ENUM('reparado', 'baja'))
   declare resultado_cmp: 'reparado' | 'baja' | null;
 
+  /** Solo en servicio CNA (Cartas de no adeudo): revision de los bienes del solicitante. */
+  @Column(DataType.ENUM('completa', 'incompleta'))
+  declare revision_bienes: 'completa' | 'incompleta' | null;
+
+  /** Solo cuando revision_bienes = 'incompleta'. */
+  @Column(DataType.STRING(400))
+  declare observaciones_revision: string | null;
+
   /** Ruta relativa en disco del dictamen de baja (pdf). Solo si resultado_cmp = 'baja'. */
   @Column(DataType.STRING(255))
   declare dictamen_url: string | null;
