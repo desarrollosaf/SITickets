@@ -25,6 +25,7 @@ import {
   MotivoDto,
   PrioridadDto,
   ReasignarDto,
+  RechazarDto,
   ReclasificarDto,
   RelojFinDto,
   RelojInicioDto,
@@ -281,18 +282,20 @@ export class TicketsController {
     return this.tickets.validar(id, usuario);
   }
 
-  @Roles('solicitante')
+  /* gestor: caso especial, ver USUARIOS_CIERRE_SERVICIO — el servicio exige
+     igual que sea la persona exacta asignada a ese servicio. */
+  @Roles('solicitante', 'gestor')
   @HttpCode(200)
   @Post(':id/rechazar')
   rechazar(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: MotivoDto,
+    @Body() dto: RechazarDto,
     @UsuarioActual() usuario: UsuarioToken,
   ) {
     return this.tickets.rechazar(id, dto.motivo, usuario);
   }
 
-  @Roles('solicitante', 'admin')
+  @Roles('solicitante', 'admin', 'gestor')
   @HttpCode(200)
   @Post(':id/reabrir')
   reabrir(

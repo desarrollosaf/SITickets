@@ -47,6 +47,17 @@ export const USUARIOS_GESTOR_TAMBIEN_TECNICO = [1]; // CASTAÑEDA CABALLERO OSCA
  */
 export const USUARIOS_FILTRO_SERVICIO_GENERADOS: Record<number, string> = {
   1: 'SIS', // CASTAÑEDA CABALLERO OSCAR GABRIEL (CACX680312) -> SISTEMAS (PROGRESS)
+  38: 'CNA', // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
+};
+
+/**
+ * Caso especial, solo para el servicio indicado (clave): en vez de que el
+ * solicitante real confirme/rechace/reabra el ticket ya resuelto, lo hace
+ * esta persona (id local) — lo reemplaza, no se suma. Clave de servicio ->
+ * id local de quien cierra.
+ */
+export const USUARIOS_CIERRE_SERVICIO: Record<string, number> = {
+  CNA: 38, // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
 };
 
 @Injectable()
@@ -266,6 +277,8 @@ export class CatalogosService {
         prefijo_folio: dto.prefijo_folio.trim().toUpperCase(),
         origen: dto.origen,
         externo: dto.externo ?? false,
+        restringido: dto.restringido ?? false,
+        permite_a_nombre_de: dto.permite_a_nombre_de ?? false,
       });
     } catch (e) {
       if (e instanceof UniqueConstraintError) {

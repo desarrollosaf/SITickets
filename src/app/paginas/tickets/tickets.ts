@@ -20,6 +20,17 @@ export class Tickets {
   /** Gestor/validador solo buscan por nombre/folio: el resto de filtros es jerga operativa que no les toca. */
   readonly esAdminUOperador = computed(() => ['admin', 'operador'].includes(this.auth.rol() ?? ''));
 
+  /**
+   * Caso especial, solo esta persona (ver USUARIOS_CIERRE_SERVICIO en el
+   * backend): cuantos de sus tickets (ya acotados a CARTAS DE NO ADEUDO)
+   * estan en RESUELTO esperando que ella los confirme.
+   */
+  private readonly USUARIOS_CIERRE_ESPECIAL = [38];
+  readonly esCierreEspecial = computed(() =>
+    this.USUARIOS_CIERRE_ESPECIAL.includes(this.auth.usuario()?.id ?? -1),
+  );
+  readonly porConfirmar = computed(() => this.tickets().filter((t) => t.estatus === 'RESUELTO'));
+
   readonly tickets = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);
   readonly tecnicos = signal<Tecnico[]>([]);
@@ -133,5 +144,26 @@ export class Tickets {
 
   paginaSiguiente() {
     this.paginaActual.update((p) => Math.min(this.totalPaginas(), p + 1));
+  }
+
+  paginaPrimera() {
+    this.paginaActual.set(1);
+  }
+
+  paginaUltima() {
+    this.paginaActual.set(this.totalPaginas());
+  }
+
+  /** Numeros alrededor de la pagina actual, para saltar varias hojas de un clic. */
+  paginasVecinas() {
+    const total = this.totalPaginas();
+    const actual = this.paginaActual();
+    const inicio = Math.max(1, Math.min(actual - 2, total - 4));
+    const fin = Math.min(total, inicio + 4);
+    return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i);
+  }
+
+  irAPagina(pagina: number) {
+    this.paginaActual.set(Math.min(this.totalPaginas(), Math.max(1, pagina)));
   }
 }

@@ -183,7 +183,17 @@ export class TicketsService {
   reanudar(id: number) {
     return this.accion(id, 'reanudar');
   }
-  resolver(id: number, d: { diagnostico: string; solucion: string; refacciones?: string }) {
+  resolver(
+    id: number,
+    d: {
+      diagnostico?: string;
+      solucion?: string;
+      refacciones?: string;
+      /** Solo servicio CNA (Cartas de no adeudo), en vez de diagnostico/solucion. */
+      revision?: 'completa' | 'incompleta';
+      observaciones?: string;
+    },
+  ) {
     return this.accion(id, 'resolver', d);
   }
 
@@ -233,8 +243,9 @@ export class TicketsService {
   validar(id: number) {
     return this.accion(id, 'validar');
   }
-  rechazar(id: number, motivo: string) {
-    return this.accion(id, 'rechazar', { motivo });
+  /** Motivo opcional: solo en servicio CNA (Cartas de no adeudo) se puede omitir. */
+  rechazar(id: number, motivo?: string) {
+    return this.accion(id, 'rechazar', { motivo: motivo || undefined });
   }
   reabrir(id: number, motivo: string) {
     return this.accion(id, 'reabrir', { motivo });

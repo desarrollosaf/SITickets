@@ -10,6 +10,13 @@
   <div class="alert alert-danger py-2 small">{{ error() }}</div>
 }
 
+@if (esCierreEspecial() && porConfirmar().length) {
+  <div class="alert alert-primary py-2 small">
+    Tienes <b>{{ porConfirmar().length }}</b> ticket(s) marcados como resueltos esperando tu
+    confirmación. Si no respondes en 3 días, el sistema los cierra por omisión.
+  </div>
+}
+
 <div class="tarjeta p-3 mb-3">
   <div class="row g-2">
     <div class="col-12 col-lg-4">
@@ -85,19 +92,34 @@
 
 <app-tabla-tickets [tickets]="ticketsPagina()" (abrir)="abierto.set($event)"
                     [ordenable]="true" [ordenPor]="ordenPor()" [ordenDir]="ordenDir()"
+                    [pedirConfirmacion]="esCierreEspecial()"
                     (ordenar)="ordenar($event)" />
 
 @if (totalPaginas() > 1) {
-  <div class="d-flex align-items-center justify-content-between mt-2">
+  <div class="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
     <span class="sub small">Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-1">
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
+              title="Primera página" (click)="paginaPrimera()">
+        <i class="bi bi-chevron-bar-left"></i>
+      </button>
       <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
               (click)="paginaAnterior()">
         <i class="bi bi-chevron-left"></i> Anterior
       </button>
+      @for (p of paginasVecinas(); track p) {
+        <button class="btn btn-sm" [class.btn-primary]="p === paginaActual()"
+                [class.btn-outline-secondary]="p !== paginaActual()" (click)="irAPagina(p)">
+          {{ p }}
+        </button>
+      }
       <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
               (click)="paginaSiguiente()">
         Siguiente <i class="bi bi-chevron-right"></i>
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
+              title="Última página" (click)="paginaUltima()">
+        <i class="bi bi-chevron-bar-right"></i>
       </button>
     </div>
   </div>

@@ -132,21 +132,49 @@ export class MotivoDto {
   motivo!: string;
 }
 
+/**
+ * Para rechazar un ticket resuelto. A diferencia de MotivoDto, el motivo es
+ * opcional aqui: en servicio CNA (Cartas de no adeudo) quien cierra en lugar
+ * del solicitante (ver USUARIOS_CIERRE_SERVICIO) puede rechazar con un clic,
+ * sin escribir nada — para cualquier otro servicio sigue siendo obligatorio,
+ * eso se valida en el service, no aqui.
+ */
+export class RechazarDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  motivo?: string;
+}
+
 export class ResolverDto {
+  /** Solo para servicios normales: en CARTAS DE NO ADEUDO (CNA) se usa `revision` en su lugar. */
+  @IsOptional()
   @IsString()
   @MinLength(3, { message: 'El diagnostico es obligatorio' })
   @MaxLength(400)
-  diagnostico!: string;
+  diagnostico?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(3, { message: 'La solucion es obligatoria' })
   @MaxLength(400)
-  solucion!: string;
+  solucion?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(300)
   refacciones?: string;
+
+  /** Solo para CARTAS DE NO ADEUDO (CNA): revision de los bienes del solicitante. */
+  @IsOptional()
+  @IsIn(['completa', 'incompleta'])
+  revision?: 'completa' | 'incompleta';
+
+  /** Solo si revision = 'incompleta'. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  observaciones?: string;
 }
 
 export class ReasignarDto {

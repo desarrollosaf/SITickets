@@ -27,6 +27,16 @@ export class CrearServicioDto {
   @IsOptional()
   @IsBoolean()
   externo?: boolean;
+
+  /** 1 = solo la gente en su lista de usuarios permitidos (mas el admin) lo registra. */
+  @IsOptional()
+  @IsBoolean()
+  restringido?: boolean;
+
+  /** Solo aplica si restringido=true: habilita "a nombre de otro" para ese servicio. */
+  @IsOptional()
+  @IsBoolean()
+  permite_a_nombre_de?: boolean;
 }
 
 /** Edicion de un servicio ya existente. La clave no se toca (ver el servicio). */

@@ -160,6 +160,9 @@ export interface TicketDetalle extends Omit<Ticket, 'sesiones'> {
   diagnostico: string | null;
   solucion: string | null;
   refacciones: string | null;
+  /** Solo servicio CNA (Cartas de no adeudo). */
+  revision_bienes: 'completa' | 'incompleta' | null;
+  observaciones_revision: string | null;
   motivo_espera: string | null;
   motivo_cancelacion: string | null;
   f_asignacion: string | null;

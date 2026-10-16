@@ -41,6 +41,7 @@ import { CedulaCustodiaService } from './cedula-custodia.service';
 import { ImpresorasService } from '../impresoras/impresoras.service';
 import {
   RFC_SIEMPRE_A_NOMBRE_PROPIO,
+  USUARIOS_CIERRE_SERVICIO,
   USUARIOS_FILTRO_SERVICIO_GENERADOS,
   USUARIOS_GESTOR_TAMBIEN_TECNICO,
 } from '../catalogos/catalogos.service';
@@ -546,6 +547,9 @@ export class TicketsService {
       diagnostico: ticket.diagnostico,
       solucion: ticket.solucion,
       refacciones: ticket.refacciones,
+      /** Solo aplica a servicio CNA (Cartas de no adeudo). */
+      revision_bienes: ticket.revision_bienes,
+      observaciones_revision: ticket.observaciones_revision,
       motivo_espera: ticket.motivo_espera,
       motivo_cancelacion: ticket.motivo_cancelacion,
       f_asignacion: ticket.f_asignacion,
@@ -1389,6 +1393,20 @@ export class TicketsService {
 
   /** Carga el ticket verificando que el rol pueda siquiera verlo. */
   private async cargar(id: number, usuario: UsuarioToken): Promise<Ticket> {
+    /*
+     * Caso especial: quien cierra un servicio por USUARIOS_CIERRE_SERVICIO
+     * (ver exigeSolicitante) necesita poder abrir CUALQUIER ticket de ese
+     * servicio para cerrarlo, sin importar la dependencia — el alcance
+     * normal de gestor (usado tambien por "Tickets generados") lo limitaria
+     * a su propia dependencia, que no tiene nada que ver con esto.
+     */
+    if (Object.values(USUARIOS_CIERRE_SERVICIO).includes(usuario.id)) {
+      const t = await this.tickets.findOne({
+        where: { id },
+        include: [{ model: Servicio, as: 'servicio' }],
+      });
+      if (t && USUARIOS_CIERRE_SERVICIO[t.servicio?.clave ?? ''] === usuario.id) return t;
+    }
     const t = await this.tickets.findOne({
       where: { id, ...(await this.alcance(usuario)) },
       include: [{ model: Servicio, as: 'servicio' }],
@@ -1592,6 +1610,15 @@ export class TicketsService {
   }
 
   private exigeSolicitante(t: Ticket, usuario: UsuarioToken) {
+    /* Caso especial, solo para el servicio indicado: reemplaza al
+       solicitante real, no se suma — ver USUARIOS_CIERRE_SERVICIO. */
+    const encargado = USUARIOS_CIERRE_SERVICIO[t.servicio?.clave ?? ''];
+    if (encargado) {
+      if (usuario.id !== encargado) {
+        throw new ForbiddenException('Solo la persona encargada de este servicio puede realizar esta accion');
+      }
+      return;
+    }
     if (t.solicitante_id !== usuario.id) {
       throw new ForbiddenException('Solo el solicitante puede realizar esta accion');
     }
@@ -1812,6 +1839,23 @@ export class TicketsService {
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.EN_ESPERA, ESTATUS.ASIGNADO]);
 
+    /*
+     * CNA (Cartas de no adeudo): no se captura diagnostico/solucion/
+     * refacciones, en su lugar el tecnico marca una sola revision para
+     * todo el ticket — completa, o incompleta con observaciones. No
+     * bloquea el cierre: es solo el registro de como quedo.
+     */
+    const esRevisionBienes = t.servicio?.clave === 'CNA';
+    if (esRevisionBienes) {
+      if (!dto.revision) throw new BadRequestException('Indica si la revisión quedó completa o incompleta');
+      if (dto.revision === 'incompleta' && !dto.observaciones?.trim()) {
+        throw new BadRequestException('Captura las observaciones de la revisión incompleta');
+      }
+    } else {
+      if (!dto.diagnostico?.trim()) throw new BadRequestException('El diagnostico es obligatorio');
+      if (!dto.solucion?.trim()) throw new BadRequestException('La solucion es obligatoria');
+    }
+
     /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
     const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
     if (!sesionAbierta) {
@@ -1828,15 +1872,19 @@ export class TicketsService {
       estatus: ESTATUS.RESUELTO,
       f_resolucion: new Date(),
       f_espera_desde: null,
-      diagnostico: dto.diagnostico,
-      solucion: dto.solucion,
-      refacciones: dto.refacciones?.trim() || 'Ninguna',
+      diagnostico: esRevisionBienes ? null : dto.diagnostico,
+      solucion: esRevisionBienes ? null : dto.solucion,
+      refacciones: esRevisionBienes ? null : dto.refacciones?.trim() || 'Ninguna',
+      revision_bienes: esRevisionBienes ? dto.revision! : null,
+      observaciones_revision: esRevisionBienes ? dto.observaciones?.trim() || null : null,
     });
     await this.reglas.anota(
       t.id,
       usuario.id,
       'Resuelto',
-      `${dto.diagnostico} → ${dto.solucion}`,
+      esRevisionBienes
+        ? `Revisión ${dto.revision}${dto.observaciones ? `: ${dto.observaciones.trim()}` : ''}`
+        : `${dto.diagnostico} → ${dto.solucion}`,
     );
 
     const objetivos = await this.reglas.objetivos();
@@ -2062,10 +2110,21 @@ export class TicketsService {
     return this.detalle(id, usuario);
   }
 
-  async rechazar(id: number, motivo: string, usuario: UsuarioToken) {
+  async rechazar(id: number, motivo: string | undefined, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
     this.exigeSolicitante(t, usuario);
     this.exigeEstatus(t, [ESTATUS.RESUELTO]);
+
+    /*
+     * El motivo solo es obligatorio fuera de CNA (Cartas de no adeudo): ahi
+     * quien cierra en lugar del solicitante (ver USUARIOS_CIERRE_SERVICIO)
+     * rechaza con un clic, sin escribir nada — el tecnico ya sabe que falto
+     * algo por la revision incompleta que el mismo dejo marcada al resolver.
+     */
+    const esRevisionBienes = t.servicio?.clave === 'CNA';
+    if (!esRevisionBienes && !motivo?.trim()) {
+      throw new BadRequestException('El motivo es obligatorio');
+    }
 
     /* Conserva folio y tecnico: es el mismo problema, no uno nuevo (§5). */
     await t.update({
@@ -2073,10 +2132,18 @@ export class TicketsService {
       rechazos: t.rechazos + 1,
       f_resolucion: null,
     });
-    await this.reglas.anota(t.id, usuario.id, 'Rechazado por el usuario', motivo, undefined, undefined, usuario.nombre);
+    await this.reglas.anota(
+      t.id,
+      usuario.id,
+      'Rechazado por el usuario',
+      motivo?.trim() || undefined,
+      undefined,
+      undefined,
+      usuario.nombre,
+    );
     this.traza.registra(
       '§5',
-      `${t.folio} rechazado por el solicitante (${motivo}). Regresa a EN ATENCION; conserva el folio.`,
+      `${t.folio} rechazado por el solicitante${motivo ? ` (${motivo})` : ''}. Regresa a EN ATENCION; conserva el folio.`,
     );
     return this.detalle(id, usuario);
   }
