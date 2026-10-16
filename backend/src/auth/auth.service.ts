@@ -67,7 +67,7 @@ export class AuthService {
      * login: pierde el rol de staff y cae al mismo flujo de abajo, como
      * cualquier solicitante identificado por saf.
      */
-    const local = await this.usuarios.findOne({ where: { rfc }, include: [Dependencia, Area] });
+    const local = await this.usuarios.findOne({ where: { rfc }, include: [Area] });
     if (local?.activo) {
       return {
         token: this.jwt.sign({ sub: local.id, rol: local.rol, externo: false }),
@@ -135,7 +135,7 @@ export class AuthService {
 
     const local = await this.usuarios.findByPk(usuario.id, {
       attributes: { exclude: ['password_hash'] },
-      include: [Dependencia, Area],
+      include: [Area],
     });
     if (!local) throw new UnauthorizedException('Sesion invalida');
     return await this.resumen(local);
@@ -151,11 +151,11 @@ export class AuthService {
 
   private async resumen(usuario: Usuario) {
     /*
-     * Usuario.dependencia_id es solo la foto del alta (ver
-     * UsuariosService.registrar()): si la persona cambia de dependencia en
-     * saf despues esa columna se queda atrasada. Se resuelve de nuevo via
-     * saf (rfc); si no se puede (sin rfc o sin match), se usa la columna
-     * local como respaldo.
+     * La dependencia siempre sale de saf (t_dependencia via
+     * s_usuario.id_Dependencia, cruzando por rfc): Usuario.dependencia_id es
+     * solo la foto del alta (ver UsuariosService.registrar()) y nunca se usa,
+     * ni como respaldo — si no se puede identificar en saf (sin rfc o sin
+     * match), queda en null.
      */
     const sUsuario = usuario.rfc
       ? await this.sUsuarios.findOne({ where: { N_Usuario: usuario.rfc } })
@@ -168,9 +168,9 @@ export class AuthService {
       correo: usuario.correo,
       rol: usuario.rol,
       extension: usuario.extension,
-      dependencia: dependenciaSaf?.nombre ?? usuario.dependencia?.nombre ?? null,
+      dependencia: dependenciaSaf?.nombre ?? null,
       area: usuario.area?.nombre ?? null,
-      dependencia_id: dependenciaSaf?.id ?? usuario.dependencia_id,
+      dependencia_id: dependenciaSaf?.id ?? null,
       area_id: usuario.area_id,
       siempreANombrePropio: !!usuario.rfc && RFC_SIEMPRE_A_NOMBRE_PROPIO.includes(usuario.rfc),
     };

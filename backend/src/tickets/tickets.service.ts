@@ -14,7 +14,6 @@ import * as ExcelJS from 'exceljs';
 import {
   Area,
   CatalogoProblema,
-  Dependencia,
   DependenciaValidador,
   ESTATUS,
   ESTATUS_FINALES,
@@ -84,7 +83,6 @@ const INCLUDES = [
   { model: CatalogoProblema, as: 'problema' },
   { model: Usuario, as: 'solicitante', attributes: ['id', 'nombre'] },
   { model: Usuario, as: 'tecnico', attributes: ['id', 'nombre'] },
-  { model: Dependencia },
   { model: Area },
   { model: Sede },
 ];
@@ -100,7 +98,6 @@ export class TicketsService {
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
-    @InjectModel(Dependencia) private readonly dependencias: typeof Dependencia,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
     @InjectModel(DependenciaValidador)
@@ -280,7 +277,8 @@ export class TicketsService {
 
     const objetivos = await this.reglas.objetivos();
     const conteos = await this.conteoSesiones(filas.map((t) => t.id));
-    return filas.map((t) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0));
+    const mapaDependencias = await this.mapaDependenciasSaf();
+    return filas.map((t) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0, mapaDependencias));
   }
 
   /**
@@ -341,7 +339,7 @@ export class TicketsService {
         prioridad: t.prioridad,
         estatus: t.estatus,
         solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
-        dependencia: t.dependencia?.nombre ?? '—',
+        dependencia: org.dependencia ?? '—',
         direccion: org.direccionCompleta ?? '—',
         departamento: org.departamento ?? '—',
         tecnico: t.tecnico?.nombre ?? 'Sin asignar',
@@ -505,8 +503,9 @@ export class TicketsService {
       !!ticket.registrado_por,
     );
 
+    const mapaDependencias = await this.mapaDependenciasSaf();
     return {
-      ...this.resumen(ticket, objetivos, sesiones.length),
+      ...this.resumen(ticket, objetivos, sesiones.length, mapaDependencias),
       dependencia_saf: orgSaf.dependencia,
       direccion_saf: orgSaf.direccion,
       departamento_saf: orgSaf.departamento,
@@ -567,7 +566,12 @@ export class TicketsService {
     return new Map(filas.map((f: any) => [Number(f.ticket_id), Number(f.n)]));
   }
 
-  private resumen(t: Ticket, objetivos: Map<string, number>, sesiones: number) {
+  private resumen(
+    t: Ticket,
+    objetivos: Map<string, number>,
+    sesiones: number,
+    mapaDependenciasSaf: Map<number, string>,
+  ) {
     const objetivo = objetivos.get(t.prioridad) ?? 1440;
     return {
       id: t.id,
@@ -597,7 +601,7 @@ export class TicketsService {
       tiene_dictamen: !!t.dictamen_url,
       tiene_cedula_salida: !!t.cedula_salida_url,
       tiene_cedula_entrada: !!t.cedula_entrada_url,
-      dependencia: t.dependencia?.nombre ?? '—',
+      dependencia: (t.dependencia_id && mapaDependenciasSaf.get(t.dependencia_id)) ?? '—',
       area: t.area?.nombre ?? '—',
       /* Los ids los usa el formulario de correccion para preseleccionar. */
       dependencia_id: t.dependencia_id,
@@ -656,14 +660,30 @@ export class TicketsService {
     if (!usuario.externo) {
       const quien = await this.usuarios.findByPk(usuario.id);
       if (!quien) throw new ForbiddenException('Sesion invalida');
+      /*
+       * area_id (y por lo tanto sede_id) es, a diferencia de dependencia_id,
+       * un dato que ESTRUCTURALMENTE nunca se llena: UsuariosService.registrar()
+       * siempre lo crea en null y nunca se edita despues (sin pantalla ni campo
+       * para capturarlo). No es un dato desactualizado que se pueda corregir
+       * resolviendolo via saf en vivo, como se hizo con dependencia_id: saf no
+       * tiene un catalogo geocodificado (lat/long) equivalente a la tabla local
+       * Sede — lo mas parecido (s_usuario.id_Departamento -> t_ubicacion) es
+       * solo una direccion en texto libre, sin coordenadas. Por eso
+       * sede_id (usado por RelojService para el geofencing del checador) rara
+       * vez trae un valor: queda como verificacion best-effort, por diseno,
+       * hasta que se decida capturar la sede a mano al registrar el ticket o
+       * armar un catalogo propio que mapee saf a Sede.
+       */
       const area = quien.area_id ? await this.areas.findByPk(quien.area_id) : null;
-      /* Usuario.dependencia_id es solo la foto del alta: se resuelve de
-         nuevo via saf (rfc) y esa gana; si no se puede identificar en saf
-         (sin rfc, o sin match), se usa la columna local como respaldo. */
-      const dependenciaSaf = await this.dependenciaLocalSafDe(quien.id);
+      /* La dependencia siempre sale de saf (s_usuario.id_Dependencia, cruzando
+         por rfc), y se guarda tal cual (id de saf, no de la tabla local, que
+         quedo deprecada): Usuario.dependencia_id es solo la foto del alta y
+         nunca se usa, ni como respaldo — si no se puede identificar en saf
+         (sin rfc, o sin match), queda en null. */
+      const dependenciaSaf = await this.dependenciaSafDeGestor(quien.id);
       return {
         nombre: quien.nombre,
-        dependencia_id: dependenciaSaf ?? quien.dependencia_id,
+        dependencia_id: dependenciaSaf,
         area_id: quien.area_id,
         sede_id: area?.sede_id ?? null,
         extension: quien.extension,
@@ -675,13 +695,14 @@ export class TicketsService {
     return { ...datos, area_id: null, sede_id: null, extension: null };
   }
 
-  /** Empareja por nombre exacto contra el catalogo local; null si no hay match. */
-  private async resolverDependenciaSaf(idSaf: number | null): Promise<number | null> {
-    if (!idSaf) return null;
-    const sDep = await this.sDependencias.findByPk(idSaf);
-    if (!sDep) return null;
-    const local = await this.dependencias.findOne({ where: { nombre: sDep.Nombre.trim() } });
-    return local?.id ?? null;
+  /**
+   * Nombre de cada dependencia de saf por su id (saf.t_dependencia), para
+   * mostrar junto al ticket sin volver a consultar por cada fila — la tabla
+   * es chica (una decena de filas) y estatica, se trae entera de un jalon.
+   */
+  private async mapaDependenciasSaf(): Promise<Map<number, string>> {
+    const todas = await this.sDependencias.findAll();
+    return new Map(todas.map((d) => [d.id_Dependencia, d.Nombre.trim()]));
   }
 
   /**
@@ -696,7 +717,7 @@ export class TicketsService {
     if (!sUsuario || sUsuario.Estado !== 1) return null;
     return {
       nombre: sUsuario.Nombre,
-      dependencia_id: await this.resolverDependenciaSaf(sUsuario.id_Dependencia),
+      dependencia_id: sUsuario.id_Dependencia,
     };
   }
 
@@ -739,6 +760,7 @@ export class TicketsService {
       limit: 20,
     });
 
+    const mapaDependencias = await this.mapaDependenciasSaf();
     const resultado: {
       id_usuario_saf: number;
       nombre: string;
@@ -747,14 +769,12 @@ export class TicketsService {
       dependencia: string | null;
     }[] = [];
     for (const s of candidatos) {
-      const dependenciaId = await this.resolverDependenciaSaf(s.id_Dependencia);
-      const dependencia = dependenciaId ? await this.dependencias.findByPk(dependenciaId) : null;
       resultado.push({
         id_usuario_saf: s.id_Usuario,
         nombre: s.Nombre,
         rfc: s.N_Usuario,
-        dependencia_id: dependenciaId,
-        dependencia: dependencia?.nombre ?? null,
+        dependencia_id: s.id_Dependencia,
+        dependencia: s.id_Dependencia ? (mapaDependencias.get(s.id_Dependencia) ?? null) : null,
       });
     }
     return resultado;
@@ -970,28 +990,15 @@ export class TicketsService {
   }
 
   /**
-   * Dependencia que un gestor atiende: no es Usuario.dependencia_id (esa es
-   * donde el gestor mismo trabaja, p.ej. "Area de informatica"), sino la
-   * dependencia (saf) de la gente a la que registra tickets — el mismo
-   * calculo que ya limita a quien puede buscar en buscarSolicitantes().
-   * Vacio si no se le puede identificar dependencia (sin rfc o sin match).
+   * Dependencia (id de saf) que un gestor atiende: no es Usuario.dependencia_id
+   * (esa es donde el gestor mismo trabaja), sino la dependencia de la gente a
+   * la que registra tickets — el mismo calculo que ya limita a quien puede
+   * buscar en buscarSolicitantes(). Vacio si no se le puede identificar (sin
+   * rfc o sin match en saf).
    */
   private async dependenciasDelGestor(usuarioId: number): Promise<number[]> {
-    const local = await this.dependenciaLocalSafDe(usuarioId);
-    return local ? [local] : [];
-  }
-
-  /**
-   * Dependencia (id local) de cualquier usuario local, resuelta siempre via
-   * saf (rfc -> s_usuario.id_Dependencia -> nombre -> dependencia local).
-   * Usuario.dependencia_id es una copia que se fija solo una vez, al dar de
-   * alta (ver UsuariosService.registrar()), y no se actualiza si la persona
-   * cambia de dependencia en saf despues — por eso no es la fuente de verdad.
-   * Null si no se le puede identificar en saf (sin rfc o sin match).
-   */
-  private async dependenciaLocalSafDe(usuarioId: number): Promise<number | null> {
     const idSaf = await this.dependenciaSafDeGestor(usuarioId);
-    return this.resolverDependenciaSaf(idSaf);
+    return idSaf ? [idSaf] : [];
   }
 
   /** Bandeja del validador: tickets pendientes de las dependencias que tiene asignadas. */
@@ -1005,7 +1012,8 @@ export class TicketsService {
       order: [['f_captura', 'ASC']],
     });
     const objetivos = await this.reglas.objetivos();
-    return filas.map((t) => this.resumen(t, objetivos, 0));
+    const mapaDependencias = await this.mapaDependenciasSaf();
+    return filas.map((t) => this.resumen(t, objetivos, 0, mapaDependencias));
   }
 
   /**
