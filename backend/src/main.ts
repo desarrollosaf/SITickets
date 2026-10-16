@@ -1,5 +1,6 @@
 import { setDefaultResultOrder } from 'node:dns';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -14,7 +15,16 @@ import { AppModule } from './app.module';
 setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  /*
+   * Detras de un proxy, req.ip es la IP del proxy y el limite del login se
+   * comparte entre todos. TRUST_PROXY=1 hace que Express lea la IP real de
+   * X-Forwarded-For. Solo activarlo si de verdad hay proxy delante: sin el,
+   * cualquiera podria inventar ese encabezado y saltarse el limite.
+   */
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy) app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
   app.use(helmet());
 
