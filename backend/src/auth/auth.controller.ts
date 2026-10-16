@@ -9,9 +9,13 @@ import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decor
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  /** Cinco intentos por minuto: frena el barrido de contrasenas. */
+  /**
+   * Diez intentos por minuto por RFC (ver UsuarioThrottlerGuard): frena que
+   * adivinen la contrasena de una cuenta sin estorbar a los demas, aunque
+   * entren cientos a la vez detras del mismo Apache.
+   */
   @Publico()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
   @Post('login')
   login(@Body() dto: LoginDto) {

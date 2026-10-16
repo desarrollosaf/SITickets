@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import {
   BienMueble,
@@ -23,6 +23,7 @@ import { MigracionesModule } from './database/migraciones.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { UsuarioThrottlerGuard } from './common/usuario-throttler.guard';
 import { BienesModule } from './bienes/bienes.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { IaModule } from './ia/ia.module';
@@ -38,7 +39,10 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
 
-    /* Tope general de peticiones. Las rutas de sesion aprietan mas el limite. */
+    /*
+     * Tope general de peticiones, por usuario (ver UsuarioThrottlerGuard).
+     * El login aprieta mas el limite y ese si cuenta por IP.
+     */
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
 
     SequelizeModule.forRootAsync({
@@ -58,6 +62,12 @@ import { UsuariosModule } from './usuarios/usuarios.module';
         synchronize: config.get('DB_SYNC') === 'true',
         /* @nestjs/sequelize solo ejecuta sync() cuando esta activo. */
         autoLoadModels: true,
+        /*
+         * Por defecto Sequelize abre maximo 5 conexiones y en la hora pico las
+         * peticiones hacian fila. 20 alcanza para cientos de usuarios a la vez
+         * sin acaparar el max_connections del MySQL que comparten otros sistemas.
+         */
+        pool: { max: 20, min: 2, acquire: 30_000, idle: 10_000 },
         retryAttempts: 20,
         retryDelay: 3000,
       }),
@@ -75,6 +85,8 @@ import { UsuariosModule } from './usuarios/usuarios.module';
         host: config.get('SAF_DB_HOST', 'localhost'),
         port: Number(config.get('SAF_DB_PORT', 3306)),
         database: config.get('SAF_DB_NAME', 'saf'),
+        /* Valida cada login: en la hora de entrada recibe la mayor rafaga. */
+        pool: { max: 10, min: 1, acquire: 30_000, idle: 10_000 },
         username: config.get('SAF_DB_USER', 'root'),
         password: config.get('SAF_DB_PASS', ''),
         models: [
@@ -163,10 +175,10 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     UsuariosModule,
   ],
   providers: [
-    /* Orden importa: primero autentica, luego verifica el rol. */
+    /* Orden importa: primero autentica, luego verifica el rol y al final limita por usuario. */
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: UsuarioThrottlerGuard },
   ],
 })
 export class AppModule {}

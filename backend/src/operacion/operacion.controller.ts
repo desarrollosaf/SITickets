@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { MonitorService } from './monitor.service';
 import { CalendarioService } from './calendario.service';
 import { TrazaService } from '../tickets/traza.service';
@@ -13,8 +14,13 @@ export class OperacionController {
     private readonly traza: TrazaService,
   ) {}
 
-  /** §17 · pantalla de turnos. La ve el area completa, no solo el admin. */
+  /**
+   * §17 · pantalla de turnos. La ve el area completa, no solo el admin.
+   * Sin limite de peticiones: el tablero se refresca solo cada pocos segundos
+   * y puede quedarse abierto todo el dia.
+   */
   @Roles('admin', 'jefe', 'tecnico', 'proveedor', 'operador')
+  @SkipThrottle()
   @Get('monitor')
   monitor() {
     return this.monitorSrv.monitor();
