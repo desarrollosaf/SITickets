@@ -121,6 +121,37 @@ export function resumenUbicacion(s: {
 
 export const RE_CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
+/* =====================================================================
+   Pestañas de las listas de tickets (Mis tickets, Todos los tickets).
+   Cada estatus cae en una sola: abiertos, resueltos y cerrados no se mezclan.
+   ===================================================================== */
+
+export type PestanaTicket = 'abiertos' | 'confirmar' | 'cerrados';
+
+const PESTANA_DE: Record<string, PestanaTicket> = {
+  REGISTRADO: 'abiertos',
+  ASIGNADO: 'abiertos',
+  EN_ATENCION: 'abiertos',
+  EN_ESPERA: 'abiertos',
+  RESUELTO: 'confirmar',
+  CERRADO: 'cerrados',
+  CANCELADO: 'cerrados',
+};
+
+export function pestanaDe(estatus: string): PestanaTicket {
+  return PESTANA_DE[estatus] ?? 'abiertos';
+}
+
+/** Primera, ultima y las vecinas de la actual; null pinta "…" en el paginador. */
+export function paginasConSalto(total: number, actual: number): (number | null)[] {
+  const lista: (number | null)[] = [];
+  for (let n = 1; n <= total; n++) {
+    if (n === 1 || n === total || Math.abs(n - actual) <= 1) lista.push(n);
+    else if (lista[lista.length - 1] !== null) lista.push(null);
+  }
+  return lista;
+}
+
 /** Quita acentos/diacriticos para comparar sin importar como se hayan escrito. */
 export function quitarAcentos(texto: string): string {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');

@@ -390,3 +390,287 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   .cajon { position: static; width: 100%; box-shadow: none; }
   body { background: #fff; }
 }
+
+/* --------------------------------------------------------------------
+   Boletos: tickets como talon de apuesta (Mis tickets, Tickets por validar)
+   -------------------------------------------------------------------- */
+/*
+ * Modo "boletos": cada ticket como talon de apuesta. Franja superior del
+ * color del estatus, corte punteado con muescas a los lados y borde
+ * inferior dentado. Las muescas y los dientes se pintan del color del
+ * fondo de la pagina (--fondo), por eso el boleto no lleva borde.
+ */
+.boletos {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.boleto-fila { display: flex; flex-direction: column; flex: 1; }
+
+.boleto {
+  --acento: var(--p3);
+  --muesca: 9px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 0.75rem 0.75rem 0 0;
+  border-top: 4px solid var(--acento);
+  box-shadow: 0 1px 2px rgb(27 36 52 / 6%), 0 4px 14px rgb(27 36 52 / 6%);
+  cursor: pointer;
+  overflow: hidden;
+  padding-bottom: 7px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.boleto:hover,
+.boleto:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgb(27 36 52 / 8%), 0 12px 28px rgb(27 36 52 / 12%);
+  outline: none;
+}
+.boleto:focus-visible { box-shadow: 0 0 0 3px rgb(43 108 176 / 35%); }
+
+/* Borde inferior dentado, como papel arrancado de la impresora. */
+.boleto::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 7px;
+  background: radial-gradient(circle at 7px 7px, var(--fondo) 4.5px, transparent 5px) repeat-x;
+  background-size: 14px 7px;
+}
+
+.boleto-cuerpo { padding: 0.9rem 1rem 0.85rem; flex: 1; }
+
+.boleto-folio {
+  font-weight: 600;
+  color: var(--acento);
+  letter-spacing: 0.02em;
+}
+
+.boleto-asunto {
+  font-weight: 650;
+  font-size: 0.98rem;
+  color: var(--tinta);
+  line-height: 1.3;
+  margin-bottom: 0.4rem;
+}
+
+.boleto-dato {
+  color: var(--tinta-2);
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+.boleto-dato .bi { margin-right: 0.2rem; opacity: 0.8; }
+.boleto-datos { display: flex; flex-wrap: wrap; column-gap: 1.25rem; }
+
+/* Asunto a la izquierda y quien lo pidio a la derecha: aprovecha el ancho
+   y el boleto queda mas bajo. En pantallas medianas se apilan. */
+.boleto-columnas { display: grid; gap: 0.35rem 1.75rem; }
+.boleto-col-quien .boleto-dato b { color: var(--tinta); font-weight: 600; }
+.boleto-dependencia { padding-left: 1.15rem; font-size: 0.74rem; }
+@media (min-width: 1200px) {
+  .boleto-columnas { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: center; }
+  .boleto-col-quien { padding-left: 1.25rem; border-left: 1px solid var(--linea); }
+  .boleto-col-quien .boleto-dato:first-child { margin-top: 0; }
+}
+
+/* Talon: separado por la linea de corte con una muesca a cada lado. */
+.boleto-talon {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  padding: 0.7rem 1rem 0.6rem;
+  border-top: 2px dashed var(--linea);
+  background: #fafbfd;
+}
+.boleto-talon::before,
+.boleto-talon::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--muesca) * -1 - 1px);
+  width: calc(var(--muesca) * 2);
+  height: calc(var(--muesca) * 2);
+  border-radius: 50%;
+  background: var(--fondo);
+  box-shadow: inset 0 1px 3px rgb(27 36 52 / 10%);
+}
+.boleto-talon::before { left: calc(var(--muesca) * -1); }
+.boleto-talon::after { right: calc(var(--muesca) * -1); }
+
+.boleto-celda {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.boleto-celda span {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tinta-2);
+}
+.boleto-celda b {
+  font-size: 0.85rem;
+  color: var(--tinta);
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.boleto-celda-fin { text-align: right; flex: 0 0 auto; }
+.boleto-celda b.vencido { color: var(--p1); }
+
+/*
+ * Pantalla ancha: boleto horizontal a todo el ancho. Franja de color a la
+ * izquierda, talon a la derecha y el corte punteado en vertical, con las
+ * muescas arriba y abajo. En celular se queda apilado como arriba.
+ */
+@media (min-width: 768px) {
+  .boleto {
+    border-top: 0;
+    border-left: 5px solid var(--acento);
+    border-radius: 0.75rem 0.75rem 0 0.75rem;
+  }
+  /* Sin relleno abajo: el dentado se monta sobre el talon y la muesca
+     inferior cae justo en el borde del boleto. */
+  .boleto { padding-bottom: 0; }
+  .boleto::after { left: 0.75rem; }
+
+  .boleto-fila { flex-direction: row; }
+  .boleto-cuerpo { padding: 0.75rem 1.25rem; min-width: 0; }
+
+  /* Ancho suficiente para nombres completos de tecnico (dos renglones). */
+  .boleto-talon {
+    flex: 0 0 min(400px, 34%);
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-top: 0;
+    border-left: 2px dashed var(--linea);
+  }
+  .boleto-talon::before,
+  .boleto-talon::after {
+    left: calc(var(--muesca) * -1 - 1px);
+    right: auto;
+  }
+  .boleto-talon::before { top: calc(var(--muesca) * -1); }
+  .boleto-talon::after { top: auto; bottom: calc(var(--muesca) * -1); }
+  /* Con la barra dorada abajo el corte ya no llega al borde: sin muesca. */
+  .boleto.por-confirmar .boleto-talon::after { display: none; }
+
+  .boleto-confirmar { margin: 0.25rem 1rem 0.9rem; }
+}
+
+/* Resuelto y esperando al solicitante: barra dorada, como "Mejora tu apuesta". */
+.boleto.por-confirmar { --acento: #c9971c; }
+.boleto-confirmar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0.75rem 0.55rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #b8860b, #e2b93b 55%, #c9971c);
+  background-size: 200% 100%;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-shadow: 0 1px 1px rgb(0 0 0 / 20%);
+  animation: brillo-confirmar 3s ease-in-out infinite;
+}
+@keyframes brillo-confirmar {
+  0%, 100% { background-position: 0% 0; }
+  50% { background-position: 100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boleto { transition: none; }
+  .boleto-confirmar { animation: none; }
+}
+
+/* --------------------------------------------------------------------
+   Buscador redondo y paginador numerado de las listas de boletos
+   -------------------------------------------------------------------- */
+.buscador { position: relative; flex: 1 1 280px; max-width: 420px; }
+.buscador .bi {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--tinta-2);
+  pointer-events: none;
+}
+.buscador input { padding-left: 2.1rem; border-radius: 999px; height: 2.4rem; }
+
+.paginador { display: flex; align-items: center; gap: 0.3rem; }
+.paginador button {
+  min-width: 2.1rem;
+  height: 2.1rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tinta);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.paginador button:hover:not(:disabled):not(.activa) { background: #f1f4f8; }
+.paginador button.activa { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+.paginador button:disabled { opacity: 0.4; }
+@media (max-width: 575.98px) {
+  .buscador { max-width: none; }
+}
+
+/* --------------------------------------------------------------------
+   Pestañas tipo pildora (Abiertos / Por confirmar / Cerrados)
+   -------------------------------------------------------------------- */
+/* Selector segmentado: contenedor gris y la pestaña activa como pastilla. */
+.pildoras {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  background: #eceff3;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+}
+.pildora {
+  --tono: #2b6cb0;
+  --tono-2: #1d4f86;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tinta-2);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.pildora:hover:not(.activa) { background: rgb(255 255 255 / 70%); color: var(--tinta); }
+.pildora.activa {
+  color: #fff;
+  background: linear-gradient(135deg, var(--tono), var(--tono-2));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--tono) 40%, transparent);
+}
+.pildora-confirmar { --tono: #d4a21f; --tono-2: #a87a0c; }
+.pildora-cerrados { --tono: #2a9463; --tono-2: #1b6b46; }
+
+.pildora-cuenta {
+  min-width: 1.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: #dde2e8;
+  color: var(--tinta-2);
+  font-size: 0.72rem;
+  text-align: center;
+}
+.pildora.activa .pildora-cuenta { background: rgb(255 255 255 / 25%); color: #fff; }
+@media (max-width: 575.98px) {
+  .pildoras { width: 100%; }
+  .pildora { flex: 1; justify-content: center; padding: 0.45rem 0.5rem; }
+}

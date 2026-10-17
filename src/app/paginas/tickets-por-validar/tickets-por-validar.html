@@ -1,9 +1,20 @@
-<div class="mb-3">
-  <h1 class="h5 mb-1">Tickets por validar</h1>
-  <p class="sub mb-0">
-    Lo que un gestor registró para tu(s) dependencia(s). Mientras no lo apruebes, no se turna a
-    técnico ni cuenta el tiempo de atención.
-  </p>
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="h5 mb-1">Tickets por validar</h1>
+    <p class="sub mb-0">
+      Lo que un gestor registró para tu(s) dependencia(s). Mientras no lo apruebes, no se turna a
+      técnico ni cuenta el tiempo de atención.
+    </p>
+  </div>
+
+  @if (tickets().length) {
+    <div class="buscador">
+      <i class="bi bi-search"></i>
+      <input type="search" class="form-control form-control-sm"
+             placeholder="Buscar por folio, solicitante, descripción, edificio…"
+             [value]="busqueda()" (input)="buscar($any($event.target).value)" />
+    </div>
+  }
 </div>
 
 @if (error()) {
@@ -20,52 +31,96 @@
     <div class="fw-semibold">Sin pendientes</div>
     <div class="sub">No hay tickets esperando tu revisión.</div>
   </div>
+} @else if (!filtrados().length) {
+  <div class="tarjeta p-5 text-center">
+    <i class="bi bi-search fs-2 sub d-block mb-2"></i>
+    <div class="fw-semibold">Ningún ticket coincide con la búsqueda</div>
+    <div class="sub">Prueba con otra palabra.</div>
+  </div>
 } @else {
-  <div class="d-flex flex-column gap-2">
-    @for (t of tickets(); track t.id) {
-      <div class="tarjeta p-3">
-        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-          <div>
-            <div class="folio" style="font-size: 0.78rem">{{ t.folio }}</div>
-            <div class="fw-semibold">{{ t.problema }}</div>
-            <div class="sub" style="font-size: 0.85rem">
-              {{ t.servicio }} · {{ t.solicitante }} · {{ t.dependencia }}
+  <div class="boletos">
+    @for (t of ticketsPagina(); track t.id) {
+      <div class="boleto boleto-fijo" style="--acento: var(--p2)">
+        <div class="boleto-fila">
+          <div class="boleto-cuerpo">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+              <span class="folio boleto-folio">
+                <i class="bi bi-ticket-perforated"></i> {{ t.folio }}
+              </span>
+              <span class="estatus estatus-EN_ESPERA">Por validar</span>
+            </div>
+
+            <div class="boleto-asunto">{{ t.problema }}</div>
+            <div class="boleto-datos">
+              <span class="boleto-dato"><i class="bi bi-tools"></i> {{ t.servicio }}</span>
+              @if (t.edificio_atencion) {
+                <span class="boleto-dato"><i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}</span>
+              }
+            </div>
+            <div class="boleto-dato">
+              <i class="bi bi-person"></i> {{ t.solicitante }} · {{ t.dependencia }}
             </div>
             @if (t.registrado_por_nombre) {
-              <div class="sub" style="font-size: 0.82rem">
-                Capturado por {{ t.registrado_por_nombre }}
+              <div class="boleto-dato">
+                <i class="bi bi-pencil-square"></i> Capturado por {{ t.registrado_por_nombre }}
               </div>
             }
             @if (modelo(t)) {
-              <div class="sub" style="font-size: 0.82rem">Modelo: {{ modelo(t) }}</div>
+              <div class="boleto-dato"><i class="bi bi-printer"></i> Modelo: {{ modelo(t) }}</div>
             }
             @if (t.color_toner) {
-              <div class="sub" style="font-size: 0.82rem">Color de tóner: {{ t.color_toner }}</div>
-            }
-            @if (t.edificio_atencion) {
-              <div class="sub" style="font-size: 0.82rem">
-                <i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}
-              </div>
+              <div class="boleto-dato"><i class="bi bi-droplet"></i> Color de tóner: {{ t.color_toner }}</div>
             }
             @if (t.contexto && t.campo_adicional && t.campo_adicional !== 'Modelo de impresora') {
-              <div class="sub" style="font-size: 0.82rem">{{ t.campo_adicional }}: {{ t.contexto }}</div>
+              <div class="boleto-dato">
+                <i class="bi bi-info-circle"></i> {{ t.campo_adicional }}: {{ t.contexto }}
+              </div>
             }
-            <div class="sub" style="font-size: 0.78rem">Capturado {{ fmt(t.f_captura) }}</div>
           </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-outline-danger btn-sm" [disabled]="ocupado() === t.id"
-                    (click)="abrirRechazo(t)">
-              Rechazar
-            </button>
-            <button class="btn btn-primary btn-sm" [disabled]="ocupado() === t.id" (click)="aprobar(t)">
-              @if (ocupado() === t.id) {
-                <span class="spinner-border spinner-border-sm me-1"></span>
-              }
-              Aprobar
-            </button>
+
+          <div class="boleto-talon">
+            <div class="boleto-celda">
+              <span>Capturado</span>
+              <b>{{ fmt(t.f_captura) }}</b>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+              <button class="btn btn-outline-danger btn-sm" [disabled]="ocupado() === t.id"
+                      (click)="abrirRechazo(t)">
+                Rechazar
+              </button>
+              <button class="btn btn-primary btn-sm" [disabled]="ocupado() === t.id" (click)="aprobar(t)">
+                @if (ocupado() === t.id) {
+                  <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Aprobar
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    }
+  </div>
+
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+    <span class="sub small">{{ desde() }}–{{ hasta() }} de {{ filtrados().length }} ticket(s)</span>
+    @if (totalPaginas() > 1) {
+      <nav class="paginador" aria-label="Páginas">
+        <button type="button" [disabled]="paginaActual() === 1" (click)="irA(paginaActual() - 1)"
+                aria-label="Anterior">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        @for (n of paginas(); track $index) {
+          @if (n === null) {
+            <span class="sub px-1">…</span>
+          } @else {
+            <button type="button" [class.activa]="n === paginaActual()" (click)="irA(n)">{{ n }}</button>
+          }
+        }
+        <button type="button" [disabled]="paginaActual() === totalPaginas()"
+                (click)="irA(paginaActual() + 1)" aria-label="Siguiente">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </nav>
     }
   </div>
 }
