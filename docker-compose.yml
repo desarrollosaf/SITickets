@@ -54,6 +54,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+    depends_on:
+      db:
+        condition: service_healthy
+
     command: >
       sh -c "apk add --no-cache chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont &&
       npm install &&
@@ -61,6 +65,38 @@ services:
 
     restart: unless-stopped
 
+  # MariaDB 10.5, la misma version que produccion. La primera vez crea las
+  # bases e importa los dumps de docker/dumps (ver docker/initdb).
+  db:
+    image: mariadb:10.5
+    container_name: sitickets-db
+
+    ports:
+      - "3330:3306"
+
+    environment:
+      MARIADB_ROOT_PASSWORD: sitickets
+      TZ: America/Mexico_City
+
+    command: --max-allowed-packet=256M
+
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      - ./docker/dumps:/dumps:ro
+
+    # Por TCP y no por socket: durante la importacion inicial MariaDB corre
+    # sin red, asi el backend no arranca hasta que los dumps terminan.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-psitickets"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 300s
+
+    restart: unless-stopped
+
 volumes:
   frontend_node_modules:
   backend_node_modules:
+  db_data:

@@ -5,8 +5,32 @@ import { TablaTickets } from '../../comp/tabla-tickets';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import { AuthService } from '../../core/auth.service';
 import { TicketsService, type FiltrosTicket } from '../../core/tickets.service';
-import { mensajeError, quitarAcentos } from '../../core/formato';
+import { mensajeError, paginasConSalto, quitarAcentos } from '../../core/formato';
 import type { Catalogos, Tecnico, Ticket } from '../../core/modelos';
+
+/**
+ * Una pestaña por estatus, en el orden del ciclo de vida. "En cola" va aparte
+ * aunque en la base sea REGISTRADO: es lo que el area tiene que atender ya.
+ * Los colores son los del chip de cada estatus (styles.scss).
+ */
+const PESTANAS = [
+  { clave: 'TODOS', texto: 'Todos', icono: 'bi-collection', tono: '#45566b' },
+  { clave: 'EN_COLA', texto: 'En cola', icono: 'bi-exclamation-octagon', tono: '#c0392b' },
+  { clave: 'REGISTRADO', texto: 'Registrado', icono: 'bi-inbox', tono: '#5b6b7c' },
+  { clave: 'ASIGNADO', texto: 'Asignado', icono: 'bi-person-check', tono: '#2b6cb0' },
+  { clave: 'EN_ATENCION', texto: 'En atención', icono: 'bi-tools', tono: '#0f8a8a' },
+  { clave: 'EN_ESPERA', texto: 'En espera', icono: 'bi-pause-circle', tono: '#d17b1f' },
+  { clave: 'RESUELTO', texto: 'Resuelto', icono: 'bi-hourglass-split', tono: '#6d35c9' },
+  { clave: 'CERRADO', texto: 'Cerrado', icono: 'bi-check2-circle', tono: '#1f8a56' },
+  { clave: 'CANCELADO', texto: 'Cancelado', icono: 'bi-x-circle', tono: '#77808c' },
+] as const;
+
+type Pestana = (typeof PESTANAS)[number]['clave'];
+
+/** Misma regla que el chip de estatus: si esta en cola, cuenta como "En cola". */
+function pestanaDe(t: Ticket): Pestana {
+  return t.en_cola ? 'EN_COLA' : (t.estatus as Pestana);
+}
 
 @Component({
   selector: 'app-tickets',
@@ -19,6 +43,9 @@ export class Tickets {
 
   /** Gestor/validador solo buscan por nombre/folio: el resto de filtros es jerga operativa que no les toca. */
   readonly esAdminUOperador = computed(() => ['admin', 'operador'].includes(this.auth.rol() ?? ''));
+
+  readonly pestanas = PESTANAS;
+  readonly pestana = signal<Pestana>('TODOS');
 
   /**
    * Caso especial, solo esta persona (ver USUARIOS_CIERRE_SERVICIO en el
@@ -89,16 +116,68 @@ export class Tickets {
   }
 
   /** Metodo normal, no computed(): busquedaTexto es una propiedad plana que cambia por ngModel. */
+  /**
+   * Un solo buscador para todo, folio incluido (antes el folio iba aparte y
+   * al servidor; la lista ya trae folio y folio_general, no hace falta).
+   * Por palabras: "bustamante santander" exige las dos, en cualquier campo.
+   * Va antes de repartir en pestañas: asi el contador de cada una dice donde
+   * hay coincidencias aunque no sea la que esta abierta.
+   */
+  ticketsBuscados() {
+    const palabras = quitarAcentos(this.busquedaTexto.trim().toLowerCase()).split(/\s+/).filter(Boolean);
+    if (!palabras.length) return this.tickets();
+    return this.tickets().filter((t) => {
+      const texto = quitarAcentos(
+        [
+          t.folio,
+          t.folio_general,
+          t.solicitante,
+          t.dependencia,
+          t.servicio,
+          t.problema,
+          t.contexto,
+          t.tecnico,
+          t.edificio_atencion,
+          t.registrado_por_nombre,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase(),
+      );
+      return palabras.every((p) => texto.includes(p));
+    });
+  }
+
   ticketsFiltrados() {
-    const texto = quitarAcentos(this.busquedaTexto.trim().toLowerCase());
-    if (!texto) return this.tickets();
-    return this.tickets().filter(
-      (t) =>
-        quitarAcentos(t.solicitante.toLowerCase()).includes(texto) ||
-        quitarAcentos(t.servicio.toLowerCase()).includes(texto) ||
-        quitarAcentos(t.problema.toLowerCase()).includes(texto) ||
-        quitarAcentos((t.contexto ?? '').toLowerCase()).includes(texto),
-    );
+    const p = this.pestana();
+    const lista = this.ticketsBuscados();
+    return p === 'TODOS' ? lista : lista.filter((t) => pestanaDe(t) === p);
+  }
+
+  conteo(): Record<string, number> {
+    const lista = this.ticketsBuscados();
+    const c: Record<string, number> = { TODOS: lista.length };
+    for (const t of lista) {
+      const p = pestanaDe(t);
+      c[p] = (c[p] ?? 0) + 1;
+    }
+    return c;
+  }
+
+  cambiarPestana(p: Pestana) {
+    this.pestana.set(p);
+    this.paginaActual.set(1);
+  }
+
+  /** Los boletos no tienen encabezados que clicar: el orden se elige aqui. */
+  cambiarOrden(valor: string) {
+    if (valor === 'prioridad' || valor === 'tiempo') {
+      this.ordenPor.set(null);
+      this.ordenar(valor);
+    } else {
+      this.ordenPor.set(null);
+      this.paginaActual.set(1);
+    }
   }
 
   onBuscarTexto() {
@@ -138,32 +217,20 @@ export class Tickets {
     return this.ticketsOrdenados().slice(inicio, inicio + this.porPagina);
   }
 
-  paginaAnterior() {
-    this.paginaActual.update((p) => Math.max(1, p - 1));
+  desde() {
+    return (this.paginaActual() - 1) * this.porPagina + 1;
   }
 
-  paginaSiguiente() {
-    this.paginaActual.update((p) => Math.min(this.totalPaginas(), p + 1));
+  hasta() {
+    return Math.min(this.paginaActual() * this.porPagina, this.ticketsFiltrados().length);
   }
 
-  paginaPrimera() {
-    this.paginaActual.set(1);
-  }
-
-  paginaUltima() {
-    this.paginaActual.set(this.totalPaginas());
-  }
-
-  /** Numeros alrededor de la pagina actual, para saltar varias hojas de un clic. */
-  paginasVecinas() {
-    const total = this.totalPaginas();
-    const actual = this.paginaActual();
-    const inicio = Math.max(1, Math.min(actual - 2, total - 4));
-    const fin = Math.min(total, inicio + 4);
-    return Array.from({ length: fin - inicio + 1 }, (_, i) => inicio + i);
+  paginas() {
+    return paginasConSalto(this.totalPaginas(), this.paginaActual());
   }
 
   irAPagina(pagina: number) {
     this.paginaActual.set(Math.min(this.totalPaginas(), Math.max(1, pagina)));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }

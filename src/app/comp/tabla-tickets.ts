@@ -3,6 +3,17 @@ import { AuthService } from '../core/auth.service';
 import { banderas, duracion, etiquetaEstatus } from '../core/formato';
 import type { Ticket } from '../core/modelos';
 
+const ACENTO: Record<string, string> = {
+  'estatus-REGISTRADO': '#45566b',
+  'estatus-ASIGNADO': '#2b6cb0',
+  'estatus-EN_ATENCION': '#0f8a8a',
+  'estatus-RESUELTO': '#6d35c9',
+  'estatus-CERRADO': '#1f8a56',
+  'estatus-EN_ESPERA': 'var(--p2)',
+  'estatus-EN_COLA': 'var(--p1)',
+  'estatus-CANCELADO': '#77808c',
+};
+
 @Component({
   selector: 'app-tabla-tickets',
   template: `
@@ -11,6 +22,95 @@ import type { Ticket } from '../core/modelos';
         <i class="bi bi-inbox fs-2 sub d-block mb-2"></i>
         <div class="fw-semibold">{{ vacio() }}</div>
         <div class="sub">{{ ayudaVacio() }}</div>
+      </div>
+    } @else if (boletos()) {
+      <div class="boletos">
+        @for (t of tickets(); track t.id) {
+          <div class="boleto" role="button" tabindex="0"
+               [style.--acento]="acento(t)"
+               [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'"
+               (click)="abrir.emit(t.id)" (keydown.enter)="abrir.emit(t.id)">
+            <div class="boleto-fila">
+            <div class="boleto-cuerpo">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <span class="folio boleto-folio">
+                  <i class="bi bi-ticket-perforated"></i>
+                  {{ esSolicitante() ? t.folio_general : t.folio }}
+                  @if (muestraFolioGeneral() && t.folio_general !== t.folio) {
+                    <span class="sub ms-1">· general {{ t.folio_general }}</span>
+                  }
+                </span>
+                <span class="d-flex gap-1 align-items-center">
+                  @if (!esSolicitante() && !ocultaPrioTiempo()) {
+                    <span class="chip" [class]="'chip-' + t.prioridad">{{ t.prioridad }}</span>
+                  }
+                  <span class="estatus" [class]="estatus(t).clase">{{ estatus(t).texto }}</span>
+                </span>
+              </div>
+
+              <div class="boleto-columnas">
+                <div>
+                  <div class="boleto-asunto">{{ t.problema }}</div>
+                  <div class="boleto-datos">
+                    <span class="boleto-dato"><i class="bi bi-tools"></i> {{ t.servicio }}</span>
+                    @if (t.edificio_atencion) {
+                      <span class="boleto-dato"><i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}</span>
+                    }
+                  </div>
+                </div>
+                @if (!esSolicitante()) {
+                  <div class="boleto-col-quien">
+                    <div class="boleto-dato">
+                      <i class="bi bi-person"></i>
+                      @if (t.interno) {
+                        {{ t.contexto || 'Trabajo interno del área' }}
+                      } @else {
+                        <b>{{ t.solicitante }}</b>
+                        <div class="boleto-dependencia">{{ t.dependencia }}</div>
+                      }
+                    </div>
+                    @if (t.registrado_por_nombre) {
+                      <div class="boleto-dato">
+                        <i class="bi bi-pencil-square"></i> Registrado por {{ t.registrado_por_nombre }}
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+
+              @if (marcas(t).length) {
+                <div class="d-flex flex-wrap gap-1 mt-2">
+                  @for (b of marcas(t); track b.texto) {
+                    <span class="chip" [class]="b.clase">{{ b.texto }}</span>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="boleto-talon">
+              @if (!sinTecnico()) {
+                <div class="boleto-celda">
+                  <span>Técnico</span>
+                  <b>{{ t.tecnico || 'Por definir' }}</b>
+                </div>
+              }
+              @if (!ocultaPrioTiempo()) {
+                <div class="boleto-celda boleto-celda-fin">
+                  <span>Tiempo · meta {{ dur(t.minutos_objetivo) }}</span>
+                  <b [class.vencido]="t.vencido">{{ dur(t.min_activo) }}</b>
+                </div>
+              }
+            </div>
+            </div>
+
+            @if (pedirConfirmacion() && t.estatus === 'RESUELTO') {
+              <div class="boleto-confirmar">
+                <span><i class="bi bi-patch-question"></i> ¿Sí quedó resuelto? Confírmalo aquí</span>
+                <i class="bi bi-chevron-right"></i>
+              </div>
+            }
+          </div>
+        }
       </div>
     } @else {
       <div class="tarjeta overflow-hidden">
@@ -130,6 +230,8 @@ export class TablaTickets {
   readonly ayudaVacio = input('Ajusta los filtros o registra uno nuevo.');
   /** Solo tiene sentido en "Mis tickets": el solicitante debe confirmar o rechazar. */
   readonly pedirConfirmacion = input(false);
+  /** Tarjetas tipo talon en vez de tabla: para listas cortas, como "Mis tickets". */
+  readonly boletos = input(false);
 
   /** Encabezados clicables de Prio/Tiempo; el padre decide el orden real (ver tickets.ts). */
   readonly ordenable = input(false);
@@ -159,5 +261,10 @@ export class TablaTickets {
 
   estatus(t: Ticket) {
     return etiquetaEstatus(t, this.esSolicitante());
+  }
+
+  /** Color de la franja del boleto: el mismo del chip de estatus (styles.scss). */
+  acento(t: Ticket): string {
+    return ACENTO[this.estatus(t).clase] ?? 'var(--p4)';
   }
 }

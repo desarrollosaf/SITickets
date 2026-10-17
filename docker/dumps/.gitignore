@@ -1,0 +1,4 @@
+# Dumps de prueba que importa docker/initdb al crear la base local.
+# Pesan decenas de MB y traen datos reales: nunca se suben al repo.
+*
+!.gitignore

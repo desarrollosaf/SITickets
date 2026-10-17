@@ -1,0 +1,2 @@
+# El script de initdb corre dentro de Linux: con CRLF falla.
+docker/initdb/*.sh text eol=lf

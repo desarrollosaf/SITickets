@@ -1,11 +1,25 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TablaTickets } from '../../comp/tabla-tickets';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import { TicketsService } from '../../core/tickets.service';
 import { AuthService } from '../../core/auth.service';
-import { fecha, mensajeError } from '../../core/formato';
+import {
+  etiquetaEstatus,
+  fecha,
+  mensajeError,
+  paginasConSalto,
+  pestanaDe,
+  type PestanaTicket,
+} from '../../core/formato';
 import type { Catalogos, Ticket, TicketPorValidar } from '../../core/modelos';
+
+type Pestana = PestanaTicket;
+
+/** Minusculas y sin acentos: "tecnico" encuentra "TÉCNICO". */
+function normalizar(texto: string): string {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
 
 @Component({
   selector: 'app-mis-tickets',
@@ -23,13 +37,6 @@ import type { Catalogos, Ticket, TicketPorValidar } from '../../core/modelos';
 
     @if (error()) {
       <div class="alert alert-danger py-2 small">{{ error() }}</div>
-    }
-
-    @if (porConfirmar().length) {
-      <div class="alert alert-primary py-2 small">
-        Tienes <b>{{ porConfirmar().length }}</b> ticket(s) marcados como resueltos esperando tu
-        confirmación. Si no respondes en 3 días, el sistema los cierra por omisión.
-      </div>
     }
 
     @if (enValidacion().length) {
@@ -66,26 +73,69 @@ import type { Catalogos, Ticket, TicketPorValidar } from '../../core/modelos';
       </div>
     }
 
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+      <div class="pildoras" role="tablist">
+        @for (p of pestanas; track p.clave) {
+          <button type="button" role="tab" class="pildora" [class]="'pildora-' + p.clave"
+                  [class.activa]="pestana() === p.clave" [attr.aria-selected]="pestana() === p.clave"
+                  (click)="cambiarPestana(p.clave)">
+            <i class="bi" [class]="p.icono"></i>
+            {{ p.texto }}
+            <span class="pildora-cuenta">{{ conteo()[p.clave] }}</span>
+          </button>
+        }
+      </div>
+
+      <div class="buscador">
+        <i class="bi bi-search"></i>
+        <input type="search" class="form-control form-control-sm"
+               placeholder="Buscar por folio, técnico, descripción, edificio…"
+               [value]="busqueda()" (input)="buscar($any($event.target).value)" />
+      </div>
+    </div>
+
+    @if (pestana() === 'confirmar' && filtrados().length) {
+      <div class="alert alert-warning py-2 small d-flex gap-2 align-items-center">
+        <i class="bi bi-hourglass-split"></i>
+        <span>
+          El técnico los marcó como resueltos. Ábrelos para confirmar o rechazar: si no respondes
+          en 3 días, el sistema los cierra solo.
+        </span>
+      </div>
+    }
+
     <app-tabla-tickets
       [tickets]="ticketsPagina()"
       [pedirConfirmacion]="true"
-      vacio="Aún no has registrado tickets"
-      ayudaVacio="Cuando reportes algo aparecerá aquí con su seguimiento."
+      [boletos]="true"
+      [vacio]="vacio()"
+      [ayudaVacio]="busqueda() ? 'Prueba con otra palabra o revisa las otras pestañas.' : ''"
       (abrir)="abierto.set($event)" />
 
-    @if (totalPaginas() > 1) {
-      <div class="d-flex align-items-center justify-content-between mt-2">
-        <span class="sub small">Página {{ paginaActual() }} de {{ totalPaginas() }}</span>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === 1"
-                  (click)="paginaAnterior()">
-            <i class="bi bi-chevron-left"></i> Anterior
-          </button>
-          <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaActual() === totalPaginas()"
-                  (click)="paginaSiguiente()">
-            Siguiente <i class="bi bi-chevron-right"></i>
-          </button>
-        </div>
+    @if (filtrados().length) {
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+        <span class="sub small">
+          {{ desde() }}–{{ hasta() }} de {{ filtrados().length }} ticket(s)
+        </span>
+        @if (totalPaginas() > 1) {
+          <nav class="paginador" aria-label="Páginas">
+            <button type="button" [disabled]="paginaActual() === 1" (click)="irA(paginaActual() - 1)"
+                    aria-label="Anterior">
+              <i class="bi bi-chevron-left"></i>
+            </button>
+            @for (n of paginas(); track $index) {
+              @if (n === null) {
+                <span class="sub px-1">…</span>
+              } @else {
+                <button type="button" [class.activa]="n === paginaActual()" (click)="irA(n)">{{ n }}</button>
+              }
+            }
+            <button type="button" [disabled]="paginaActual() === totalPaginas()"
+                    (click)="irA(paginaActual() + 1)" aria-label="Siguiente">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+          </nav>
+        }
       </div>
     }
 
@@ -106,44 +156,117 @@ export class MisTickets {
   readonly error = signal('');
   readonly fmt = fecha;
 
-  readonly porConfirmar = () => this.tickets().filter((t) => t.estatus === 'RESUELTO');
-
   /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
   readonly enValidacion = signal<TicketPorValidar[]>([]);
+
+  readonly pestanas: { clave: Pestana; texto: string; icono: string }[] = [
+    { clave: 'abiertos', texto: 'Abiertos', icono: 'bi-ticket-perforated' },
+    { clave: 'confirmar', texto: 'Por confirmar', icono: 'bi-hourglass-split' },
+    { clave: 'cerrados', texto: 'Cerrados', icono: 'bi-check2-circle' },
+  ];
+  readonly pestana = signal<Pestana>('abiertos');
+  readonly busqueda = signal('');
+
+  /**
+   * La busqueda se aplica antes de repartir en pestañas: asi el contador de
+   * cada pestaña dice donde hay coincidencias aunque no sea la que esta abierta.
+   */
+  readonly coincidencias = computed(() => {
+    const q = normalizar(this.busqueda().trim());
+    if (!q) return this.tickets();
+    const palabras = q.split(/\s+/);
+    return this.tickets().filter((t) => {
+      const texto = normalizar(
+        [
+          t.folio,
+          t.folio_general,
+          t.problema,
+          t.servicio,
+          t.tecnico,
+          t.contexto,
+          t.edificio_atencion,
+          t.campo_adicional,
+          t.modelo_traslado,
+          t.registrado_por_nombre,
+          etiquetaEstatus(t, true).texto,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
+      return palabras.every((p) => texto.includes(p));
+    });
+  });
+
+  readonly conteo = computed(() => {
+    const c: Record<Pestana, number> = { abiertos: 0, confirmar: 0, cerrados: 0 };
+    for (const t of this.coincidencias()) c[pestanaDe(t.estatus)]++;
+    return c;
+  });
+
+  readonly filtrados = computed(() =>
+    this.coincidencias().filter((t) => pestanaDe(t.estatus) === this.pestana()),
+  );
+
+  readonly vacio = computed(() => {
+    if (this.busqueda().trim()) return 'Ningún ticket coincide con la búsqueda';
+    return {
+      abiertos: 'No tienes tickets abiertos',
+      confirmar: 'No tienes tickets por confirmar',
+      cerrados: 'Aún no tienes tickets cerrados',
+    }[this.pestana()];
+  });
 
   readonly porPagina = 10;
   readonly paginaActual = signal(1);
 
-  totalPaginas() {
-    return Math.max(1, Math.ceil(this.tickets().length / this.porPagina));
-  }
+  readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.filtrados().length / this.porPagina)),
+  );
+  readonly desde = computed(() => (this.paginaActual() - 1) * this.porPagina + 1);
+  readonly hasta = computed(() =>
+    Math.min(this.paginaActual() * this.porPagina, this.filtrados().length),
+  );
 
-  ticketsPagina() {
-    const inicio = (this.paginaActual() - 1) * this.porPagina;
-    return this.tickets().slice(inicio, inicio + this.porPagina);
-  }
+  readonly ticketsPagina = computed(() =>
+    this.filtrados().slice(this.desde() - 1, this.hasta()),
+  );
 
-  paginaAnterior() {
-    this.paginaActual.update((p) => Math.max(1, p - 1));
-  }
-
-  paginaSiguiente() {
-    this.paginaActual.update((p) => Math.min(this.totalPaginas(), p + 1));
-  }
+  readonly paginas = computed(() => paginasConSalto(this.totalPaginas(), this.paginaActual()));
 
   constructor() {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
     if (this.auth.rol() === 'gestor') {
       this.api.misPorValidar().subscribe({ next: (r) => this.enValidacion.set(r) });
     }
-    this.cargar();
+    this.cargar(true);
   }
 
-  cargar() {
+  cambiarPestana(p: Pestana) {
+    this.pestana.set(p);
+    this.paginaActual.set(1);
+  }
+
+  buscar(texto: string) {
+    this.busqueda.set(texto);
+    this.paginaActual.set(1);
+  }
+
+  irA(n: number) {
+    this.paginaActual.set(Math.min(Math.max(1, n), this.totalPaginas()));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /**
+   * La primera vez abre "Por confirmar" si hay algo esperando respuesta: es lo
+   * unico que le pide accion al solicitante. Al recargar tras un cambio se
+   * queda en la pestaña donde estaba.
+   */
+  cargar(inicial = false) {
     this.api.listar({ propios: 'true' }).subscribe({
       next: (t) => {
         this.tickets.set(t);
-        this.paginaActual.set(1);
+        if (inicial && t.some((x) => x.estatus === 'RESUELTO')) this.pestana.set('confirmar');
+        this.paginaActual.set(Math.min(this.paginaActual(), this.totalPaginas()));
       },
       error: (e) => this.error.set(mensajeError(e)),
     });
