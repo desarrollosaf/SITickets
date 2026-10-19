@@ -151,6 +151,12 @@ export class DetalleTicket {
   readonly esMiSolicitud = computed(
     () => this.ticket()?.solicitante_id === this.auth.usuario()?.id,
   );
+  /** El gestor que registro el ticket "a nombre de otro" puede actuar en lugar del solicitante. */
+  readonly esGestorQueRegistro = computed(
+    () => this.rol() === 'gestor' && this.ticket()?.registrado_por === this.auth.usuario()?.id,
+  );
+  /** Reabrir: solo admin, mas la unica excepcion puntual que ya manda el backend en la sesion. */
+  readonly puedeReabrir = computed(() => this.auth.usuario()?.puedeReabrirTickets ?? false);
   /** Servicio CNA (Cartas de no adeudo): al resolver, revision completa/incompleta en vez de diagnostico/solucion. */
   readonly esRevisionBienes = computed(() => this.ticket()?.servicio_clave === 'CNA');
   /** Servicio SIS (SISTEMAS/PROGRESS): al resolver, el ticket cierra de una vez, sin pasar por RESUELTO. */

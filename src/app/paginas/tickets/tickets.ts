@@ -50,14 +50,25 @@ export class Tickets {
 
   /**
    * Caso especial, solo esta persona (ver USUARIOS_CIERRE_SERVICIO en el
-   * backend): cuantos de sus tickets (ya acotados a CARTAS DE NO ADEUDO)
-   * estan en RESUELTO esperando que ella los confirme.
+   * backend): TODOS sus tickets (ya acotados a CARTAS DE NO ADEUDO) en
+   * RESUELTO esperan que ella los confirme, los haya registrado ella o no.
    */
   private readonly USUARIOS_CIERRE_ESPECIAL = [38];
   readonly esCierreEspecial = computed(() =>
     this.USUARIOS_CIERRE_ESPECIAL.includes(this.auth.usuario()?.id ?? -1),
   );
-  readonly porConfirmar = computed(() => this.tickets().filter((t) => t.estatus === 'RESUELTO'));
+  /**
+   * Un gestor cualquiera (no el caso especial de arriba) solo ve en
+   * "Tickets generados" lo que el mismo registro "a nombre de otro" (ver
+   * alcance() en el backend) — asi que aqui siempre es suyo. El caso
+   * especial si mezcla tickets de otros gestores de su dependencia.
+   */
+  readonly miConfirmacion = (t: Ticket) =>
+    this.esCierreEspecial() ||
+    (this.auth.rol() === 'gestor' && t.registrado_por === this.auth.usuario()?.id);
+  readonly porConfirmar = computed(() =>
+    this.tickets().filter((t) => t.estatus === 'RESUELTO' && this.miConfirmacion(t)),
+  );
 
   readonly tickets = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);

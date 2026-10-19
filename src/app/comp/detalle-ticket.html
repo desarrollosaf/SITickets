@@ -120,8 +120,8 @@
             </button>
           }
 
-          <!-- Solicitante (o quien cierra en su lugar, ver USUARIOS_CIERRE_SERVICIO) -->
-          @if (esCierreEspecial() || (rol() === 'solicitante' && esMiSolicitud() && !tieneCierreEspecial())) {
+          <!-- Solicitante (o quien cierra en su lugar: ver USUARIOS_CIERRE_SERVICIO, o el gestor que registro a nombre de otro) -->
+          @if (esCierreEspecial() || esGestorQueRegistro() || (rol() === 'solicitante' && esMiSolicitud() && !tieneCierreEspecial())) {
             @if (t.estatus === 'RESUELTO') {
               <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="validar()">
                 Sí quedó resuelto
@@ -136,16 +136,18 @@
                 </button>
               }
             }
-            @if (t.estatus === 'CERRADO') {
-              <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reabrir')">
-                Reabrir
-              </button>
-            }
             @if (t.estatus === 'REGISTRADO' || t.estatus === 'ASIGNADO') {
               <button class="btn btn-sm btn-outline-danger" (click)="abrirFormulario('cancelar')">
                 Cancelar
               </button>
             }
+          }
+
+          <!-- Reabrir: nadie mas, ni el solicitante ni el gestor — solo el administrador (ver USUARIOS_REABREN_TICKETS en el backend para la unica excepcion puntual). -->
+          @if (puedeReabrir() && t.estatus === 'CERRADO') {
+            <button class="btn btn-sm btn-outline-secondary" (click)="abrirFormulario('reabrir')">
+              Reabrir
+            </button>
           }
         </div>
 

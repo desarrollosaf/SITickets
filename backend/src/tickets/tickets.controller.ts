@@ -296,7 +296,7 @@ export class TicketsController {
     return this.tickets.rechazar(id, dto.motivo, usuario);
   }
 
-  @Roles('solicitante', 'admin', 'gestor')
+  /* Sin @Roles: la autorizacion real (solo admin + USUARIOS_REABREN_TICKETS) vive en exigeReabrir(). */
   @HttpCode(200)
   @Post(':id/reabrir')
   reabrir(

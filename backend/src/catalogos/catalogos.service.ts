@@ -54,6 +54,13 @@ export const USUARIOS_CIERRE_SERVICIO: Record<string, number> = {
   CNA: 38, // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
 };
 
+/**
+ * Reabrir un ticket cerrado ya no lo puede hacer nadie mas que el
+ * administrador — ni el solicitante, ni el gestor que lo registro. Esta es
+ * la unica excepcion puntual admitida (por rfc, no por id local).
+ */
+export const USUARIOS_REABREN_TICKETS = ['RARC980223']; // RANGEL ROJAS CESAR
+
 @Injectable()
 export class CatalogosService {
   constructor(

@@ -98,7 +98,7 @@ function normalizar(texto: string): string {
 
     <app-tabla-tickets
       [tickets]="ticketsPagina()"
-      [pedirConfirmacion]="true"
+      [pedirConfirmacion]="todosConfirman"
       [boletos]="true"
       [vacio]="vacio()"
       [ayudaVacio]="busqueda() ? 'Prueba con otra palabra o revisa las otras pestañas.' : ''"
@@ -147,6 +147,8 @@ export class MisTickets {
   readonly abierto = signal<number | null>(null);
   readonly error = signal('');
   readonly fmt = fecha;
+  /** Aqui todo lo que esta en pantalla ya es del visitante: siempre le toca confirmar. */
+  readonly todosConfirman = (_t: Ticket) => true;
 
   /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
   readonly enValidacion = signal<TicketPorValidar[]>([]);
