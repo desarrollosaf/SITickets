@@ -55,6 +55,19 @@ export const USUARIOS_CIERRE_SERVICIO: Record<string, number> = {
 };
 
 /**
+ * Caso especial, solo para el servicio indicado (clave): los tickets que
+ * esta persona (rfc) registra de ese servicio no aparecen en los listados
+ * generales ("Todos los tickets", "Tickets generados") — son resueltos al
+ * momento por telefono y se cierran solos (ver cierreInmediato en
+ * resolver()), asi que no aportan nada ahi. Si lo registra alguien mas, si
+ * aparece normal. No afecta su propia bandeja (ahi sigue viendolos como
+ * tecnico turnado).
+ */
+export const USUARIOS_OCULTOS_LISTADO: Record<string, string> = {
+  CACX680312: 'SIS', // CASTAÑEDA CABALLERO OSCAR GABRIEL -> SISTEMAS (PROGRESS)
+};
+
+/**
  * Reabrir un ticket cerrado ya no lo puede hacer nadie mas que el
  * administrador — ni el solicitante, ni el gestor que lo registro. Esta es
  * la unica excepcion puntual admitida (por rfc, no por id local).
