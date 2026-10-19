@@ -86,6 +86,7 @@ export class Usuarios {
   rol = '';
   servicioIds: number[] = [];
   dependenciaIds: number[] = [];
+  servicioIdsValidador: number[] = [];
 
   /* ---------------- tipo(s) de servicio (solo si rol es tecnico) ---------------- */
 
@@ -114,6 +115,12 @@ export class Usuarios {
     this.dependenciaIds = this.dependenciaIds.includes(id)
       ? this.dependenciaIds.filter((d) => d !== id)
       : [...this.dependenciaIds, id];
+  }
+
+  alternarServicioValidador(id: number) {
+    this.servicioIdsValidador = this.servicioIdsValidador.includes(id)
+      ? this.servicioIdsValidador.filter((s) => s !== id)
+      : [...this.servicioIdsValidador, id];
   }
 
   /* ---------------- personal ya registrado ---------------- */
@@ -184,6 +191,7 @@ export class Usuarios {
     this.rol = '';
     this.servicioIds = [];
     this.dependenciaIds = [];
+    this.servicioIdsValidador = [];
     this.errorForm.set('');
     this.aviso.set('');
   }
@@ -212,6 +220,10 @@ export class Usuarios {
         servicio_ids: this.mostrarServicio() && this.servicioIds.length ? this.servicioIds : undefined,
         dependencia_ids:
           this.mostrarDependencias() && this.dependenciaIds.length ? this.dependenciaIds : undefined,
+        servicio_ids_validador:
+          this.mostrarDependencias() && this.servicioIdsValidador.length
+            ? this.servicioIdsValidador
+            : undefined,
       })
       .subscribe({
         next: (r) => {
@@ -238,6 +250,7 @@ export class Usuarios {
   editExtension = '';
   editServicioIds: number[] = [];
   editDependenciaIds: number[] = [];
+  editServicioIdsValidador: number[] = [];
 
   mostrarServicioEdicion() {
     return this.editRol === 'tecnico';
@@ -259,6 +272,12 @@ export class Usuarios {
       : [...this.editDependenciaIds, id];
   }
 
+  alternarServicioValidadorEdicion(id: number) {
+    this.editServicioIdsValidador = this.editServicioIdsValidador.includes(id)
+      ? this.editServicioIdsValidador.filter((s) => s !== id)
+      : [...this.editServicioIdsValidador, id];
+  }
+
   abrirEditar(u: UsuarioStaff) {
     this.editando.set(u);
     this.editRol = u.rol;
@@ -266,6 +285,7 @@ export class Usuarios {
     this.editExtension = u.extension ?? '';
     this.editServicioIds = [...u.servicio_ids];
     this.editDependenciaIds = [...u.dependencia_ids_validador];
+    this.editServicioIdsValidador = [...u.servicio_ids_validador];
     this.errorEdicion.set('');
   }
 
@@ -285,6 +305,9 @@ export class Usuarios {
         extension: this.editExtension.trim() || undefined,
         servicio_ids: this.mostrarServicioEdicion() ? this.editServicioIds : undefined,
         dependencia_ids: this.mostrarDependenciasEdicion() ? this.editDependenciaIds : undefined,
+        servicio_ids_validador: this.mostrarDependenciasEdicion()
+          ? this.editServicioIdsValidador
+          : undefined,
         activo: u.activo,
       })
       .subscribe({
@@ -309,6 +332,7 @@ export class Usuarios {
         extension: u.extension ?? undefined,
         servicio_ids: u.servicio_ids,
         dependencia_ids: u.dependencia_ids_validador,
+        servicio_ids_validador: u.servicio_ids_validador,
         activo: !u.activo,
       })
       .subscribe({

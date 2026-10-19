@@ -126,7 +126,7 @@ export class MonitorService {
              del ticket: ese catalogo a veces sale vacio o desactualizado. */
           const org = await this.ticketsSrv.datosOrganizacionalesDelSolicitante(
             t.solicitante_id,
-            !!t.registrado_por,
+            t.solicitante_nombre,
           );
           return {
             turno: i + 1,

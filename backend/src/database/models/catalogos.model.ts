@@ -211,6 +211,10 @@ export class Usuario extends Model {
   /** Solo rol validador: dependencias que revisa (ver DependenciaValidador). */
   @HasMany(() => DependenciaValidador)
   declare validaciones: DependenciaValidador[];
+
+  /** Solo rol validador: servicios que puede autorizar (ver ServicioValidador). Vacio = todos. */
+  @HasMany(() => ServicioValidador)
+  declare serviciosAValidar: ServicioValidador[];
 }
 
 /** §3 · tipos de servicio. */
@@ -354,6 +358,32 @@ export class TecnicoServicio extends Model {
   @Default(false)
   @Column(DataType.BOOLEAN)
   declare suplente: boolean;
+
+  @BelongsTo(() => Usuario)
+  declare usuario: Usuario;
+
+  @BelongsTo(() => Servicio)
+  declare servicio: Servicio;
+}
+
+/**
+ * §16 · a que servicio(s) puede autorizar cada usuario con rol validador. Sin
+ * ninguna fila aqui, ese validador autoriza cualquier servicio (sin
+ * restriccion) — es como quedan hoy todos salvo a quien el admin le marque
+ * algo explicito. Mismo criterio que DependenciaValidador/TecnicoServicio:
+ * administrable desde pantalla, nada cableado por nombre de usuario.
+ */
+@Table({ tableName: 'servicio_validador', timestamps: false })
+export class ServicioValidador extends Model {
+  @PrimaryKey
+  @ForeignKey(() => Usuario)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare usuario_id: number;
+
+  @PrimaryKey
+  @ForeignKey(() => Servicio)
+  @Column(DataType.SMALLINT.UNSIGNED)
+  declare servicio_id: number;
 
   @BelongsTo(() => Usuario)
   declare usuario: Usuario;

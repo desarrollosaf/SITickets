@@ -12,6 +12,7 @@ import {
   DependenciaValidador,
   SDependencia,
   Servicio,
+  ServicioValidador,
   SUsuario,
   TecnicoServicio,
   Usuario,
@@ -29,6 +30,7 @@ export class UsuariosService {
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     @InjectModel(CatalogoRol) private readonly roles: typeof CatalogoRol,
     @InjectModel(DependenciaValidador) private readonly validadores: typeof DependenciaValidador,
+    @InjectModel(ServicioValidador) private readonly servicioValidador: typeof ServicioValidador,
   ) {}
 
   /**
@@ -97,7 +99,12 @@ export class UsuariosService {
   async listar() {
     const filas = await this.usuarios.findAll({
       where: { rol: { [Op.ne]: 'solicitante' } },
-      include: [Area, { model: TecnicoServicio, include: [Servicio] }, DependenciaValidador],
+      include: [
+        Area,
+        { model: TecnicoServicio, include: [Servicio] },
+        DependenciaValidador,
+        { model: ServicioValidador, include: [Servicio] },
+      ],
       order: [
         ['rol', 'ASC'],
         ['nombre', 'ASC'],
@@ -146,6 +153,9 @@ export class UsuariosService {
           .map((v) => nombrePorIdSaf.get(v.dependencia_id))
           .filter(Boolean),
         dependencia_ids_validador: (u.validaciones ?? []).map((v) => v.dependencia_id),
+        /** Solo rol validador: servicios que puede autorizar. Vacio = sin restriccion (todos). */
+        servicios_validador: (u.serviciosAValidar ?? []).map((v) => v.servicio?.nombre).filter(Boolean),
+        servicio_ids_validador: (u.serviciosAValidar ?? []).map((v) => v.servicio_id),
         dependencia: dependenciaSaf ?? null,
         area: u.area?.nombre ?? null,
         activo: u.activo,
@@ -182,6 +192,25 @@ export class UsuariosService {
     }
   }
 
+  /**
+   * Valida que todos los servicios existan y que solo un validador pueda
+   * traerlos. Sin ninguno, el validador queda sin restriccion (autoriza
+   * cualquier servicio) — ver ServicioValidador.
+   */
+  private async validarServiciosValidador(
+    servicioIds: number[] | undefined,
+    rol: string,
+  ): Promise<void> {
+    if (!servicioIds?.length) return;
+    if (rol !== 'validador') {
+      throw new BadRequestException('Solo el rol validador puede traer servicios a autorizar');
+    }
+    const encontrados = await this.servicios.count({ where: { id: { [Op.in]: servicioIds } } });
+    if (encontrados !== new Set(servicioIds).size) {
+      throw new BadRequestException('Alguno de los servicios elegidos no existe');
+    }
+  }
+
   async registrar(dto: RegistrarUsuarioDto) {
     const sUsuario = await this.sUsuarios.findByPk(dto.id_usuario_saf);
     if (!sUsuario || sUsuario.Estado !== 1) {
@@ -196,6 +225,7 @@ export class UsuariosService {
     await this.validarRol(dto.rol);
     await this.validarServicios(dto.servicio_ids, dto.rol);
     await this.validarDependenciasValidador(dto.dependencia_ids, dto.rol);
+    await this.validarServiciosValidador(dto.servicio_ids_validador, dto.rol);
 
     try {
       const creado = await this.usuarios.create({
@@ -218,6 +248,12 @@ export class UsuariosService {
       if (dto.dependencia_ids?.length) {
         await this.validadores.bulkCreate(
           dto.dependencia_ids.map((dependencia_id) => ({ usuario_id: creado.id, dependencia_id })),
+        );
+      }
+
+      if (dto.servicio_ids_validador?.length) {
+        await this.servicioValidador.bulkCreate(
+          dto.servicio_ids_validador.map((servicio_id) => ({ usuario_id: creado.id, servicio_id })),
         );
       }
 
@@ -247,6 +283,7 @@ export class UsuariosService {
     await this.validarRol(dto.rol);
     await this.validarServicios(dto.servicio_ids, dto.rol);
     await this.validarDependenciasValidador(dto.dependencia_ids, dto.rol);
+    await this.validarServiciosValidador(dto.servicio_ids_validador, dto.rol);
 
     try {
       await usuario.update({
@@ -292,6 +329,26 @@ export class UsuariosService {
         if (aAgregar.length) {
           await this.validadores.bulkCreate(
             aAgregar.map((dependencia_id) => ({ usuario_id: id, dependencia_id })),
+          );
+        }
+      }
+
+      if (dto.rol !== 'validador') {
+        await this.servicioValidador.destroy({ where: { usuario_id: id } });
+      } else {
+        const nuevos = dto.servicio_ids_validador ?? [];
+        const actuales = await this.servicioValidador.findAll({ where: { usuario_id: id } });
+        const aQuitar = actuales.filter((e) => !nuevos.includes(e.servicio_id));
+        const aAgregar = nuevos.filter((sid) => !actuales.some((e) => e.servicio_id === sid));
+
+        if (aQuitar.length) {
+          await this.servicioValidador.destroy({
+            where: { usuario_id: id, servicio_id: { [Op.in]: aQuitar.map((e) => e.servicio_id) } },
+          });
+        }
+        if (aAgregar.length) {
+          await this.servicioValidador.bulkCreate(
+            aAgregar.map((servicio_id) => ({ usuario_id: id, servicio_id })),
           );
         }
       }

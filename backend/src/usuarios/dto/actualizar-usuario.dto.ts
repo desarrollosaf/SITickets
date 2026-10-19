@@ -44,6 +44,15 @@ export class ActualizarUsuarioDto {
   @IsInt({ each: true })
   dependencia_ids?: number[];
 
+  /**
+   * Solo aplica si rol es validador; sin valor (o []) deja al validador sin
+   * restriccion de servicio (autoriza cualquiera).
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  servicio_ids_validador?: number[];
+
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
