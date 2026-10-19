@@ -83,6 +83,11 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/tickets-por-validar', etiqueta: 'Tickets por validar', icono: 'bi-patch-check' },
     { ruta: '/tickets', etiqueta: 'Tickets generados', icono: 'bi-inboxes' },
   ],
+  sistemas: [
+    { ruta: '/bandeja', etiqueta: 'Mis tickets turnados', icono: 'bi-clipboard-check' },
+    { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
+    { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
+  ],
 
 };
 const NOMBRE_ROL: Record<Rol, string> = {
@@ -94,6 +99,7 @@ const NOMBRE_ROL: Record<Rol, string> = {
   operador: 'Operador',
   gestor: 'Gestor',
   validador: 'Validador',
+  sistemas: 'Sistemas',
 };
 
 @Component({

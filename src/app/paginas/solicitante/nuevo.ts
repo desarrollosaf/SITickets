@@ -241,7 +241,7 @@ export class Nuevo {
    */
   readonly puedeElegirUsuario = computed(
     () =>
-      ['admin', 'operador', 'gestor', 'validador'].includes(this.auth.rol() ?? '') &&
+      ['admin', 'operador', 'gestor', 'validador', 'sistemas'].includes(this.auth.rol() ?? '') &&
       !this.auth.usuario()?.siempreANombrePropio &&
       (this.esAdmin() ||
         !this.servicioActual()?.restringido ||

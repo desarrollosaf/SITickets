@@ -76,6 +76,7 @@ export class AuthService {
         return '/tickets';
       case 'tecnico':
       case 'proveedor':
+      case 'sistemas':
         return '/bandeja';
       case 'jefe':
         return '/bandeja';

@@ -153,6 +153,8 @@ export class DetalleTicket {
   );
   /** Servicio CNA (Cartas de no adeudo): al resolver, revision completa/incompleta en vez de diagnostico/solucion. */
   readonly esRevisionBienes = computed(() => this.ticket()?.servicio_clave === 'CNA');
+  /** Servicio SIS (SISTEMAS/PROGRESS): al resolver, el ticket cierra de una vez, sin pasar por RESUELTO. */
+  readonly esCierreInmediato = computed(() => this.ticket()?.servicio_clave === 'SIS');
   /**
    * Caso especial, solo para el servicio indicado (ver USUARIOS_CIERRE_SERVICIO
    * en el backend): esta persona reemplaza al solicitante real para
@@ -168,17 +170,7 @@ export class DetalleTicket {
     const clave = this.ticket()?.servicio_clave;
     return !!clave && this.USUARIOS_CIERRE_SERVICIO[clave] === this.auth.usuario()?.id;
   });
-  /**
-   * Caso especial, solo esta persona (ver USUARIOS_GESTOR_TAMBIEN_TECNICO en
-   * el backend): ademas de registrar como gestor, el mismo atiende los
-   * tickets de su especialidad.
-   */
-  private readonly USUARIOS_GESTOR_TAMBIEN_TECNICO = [1];
-  readonly atiende = computed(
-    () =>
-      ['tecnico', 'jefe', 'proveedor'].includes(this.rol() ?? '') ||
-      this.USUARIOS_GESTOR_TAMBIEN_TECNICO.includes(this.auth.usuario()?.id ?? -1),
-  );
+  readonly atiende = computed(() => ['tecnico', 'jefe', 'proveedor', 'sistemas'].includes(this.rol() ?? ''));
   readonly esAdmin = computed(() => this.rol() === 'admin');
   /** Oculta la mecanica interna de "EN COLA": al solicitante solo le importa que quedo registrado. */
   readonly esSolicitante = computed(() => this.rol() === 'solicitante');

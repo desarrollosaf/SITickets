@@ -112,7 +112,8 @@ export type Rol =
   | 'proveedor'
   | 'operador'
   | 'gestor'
-  | 'validador';
+  | 'validador'
+  | 'sistemas';
 
 /**
  * Catalogo de roles administrable (pantalla de admin): el admin puede dar de

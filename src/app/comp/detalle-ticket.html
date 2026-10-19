@@ -328,7 +328,12 @@
                 }
               } @else {
                 <div class="alert alert-info py-2 small">
-                  Diagnóstico y solución son obligatorios: es lo que después alimenta el tablero de compras.
+                  @if (esCierreInmediato()) {
+                    SISTEMAS (PROGRESS) no requiere confirmación: al marcar resuelto, el ticket se cierra
+                    de una vez.
+                  } @else {
+                    Diagnóstico y solución son obligatorios: es lo que después alimenta el tablero de compras.
+                  }
                 </div>
                 <label class="form-label small fw-semibold" for="fm-dx">Diagnóstico (causa)</label>
                 <input id="fm-dx" class="form-control form-control-sm mb-2" [(ngModel)]="diagnostico"
