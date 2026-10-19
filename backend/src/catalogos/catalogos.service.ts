@@ -32,21 +32,15 @@ import type { UsuarioToken } from '../common/usuario-actual.decorator';
 export const RFC_SIEMPRE_A_NOMBRE_PROPIO = ['TOMJ820727', 'NATL830315'];
 
 /**
- * Caso especial, solo esta persona: ademas de registrar como gestor, el
- * tambien atiende los tickets de su(s) especialidad(es) (ver
- * TecnicoServicio) — igual que cualquier tecnico, aunque su rol siga
- * siendo gestor. Id local, no rfc: es lo que ya trae el token de sesion,
- * sin tener que ir a buscarlo en cada ticket.
- */
-export const USUARIOS_GESTOR_TAMBIEN_TECNICO = [1]; // CASTAÑEDA CABALLERO OSCAR GABRIEL (CACX680312)
-
-/**
  * Caso especial, solo esta persona: en "Tickets generados" no ve toda su
  * dependencia, solo los tickets del servicio indicado (clave del catalogo).
  * Id local -> clave de servicio.
+ *
+ * CASTAÑEDA (CACX680312, antes id 1 aqui) ya no es excepcion: tiene su
+ * propio rol "sistemas" (ver migracion 024_rol_sistemas.sql), que atiende
+ * como tecnico normal via ROLES_TECNICOS en tickets.service.ts.
  */
 export const USUARIOS_FILTRO_SERVICIO_GENERADOS: Record<number, string> = {
-  1: 'SIS', // CASTAÑEDA CABALLERO OSCAR GABRIEL (CACX680312) -> SISTEMAS (PROGRESS)
   38: 'CNA', // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
 };
 
@@ -429,10 +423,7 @@ export class CatalogosService {
     const filas = await this.usuarios.findAll({
       where: {
         activo: true,
-        [Op.or]: [
-          { rol: { [Op.in]: ['tecnico', 'proveedor', 'jefe'] } },
-          { id: { [Op.in]: USUARIOS_GESTOR_TAMBIEN_TECNICO } },
-        ],
+        rol: { [Op.in]: ['tecnico', 'proveedor', 'jefe', 'sistemas'] },
       },
       attributes: ['id', 'nombre', 'rol'],
       include: [

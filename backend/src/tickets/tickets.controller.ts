@@ -54,7 +54,7 @@ export class TicketsController {
    * nombre de quien registra un ticket (§2). Va antes de ':id' para que no se
    * confunda "solicitantes" con un identificador de ticket.
    */
-  @Roles('admin', 'operador', 'gestor', 'validador')
+  @Roles('admin', 'operador', 'gestor', 'validador', 'sistemas')
   @Get('solicitantes')
   buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.buscarSolicitantes(q, usuario);
@@ -142,7 +142,7 @@ export class TicketsController {
     return this.tickets.nivelTonerDelTicket(id, usuario);
   }
 
-  @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor', 'validador')
+  @Roles('solicitante', 'admin', 'operador', 'gestor', 'tecnico', 'jefe', 'proveedor', 'validador', 'sistemas')
   @Post()
   crear(@Body() dto: CrearTicketDto, @UsuarioActual() usuario: UsuarioToken) {
     return this.tickets.crear(dto, usuario);
@@ -351,9 +351,7 @@ export class TicketsController {
 
   /* ---------------- §16 reloj checador ---------------- */
 
-  /* gestor: caso especial, ver USUARIOS_GESTOR_TAMBIEN_TECNICO — RelojService
-     igual exige que el ticket sea suyo, asi que no abre nada a cualquier gestor. */
-  @Roles('tecnico', 'jefe', 'proveedor', 'admin', 'gestor')
+  @Roles('tecnico', 'jefe', 'proveedor', 'sistemas', 'admin')
   @HttpCode(200)
   @Post(':id/reloj/inicio')
   relojInicio(
@@ -364,7 +362,7 @@ export class TicketsController {
     return this.reloj.iniciar(id, dto, usuario);
   }
 
-  @Roles('tecnico', 'jefe', 'proveedor', 'admin', 'gestor')
+  @Roles('tecnico', 'jefe', 'proveedor', 'sistemas', 'admin')
   @HttpCode(200)
   @Post(':id/reloj/fin')
   relojFin(

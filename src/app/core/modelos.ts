@@ -10,7 +10,8 @@ export type Rol =
   | 'proveedor'
   | 'operador'
   | 'gestor'
-  | 'validador';
+  | 'validador'
+  | 'sistemas';
 
 export type EstatusClave =
   | 'REGISTRADO'

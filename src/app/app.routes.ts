@@ -29,6 +29,7 @@ export const routes: Routes = [
             'tecnico',
             'jefe',
             'proveedor',
+            'sistemas',
           ),
         ],
         loadComponent: () => import('./paginas/solicitante/nuevo').then((m) => m.Nuevo),
@@ -36,7 +37,16 @@ export const routes: Routes = [
       {
         path: 'mis-tickets',
         canActivate: [
-          guardRol('solicitante', 'admin', 'gestor', 'validador', 'tecnico', 'jefe', 'proveedor'),
+          guardRol(
+            'solicitante',
+            'admin',
+            'gestor',
+            'validador',
+            'tecnico',
+            'jefe',
+            'proveedor',
+            'sistemas',
+          ),
         ],
         loadComponent: () => import('./paginas/solicitante/mis-tickets').then((m) => m.MisTickets),
       },
@@ -50,7 +60,7 @@ export const routes: Routes = [
       },
       {
         path: 'bandeja',
-        canActivate: [guardRol('tecnico', 'jefe', 'proveedor')],
+        canActivate: [guardRol('tecnico', 'jefe', 'proveedor', 'sistemas')],
         loadComponent: () => import('./paginas/bandeja/bandeja').then((m) => m.Bandeja),
       },
       {
@@ -120,7 +130,7 @@ export const routes: Routes = [
       {
         /* Destino del QR "de llegada" (ver boton en el detalle del ticket). */
         path: 'checador/:id',
-        canActivate: [guardRol('admin', 'tecnico', 'jefe', 'proveedor')],
+        canActivate: [guardRol('admin', 'tecnico', 'jefe', 'proveedor', 'sistemas')],
         loadComponent: () => import('./paginas/checador/checador').then((m) => m.Checador),
       },
       { path: '', pathMatch: 'full', redirectTo: 'mis-tickets' },

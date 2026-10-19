@@ -43,7 +43,6 @@ import {
   RFC_SIEMPRE_A_NOMBRE_PROPIO,
   USUARIOS_CIERRE_SERVICIO,
   USUARIOS_FILTRO_SERVICIO_GENERADOS,
-  USUARIOS_GESTOR_TAMBIEN_TECNICO,
 } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
@@ -76,8 +75,13 @@ export const CARPETA_CEDULAS = join(process.cwd(), 'storage', 'cedulas');
  */
 const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
 
-/** Roles que atienden tickets y por tanto ven solo lo que traen turnado. */
-const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe'];
+/**
+ * Roles que atienden tickets y por tanto ven solo lo que traen turnado.
+ * "sistemas" es un rol de una sola persona (SISTEMAS/PROGRESS, ver
+ * migracion 024_rol_sistemas.sql): atiende como cualquier tecnico, con la
+ * especialidad dada por tecnico_servicio en vez de estar cableada en codigo.
+ */
+const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe', 'sistemas'];
 
 /** Solicitud de toner/cartucho: aqui ademas del modelo se pide el color a cambiar. */
 const CLAVES_TONER = ['IMP-01', 'IMPA-01'];
@@ -878,7 +882,7 @@ export class TicketsService {
      * solicitante_nombre en vez de confiar en el join. registrado_por deja
      * rastro de quien lo dio de alta realmente (siempre un usuario.id local).
      */
-    const ROLES_A_NOMBRE_DE = ['admin', 'operador', 'gestor', 'validador'];
+    const ROLES_A_NOMBRE_DE = ['admin', 'operador', 'gestor', 'validador', 'sistemas'];
     let quien: {
       nombre: string;
       dependencia_id: number | null;
@@ -1602,9 +1606,7 @@ export class TicketsService {
 
   private exigeTecnico(t: Ticket, usuario: UsuarioToken) {
     if (usuario.rol === 'admin') return;
-    const esTecnico =
-      ROLES_TECNICOS.includes(usuario.rol) || USUARIOS_GESTOR_TAMBIEN_TECNICO.includes(usuario.id);
-    if (!esTecnico || !this.esTecnicoDe(t, usuario)) {
+    if (!ROLES_TECNICOS.includes(usuario.rol) || !this.esTecnicoDe(t, usuario)) {
       throw new ForbiddenException('Solo el tecnico asignado puede mover este ticket');
     }
   }
@@ -1846,6 +1848,13 @@ export class TicketsService {
      * bloquea el cierre: es solo el registro de como quedo.
      */
     const esRevisionBienes = t.servicio?.clave === 'CNA';
+    /*
+     * SISTEMAS (PROGRESS): lo atiende el rol "sistemas" (una sola persona,
+     * interna del area), asi que no tiene caso pedirle al solicitante que
+     * confirme — el ticket cierra solo al resolverse, sin pasar por
+     * RESUELTO ni por el cierre por omision de 3 dias.
+     */
+    const cierreInmediato = t.servicio?.clave === 'SIS';
     if (esRevisionBienes) {
       if (!dto.revision) throw new BadRequestException('Indica si la revisión quedó completa o incompleta');
       if (dto.revision === 'incompleta' && !dto.observaciones?.trim()) {
@@ -1868,15 +1877,24 @@ export class TicketsService {
       { where: { ticket_id: t.id, fin: null } },
     );
 
-    await t.update({
-      estatus: ESTATUS.RESUELTO,
-      f_resolucion: new Date(),
-      f_espera_desde: null,
-      diagnostico: esRevisionBienes ? null : dto.diagnostico,
-      solucion: esRevisionBienes ? null : dto.solucion,
-      refacciones: esRevisionBienes ? null : dto.refacciones?.trim() || 'Ninguna',
-      revision_bienes: esRevisionBienes ? dto.revision! : null,
-      observaciones_revision: esRevisionBienes ? dto.observaciones?.trim() || null : null,
+    const ahora = new Date();
+    await this.db.transaction(async (tx) => {
+      await t.update(
+        {
+          estatus: cierreInmediato ? ESTATUS.CERRADO : ESTATUS.RESUELTO,
+          f_resolucion: ahora,
+          f_validacion: cierreInmediato ? ahora : null,
+          cierre_por_omision: false,
+          f_espera_desde: null,
+          diagnostico: esRevisionBienes ? null : dto.diagnostico,
+          solucion: esRevisionBienes ? null : dto.solucion,
+          refacciones: esRevisionBienes ? null : dto.refacciones?.trim() || 'Ninguna',
+          revision_bienes: esRevisionBienes ? dto.revision! : null,
+          observaciones_revision: esRevisionBienes ? dto.observaciones?.trim() || null : null,
+        },
+        { transaction: tx },
+      );
+      if (cierreInmediato) await this.reglas.asignaFolioDeCierre(t, tx);
     });
     await this.reglas.anota(
       t.id,
@@ -1886,6 +1904,14 @@ export class TicketsService {
         ? `Revisión ${dto.revision}${dto.observaciones ? `: ${dto.observaciones.trim()}` : ''}`
         : `${dto.diagnostico} → ${dto.solucion}`,
     );
+    if (cierreInmediato) {
+      await this.reglas.anota(
+        t.id,
+        usuario.id,
+        'Cerrado automáticamente',
+        'SISTEMAS (PROGRESS) no requiere confirmación del solicitante.',
+      );
+    }
 
     const objetivos = await this.reglas.objetivos();
     const objetivo = objetivos.get(t.prioridad) ?? 1440;
@@ -1893,7 +1919,8 @@ export class TicketsService {
     this.traza.registra(
       '§10',
       `${t.folio} resuelto en ${activo} min (objetivo ${objetivo} min) · ` +
-        `${activo <= objetivo ? 'dentro de tiempo' : 'FUERA DE TIEMPO'}. Notificado al solicitante.`,
+        `${activo <= objetivo ? 'dentro de tiempo' : 'FUERA DE TIEMPO'}` +
+        (cierreInmediato ? '. Cerrado automaticamente (SISTEMAS).' : '. Notificado al solicitante.'),
     );
     return this.detalle(id, usuario);
   }
@@ -2210,14 +2237,7 @@ export class TicketsService {
     }
 
     const destino = await this.usuarios.findOne({
-      where: {
-        id: dto.tecnico,
-        activo: true,
-        [Op.or]: [
-          { rol: { [Op.in]: ROLES_TECNICOS } },
-          { id: { [Op.in]: USUARIOS_GESTOR_TAMBIEN_TECNICO } },
-        ],
-      },
+      where: { id: dto.tecnico, activo: true, rol: { [Op.in]: ROLES_TECNICOS } },
     });
     if (!destino) throw new BadRequestException('El tecnico destino no existe o no esta activo');
 
