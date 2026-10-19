@@ -35,6 +35,9 @@ const ACENTO: Record<string, string> = {
               <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
                 <span class="folio boleto-folio">
                   <i class="bi bi-ticket-perforated"></i>
+                  @if (esAdminUOperador() && t.datos_copiados) {
+                    <span class="punto-copiado" title="Datos copiados"></span>
+                  }
                   {{ esSolicitante() ? t.folio_general : t.folio }}
                   @if (muestraFolioGeneral() && t.folio_general !== t.folio) {
                     <span class="sub ms-1">· general {{ t.folio_general }}</span>
