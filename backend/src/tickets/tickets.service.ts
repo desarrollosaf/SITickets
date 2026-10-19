@@ -24,6 +24,7 @@ import {
   Sede,
   Servicio,
   ServicioUsuarioPermitido,
+  ServicioValidador,
   SUbicacion,
   SUbicacionDepartamento,
   SUsuario,
@@ -112,6 +113,8 @@ export class TicketsService {
     private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
     @InjectModel(DependenciaValidador)
     private readonly dependenciaValidador: typeof DependenciaValidador,
+    @InjectModel(ServicioValidador)
+    private readonly servicioValidador: typeof ServicioValidador,
     @InjectModel(SUsuario, 'saf') private readonly sUsuarios: typeof SUsuario,
     @InjectModel(SDependencia, 'saf') private readonly sDependencias: typeof SDependencia,
     @InjectModel(SDireccion, 'saf') private readonly sDirecciones: typeof SDireccion,
@@ -204,6 +207,10 @@ export class TicketsService {
         if (claveServicio) {
           const servicio = await this.serviciosM.findOne({ where: { clave: claveServicio } });
           where.servicio_id = servicio?.id ?? null;
+        } else if (usuario.rol === 'validador') {
+          /* Servicios que puede autorizar (ver ServicioValidador). Vacio = sin restriccion. */
+          const servicioIds = await this.serviciosQueValida(usuario.id);
+          if (servicioIds.length) where.servicio_id = { [Op.in]: servicioIds };
         }
         return where;
       }
@@ -339,7 +346,7 @@ export class TicketsService {
      */
     const orgs = await Promise.all(
       filas.map((t) =>
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ),
     );
 
@@ -538,7 +545,7 @@ export class TicketsService {
      */
     const orgSaf = await this.datosOrganizacionalesDelSolicitante(
       ticket.solicitante_id,
-      !!ticket.registrado_por,
+      ticket.solicitante_nombre,
     );
 
     const mapaDependencias = await this.mapaDependenciasSaf();
@@ -836,7 +843,7 @@ export class TicketsService {
      * el catalogo): solo la gente en esa lista, mas el administrador.
      */
     if (problema.servicio.restringido && usuario.rol !== 'admin') {
-      const rfc = await this.rfcDelSolicitante(usuario.id);
+      const rfc = await this.rfcDelSolicitante(usuario.id, usuario.nombre);
       const permitido = rfc
         ? await this.permitidosServicio.findOne({
             where: { servicio_id: problema.servicio_id, rfc },
@@ -1031,6 +1038,12 @@ export class TicketsService {
     return filas.map((f) => f.dependencia_id);
   }
 
+  /** Servicios que este validador puede autorizar. Vacio = sin restriccion (autoriza todos). */
+  private async serviciosQueValida(usuarioId: number): Promise<number[]> {
+    const filas = await this.servicioValidador.findAll({ where: { usuario_id: usuarioId } });
+    return filas.map((f) => f.servicio_id);
+  }
+
   /**
    * Dependencia (id de saf) que un gestor atiende: no es Usuario.dependencia_id
    * (esa es donde el gestor mismo trabaja), sino la dependencia de la gente a
@@ -1043,13 +1056,20 @@ export class TicketsService {
     return idSaf ? [idSaf] : [];
   }
 
-  /** Bandeja del validador: tickets pendientes de las dependencias que tiene asignadas. */
+  /** Bandeja del validador: tickets pendientes de las dependencias (y, si aplica, servicios) que tiene asignados. */
   async porValidar(usuario: UsuarioToken) {
     const dependenciaIds = await this.dependenciasDe(usuario.id);
     if (!dependenciaIds.length) return [];
 
+    const where: Record<string, unknown> = {
+      pendiente_validacion: true,
+      dependencia_id: { [Op.in]: dependenciaIds },
+    };
+    const servicioIds = await this.serviciosQueValida(usuario.id);
+    if (servicioIds.length) where.servicio_id = { [Op.in]: servicioIds };
+
     const filas = await this.tickets.findAll({
-      where: { pendiente_validacion: true, dependencia_id: { [Op.in]: dependenciaIds } },
+      where,
       include: INCLUDES,
       order: [['f_captura', 'ASC']],
     });
@@ -1102,6 +1122,10 @@ export class TicketsService {
     const dependenciaIds = await this.dependenciasDe(usuario.id);
     if (!t.dependencia_id || !dependenciaIds.includes(t.dependencia_id)) {
       throw new ForbiddenException('No validas tickets de esa dependencia');
+    }
+    const servicioIds = await this.serviciosQueValida(usuario.id);
+    if (servicioIds.length && !servicioIds.includes(t.servicio_id)) {
+      throw new ForbiddenException('No validas tickets de ese tipo de servicio');
     }
     return t;
   }
@@ -1284,7 +1308,7 @@ export class TicketsService {
   ): Promise<void> {
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(ticket.tecnico_id!, { attributes: ['rfc'] }),
-      this.rfcDelSolicitante(ticket.solicitante_id, !!ticket.registrado_por),
+      this.rfcDelSolicitante(ticket.solicitante_id, ticket.solicitante_nombre),
     ]);
     if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
 
@@ -1421,24 +1445,21 @@ export class TicketsService {
 
   /**
    * rfc de quien solicito el ticket. solicitante_id no vive siempre en el
-   * mismo espacio de ids (ver comentario en el modelo Ticket): si el ticket
-   * se registro "a nombre de otro" (ticket.registrado_por != null, ver
-   * crear()), solicitante_id SIEMPRE es un id_Usuario de saf.s_usuario, sin
-   * ambiguedad — nunca hay que tocar la tabla local, forzarSaf evita el
-   * riesgo real de que ese numero choque por casualidad con el id local de
-   * otra persona (p. ej. del propio gestor que lo registro) y se le adjudique
-   * el rfc equivocado. Sin forzarSaf, se mantiene el criterio dual de
-   * siempre: primero usuario local, si no hay fila ahi se asume saf (caso
-   * del solicitante externo registrando su propio ticket).
+   * mismo espacio de ids (ver comentario en el modelo Ticket): puede ser un
+   * usuario.id local o un id_Usuario de saf.s_usuario, y el numero puede
+   * coincidir por pura casualidad con el de una persona distinta en el otro
+   * espacio (p. ej. solicitante_id=4 es a la vez un usuario.id local real y
+   * un id_Usuario de saf real, de dos personas que no tienen nada que ver).
+   * Por eso no basta con "existe en la tabla local": se exige ademas que el
+   * nombre coincida con solicitanteNombre (el mismo desempate que ya usa
+   * alcance()) antes de confiar en esa fila local.
    */
   private async rfcDelSolicitante(
     solicitanteId: number,
-    forzarSaf = false,
+    solicitanteNombre?: string | null,
   ): Promise<string | null> {
-    if (!forzarSaf) {
-      const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
-      if (local?.rfc) return local.rfc;
-    }
+    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc', 'nombre'] });
+    if (local?.rfc && local.nombre === solicitanteNombre) return local.rfc;
     const externo = await this.sUsuarios.findByPk(solicitanteId);
     return externo?.N_Usuario ?? null;
   }
@@ -1446,13 +1467,13 @@ export class TicketsService {
   /**
    * Dependencia/direccion/departamento del solicitante, solo para el
    * dictamen de baja (§ EQUIPO DE COMPUTO): se resuelven al momento desde
-   * saf, no se guardan en ticketsv2. Mismo criterio dual (y el mismo
-   * forzarSaf) que rfcDelSolicitante: ver ahi el porque.
+   * saf, no se guardan en ticketsv2. Mismo criterio (y el mismo desempate
+   * por nombre) que rfcDelSolicitante: ver ahi el porque.
    */
   /** Publico: tambien lo usa MonitorService para la cola de "en turno". */
   async datosOrganizacionalesDelSolicitante(
     solicitanteId: number,
-    forzarSaf = false,
+    solicitanteNombre?: string | null,
   ): Promise<{
     dependencia: string | null;
     direccion: string | null;
@@ -1470,12 +1491,11 @@ export class TicketsService {
       direccionCompleta: null,
     };
 
-    const local = forzarSaf
-      ? null
-      : await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc'] });
-    const sUsuario = local?.rfc
-      ? await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } })
-      : await this.sUsuarios.findByPk(solicitanteId);
+    const local = await this.usuarios.findByPk(solicitanteId, { attributes: ['rfc', 'nombre'] });
+    const sUsuario =
+      local?.rfc && local.nombre === solicitanteNombre
+        ? await this.sUsuarios.findOne({ where: { N_Usuario: local.rfc } })
+        : await this.sUsuarios.findByPk(solicitanteId);
     if (!sUsuario) return vacio;
 
     const [dep, dir, depto, ubicacionDepto] = await Promise.all([
@@ -1519,7 +1539,7 @@ export class TicketsService {
       return { bien: null, motivo: 'El ticket no tiene un número de inventario capturado.' };
     }
 
-    const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
+    const rfc = await this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre);
     if (!rfc) {
       return { bien: null, motivo: 'No se pudo identificar el RFC del solicitante.' };
     }
@@ -1542,7 +1562,7 @@ export class TicketsService {
     if (t.servicio?.clave !== 'IMPA') {
       return { impresoras: [], motivo: 'Este ticket no es de Impresoras arrendadas.' };
     }
-    const org = await this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por);
+    const org = await this.datosOrganizacionalesDelSolicitante(t.solicitante_id, t.solicitante_nombre);
     return this.impresorasSrv.nivelToner(org.direccionCompleta, usuario);
   }
 
@@ -1574,7 +1594,7 @@ export class TicketsService {
       return { bienes: [], motivo: 'Este ticket no captura número de inventario.' };
     }
 
-    const rfc = await this.rfcDelSolicitante(ticket.solicitante_id, !!ticket.registrado_por);
+    const rfc = await this.rfcDelSolicitante(ticket.solicitante_id, ticket.solicitante_nombre);
     if (!rfc) {
       return { bienes: [], motivo: 'No se pudo identificar el RFC del solicitante.' };
     }
@@ -1660,7 +1680,7 @@ export class TicketsService {
 
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
-      this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por),
+      this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre),
     ]);
     if (!tecnicoLocal?.rfc || !rfcSolicitante) return;
 
@@ -1704,12 +1724,12 @@ export class TicketsService {
   private async generarCedulaSalida(t: Ticket, usuario: UsuarioToken): Promise<void> {
     try {
       if (!t.contexto) return;
-      const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre);
       if (!rfc) return;
 
       const [{ bienes }, org] = await Promise.all([
         this.bienesSrv.porRfcCmp(rfc),
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ]);
       const bien = bienes.find((b) => b.inventario === t.contexto);
       const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
@@ -1793,12 +1813,12 @@ export class TicketsService {
   private async generarCedulaEntrada(t: Ticket, usuario: UsuarioToken): Promise<void> {
     try {
       if (!t.contexto) return;
-      const rfc = await this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por);
+      const rfc = await this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre);
       if (!rfc) return;
 
       const [{ bienes }, org] = await Promise.all([
         this.bienesSrv.porRfcCmp(rfc),
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ]);
       const bien = bienes.find((b) => b.inventario === t.contexto);
       const detalleBien = bien?.id ? await this.bienesSrv.detalleBien(bien.id, bien.esBc) : null;
@@ -1975,7 +1995,7 @@ export class TicketsService {
     if (t.contexto && this.esTicketDeInventarioCmp(t)) {
       const [tecnicoLocal, rfcSolicitante] = await Promise.all([
         this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
-        this.rfcDelSolicitante(t.solicitante_id, !!t.registrado_por),
+        this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ]);
       if (rfcSolicitante) {
         const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
@@ -1999,7 +2019,7 @@ export class TicketsService {
     if (!reparado) {
       const [detalleBien, org] = await Promise.all([
         bienId ? this.bienesSrv.detalleBien(bienId, bienEsBc) : null,
-        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, !!t.registrado_por),
+        this.datosOrganizacionalesDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ]);
 
       const pdf = await this.dictamenSrv.generar({

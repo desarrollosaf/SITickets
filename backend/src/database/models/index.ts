@@ -11,6 +11,7 @@ import {
   Sede,
   Servicio,
   ServicioUsuarioPermitido,
+  ServicioValidador,
   TecnicoServicio,
   Usuario,
 } from './catalogos.model';
@@ -43,6 +44,7 @@ export const MODELOS = [
   ServicioUsuarioPermitido,
   DependenciaValidador,
   TecnicoServicio,
+  ServicioValidador,
   Prioridad,
   Estatus,
   CatalogoProblema,

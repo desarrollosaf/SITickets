@@ -480,6 +480,9 @@ export interface UsuarioStaff {
   /** Solo rol validador: dependencias que revisa antes de turnar a tecnico. */
   dependencias_validador: string[];
   dependencia_ids_validador: number[];
+  /** Solo rol validador: servicios que puede autorizar. Vacio = sin restriccion (todos). */
+  servicios_validador: string[];
+  servicio_ids_validador: number[];
   dependencia: string | null;
   area: string | null;
   activo: boolean;
@@ -495,6 +498,8 @@ export interface RegistrarUsuarioForm {
   servicio_ids?: number[];
   /** Dependencias que valida, una o varias. Solo aplica si rol es validador. */
   dependencia_ids?: number[];
+  /** Servicios que puede autorizar. Solo aplica si rol es validador. Vacio = sin restriccion. */
+  servicio_ids_validador?: number[];
 }
 
 /** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
@@ -505,5 +510,6 @@ export interface ActualizarUsuarioForm {
   extension?: string;
   servicio_ids?: number[];
   dependencia_ids?: number[];
+  servicio_ids_validador?: number[];
   activo?: boolean;
 }

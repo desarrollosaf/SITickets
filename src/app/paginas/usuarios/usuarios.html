@@ -96,6 +96,24 @@
             de su revisión antes de turnarse a un técnico.
           </div>
         </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Servicios que autoriza</label>
+          <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto">
+            @for (s of servicios(); track s.id) {
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'u-srvval-' + s.id"
+                       [checked]="servicioIdsValidador.includes(s.id)"
+                       (change)="alternarServicioValidador(s.id)" />
+                <label class="form-check-label small" [for]="'u-srvval-' + s.id">{{ s.nombre }}</label>
+              </div>
+            }
+          </div>
+          <div class="form-text">
+            Sin ninguno marcado, autoriza cualquier tipo de servicio. Márcalos solo si debe quedar
+            limitado a ciertos tipos.
+          </div>
+        </div>
       }
 
       <div class="row g-3 mb-3">
@@ -262,6 +280,24 @@
           <div class="form-text">
             Los tickets que un gestor registre para gente de estas dependencias quedarán pendientes
             de su revisión antes de turnarse a un técnico.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Servicios que autoriza</label>
+          <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto">
+            @for (s of servicios(); track s.id) {
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [id]="'e-srvval-' + s.id"
+                       [checked]="editServicioIdsValidador.includes(s.id)"
+                       (change)="alternarServicioValidadorEdicion(s.id)" />
+                <label class="form-check-label small" [for]="'e-srvval-' + s.id">{{ s.nombre }}</label>
+              </div>
+            }
+          </div>
+          <div class="form-text">
+            Sin ninguno marcado, autoriza cualquier tipo de servicio. Márcalos solo si debe quedar
+            limitado a ciertos tipos.
           </div>
         </div>
       }

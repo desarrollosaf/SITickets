@@ -39,4 +39,14 @@ export class RegistrarUsuarioDto {
   @Type(() => Number)
   @IsInt({ each: true })
   dependencia_ids?: number[];
+
+  /**
+   * Servicios que puede autorizar (servicio_validador), uno o varios. Solo
+   * aplica si rol es validador. Sin valor (o []), autoriza cualquier
+   * servicio, sin restriccion.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt({ each: true })
+  servicio_ids_validador?: number[];
 }
