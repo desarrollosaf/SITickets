@@ -85,8 +85,14 @@ export function banderas(t: {
   rechazos: number;
   interno: boolean;
   vencido: boolean;
+  pendiente_validacion?: boolean;
+  motivo_rechazo_validacion?: string | null;
 }): { texto: string; clase: string }[] {
   const b: { texto: string; clase: string }[] = [];
+  /* Solo aparecen mezclados en "Tickets generados" del gestor (ver
+     construyeFiltro() en el backend): sin tecnico ni SLA corriendo todavia. */
+  if (t.pendiente_validacion) b.push({ texto: 'pendiente de validación', clase: 'chip-bandera' });
+  if (t.motivo_rechazo_validacion) b.push({ texto: 'rechazado en validación', clase: 'chip-P1' });
   if (t.reasignaciones >= 2) b.push({ texto: `${t.reasignaciones} reasignaciones`, clase: 'chip-bandera' });
   if (t.reclasificado) b.push({ texto: 'reclasificado', clase: 'chip-bandera' });
   if (t.escalado) b.push({ texto: 'escalado auto', clase: 'chip-P1' });

@@ -28,7 +28,7 @@ const ACENTO: Record<string, string> = {
         @for (t of tickets(); track t.id) {
           <div class="boleto" role="button" tabindex="0"
                [style.--acento]="acento(t)"
-               [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'"
+               [class.por-confirmar]="t.estatus === 'RESUELTO' && pedirConfirmacion()(t)"
                (click)="abrir.emit(t.id)" (keydown.enter)="abrir.emit(t.id)">
             <div class="boleto-fila">
             <div class="boleto-cuerpo">
@@ -106,7 +106,7 @@ const ACENTO: Record<string, string> = {
             </div>
             </div>
 
-            @if (pedirConfirmacion() && t.estatus === 'RESUELTO') {
+            @if (t.estatus === 'RESUELTO' && pedirConfirmacion()(t)) {
               <div class="boleto-confirmar">
                 <span><i class="bi bi-patch-question"></i> ¿Sí quedó resuelto? Confírmalo aquí</span>
                 <i class="bi bi-chevron-right"></i>
@@ -156,7 +156,7 @@ const ACENTO: Record<string, string> = {
             <tbody>
               @for (t of tickets(); track t.id) {
                 <tr (click)="abrir.emit(t.id)"
-                    [class.por-confirmar]="pedirConfirmacion() && t.estatus === 'RESUELTO'">
+                    [class.por-confirmar]="t.estatus === 'RESUELTO' && pedirConfirmacion()(t)">
                   <td>
                     @if (esAdminUOperador() && t.datos_copiados) {
                       <span class="punto-copiado" title="Datos copiados"></span>
@@ -184,7 +184,7 @@ const ACENTO: Record<string, string> = {
                         <i class="bi bi-geo-alt"></i> {{ t.edificio_atencion }}
                       </div>
                     }
-                    @if (pedirConfirmacion() && t.estatus === 'RESUELTO') {
+                    @if (t.estatus === 'RESUELTO' && pedirConfirmacion()(t)) {
                       <div class="d-flex flex-wrap gap-1 mt-1">
                         <span class="chip chip-confirmar">
                           <i class="bi bi-question-circle"></i> ¿Sí quedó resuelto? Da clic para confirmar
@@ -231,8 +231,13 @@ export class TablaTickets {
   readonly sinTecnico = input(false);
   readonly vacio = input('Sin tickets');
   readonly ayudaVacio = input('Ajusta los filtros o registra uno nuevo.');
-  /** Solo tiene sentido en "Mis tickets": el solicitante debe confirmar o rechazar. */
-  readonly pedirConfirmacion = input(false);
+  /**
+   * Por renglon, no un booleano global: decide si a ESTE visitante le toca
+   * confirmar/rechazar ESTE ticket en particular (en "Mis tickets" siempre
+   * es true; en "Tickets generados" solo el gestor que lo registro, o el
+   * caso especial de cierre por servicio — ver tickets.ts).
+   */
+  readonly pedirConfirmacion = input<(t: Ticket) => boolean>(() => false);
   /** Tarjetas tipo talon en vez de tabla: para listas cortas, como "Mis tickets". */
   readonly boletos = input(false);
 

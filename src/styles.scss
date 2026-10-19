@@ -247,17 +247,17 @@ table.tickets thead th.ordenable i.activo { opacity: 1; color: var(--p3, #2563eb
 table.tickets thead th.ordenable:hover i { opacity: 0.7; }
 
 /* Resuelto, esperando que el solicitante confirme o rechace. */
-table.tickets tbody tr.por-confirmar { background: #fff8ec; border-left: 3px solid #f0b45c; }
-table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
+table.tickets tbody tr.por-confirmar { background: #f6f1fc; border-left: 3px solid #9d6fe0; }
+table.tickets tbody tr.por-confirmar:hover { background: #ece0f9; }
 
 @keyframes parpadeo-aviso {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
 .chip-confirmar {
-  background: #e9f2ff;
-  color: #1f5fa8;
-  border: 1px solid #b8d4f5;
+  background: #f1ecfb;
+  color: #6d35c9;
+  border: 1px solid #ddd0f2;
   animation: parpadeo-aviso 1.2s ease-in-out infinite;
 }
 
@@ -560,11 +560,12 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   /* Con la barra dorada abajo el corte ya no llega al borde: sin muesca. */
   .boleto.por-confirmar .boleto-talon::after { display: none; }
 
-  .boleto-confirmar { margin: 0.25rem 1rem 0.9rem; }
+  /* Un tercio de ancho: ya no necesita ocupar toda la tarjeta para leerse. */
+  .boleto-confirmar { margin: 0.25rem 1rem 0.9rem; width: 33%; min-width: 230px; }
 }
 
-/* Resuelto y esperando al solicitante: barra dorada, como "Mejora tu apuesta". */
-.boleto.por-confirmar { --acento: #c9971c; }
+/* Resuelto y esperando al solicitante: barra morada, igual al chip de estatus "Resuelto". */
+.boleto.por-confirmar { --acento: #6d35c9; }
 .boleto-confirmar {
   display: flex;
   justify-content: space-between;
@@ -573,7 +574,7 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   margin: 0 0.75rem 0.55rem;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
-  background: linear-gradient(90deg, #b8860b, #e2b93b 55%, #c9971c);
+  background: linear-gradient(90deg, #5b2aa8, #8a52d9 55%, #6d35c9);
   background-size: 200% 100%;
   color: #fff;
   font-size: 0.8rem;

@@ -20,7 +20,7 @@
   <div class="alert alert-danger py-2 small">{{ error() }}</div>
 }
 
-@if (esCierreEspecial() && porConfirmar().length) {
+@if (porConfirmar().length) {
   <div class="alert alert-primary py-2 small">
     Tienes <b>{{ porConfirmar().length }}</b> ticket(s) marcados como resueltos esperando tu
     confirmación. Si no respondes en 3 días, el sistema los cierra por omisión.
@@ -88,7 +88,7 @@
   </div>
 } @else {
   <app-tabla-tickets [tickets]="ticketsPagina()" (abrir)="abierto.set($event)"
-                     [pedirConfirmacion]="esCierreEspecial()"
+                     [pedirConfirmacion]="miConfirmacion"
                      [boletos]="true"
                      [vacio]="busquedaTexto.trim() ? 'Ningún ticket coincide con la búsqueda' : 'Sin tickets en esta pestaña'"
                      [ayudaVacio]="busquedaTexto.trim() ? 'Prueba con otra palabra o revisa las otras pestañas.' : ''" />

@@ -44,6 +44,7 @@ import {
   RFC_SIEMPRE_A_NOMBRE_PROPIO,
   USUARIOS_CIERRE_SERVICIO,
   USUARIOS_FILTRO_SERVICIO_GENERADOS,
+  USUARIOS_REABREN_TICKETS,
 } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '../common/correo';
@@ -207,36 +208,43 @@ export class TicketsService {
      * registro a nombre de otros, eso vive en "Tickets generados". Lo que
      * tiene en validacion (a su nombre o a nombre de otro) sigue aparte, en
      * misPorValidar().
-     *
-     * "Tickets generados" (modo 'todo'): todo lo de su(s) dependencia(s)
-     * —de cualquier solicitante, lo haya registrado el o no— igual que el
-     * patron ya usado en porValidar(): para el validador, las dependencias
-     * que tiene asignadas en dependencia_validador; para el gestor, la suya
-     * propia (resuelta via saf).
      */
-    if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
+    if (usuario.rol === 'gestor') {
       if (modo === 'todo') {
-        const dependenciaIds =
-          usuario.rol === 'validador'
-            ? await this.dependenciasDe(usuario.id)
-            : await this.dependenciasDelGestor(usuario.id);
-        if (!dependenciaIds.length) return { id: null };
-        const where: Record<string, unknown> = { dependencia_id: { [Op.in]: dependenciaIds } };
-        /* Caso especial, solo quien este en la lista: aqui no ve toda la
-           dependencia, solo el servicio indicado. */
+        /*
+         * "Tickets generados": cada gestor ve SOLO lo que el mismo registro
+         * "a nombre de otro" — no lo de otros gestores de su misma
+         * dependencia, aunque antes si se mezclaba ahi.
+         */
         const claveServicio = USUARIOS_FILTRO_SERVICIO_GENERADOS[usuario.id];
         if (claveServicio) {
+          /* Caso especial (ver USUARIOS_CIERRE_SERVICIO): ve todo el servicio
+             de su dependencia, lo haya registrado el o no — es quien cierra
+             esos tickets en lugar del solicitante, necesita verlos todos. */
+          const dependenciaIds = await this.dependenciasDelGestor(usuario.id);
+          if (!dependenciaIds.length) return { id: null };
           const servicio = await this.serviciosM.findOne({ where: { clave: claveServicio } });
-          where.servicio_id = servicio?.id ?? null;
-        } else if (usuario.rol === 'validador') {
-          /* Servicios que puede autorizar (ver ServicioValidador). Vacio = sin restriccion. */
-          const servicioIds = await this.serviciosQueValida(usuario.id);
-          if (servicioIds.length) where.servicio_id = { [Op.in]: servicioIds };
+          return { dependencia_id: { [Op.in]: dependenciaIds }, servicio_id: servicio?.id ?? null };
         }
-        return where;
+        return { registrado_por: usuario.id };
       }
       /* Mismo desempate por nombre que arriba: evita que choque con el id de
          otra persona en el otro espacio de ids. */
+      return { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre };
+    }
+    if (usuario.rol === 'validador') {
+      if (modo === 'todo') {
+        /* "Tickets generados" del validador: todo lo de la(s) dependencia(s)
+           que tiene asignadas en dependencia_validador, de cualquier gestor —
+           su trabajo es revisar lo de todos, no solo lo suyo. */
+        const dependenciaIds = await this.dependenciasDe(usuario.id);
+        if (!dependenciaIds.length) return { id: null };
+        const where: Record<string, unknown> = { dependencia_id: { [Op.in]: dependenciaIds } };
+        /* Servicios que puede autorizar (ver ServicioValidador). Vacio = sin restriccion. */
+        const servicioIds = await this.serviciosQueValida(usuario.id);
+        if (servicioIds.length) where.servicio_id = { [Op.in]: servicioIds };
+        return where;
+      }
       return { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre };
     }
     if (ROLES_TECNICOS.includes(usuario.rol)) {
@@ -289,13 +297,16 @@ export class TicketsService {
     const where: Record<string | symbol, unknown> = { ...(await this.alcance(usuario, modo)) };
 
     /*
-     * §16 pendientes de validacion (o rechazados ahi) nunca aparecen en
-     * ningun listado normal —"Tickets generados", "Mis tickets", bandeja—.
-     * El gestor los ve aparte en mis-por-validar(); el validador en
-     * por-validar(). Ninguna de esas dos pasa por construyeFiltro().
+     * §16 pendientes de validacion (o rechazados ahi) no aparecen en ningun
+     * listado normal —"Mis tickets", bandeja—, excepto "Tickets generados"
+     * del gestor: como ya esta acotado a lo que el mismo registro (ver
+     * alcance()), tiene sentido que vea ahi TODO lo suyo de principio a fin,
+     * no solo lo ya aprobado. El validador los ve aparte en por-validar().
      */
-    where.pendiente_validacion = false;
-    where.motivo_rechazo_validacion = { [Op.is]: null };
+    if (!(usuario.rol === 'gestor' && modo === 'todo')) {
+      where.pendiente_validacion = false;
+      where.motivo_rechazo_validacion = { [Op.is]: null };
+    }
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
     if (filtros.prioridad) where.prioridad = filtros.prioridad;
@@ -1826,8 +1837,28 @@ export class TicketsService {
       }
       return;
     }
+    /* El gestor que registro el ticket "a nombre de otro" puede actuar en
+       su lugar: cancelarlo, confirmar o rechazar la resolucion. Se suma al
+       solicitante real, no lo reemplaza (a diferencia del caso de arriba) —
+       cualquiera de los dos puede hacerlo. No aplica a reabrir() — ver
+       exigeReabrir(). */
+    if (usuario.rol === 'gestor' && t.registrado_por === usuario.id) return;
     if (t.solicitante_id !== usuario.id) {
       throw new ForbiddenException('Solo el solicitante puede realizar esta accion');
+    }
+  }
+
+  /**
+   * Reabrir un ticket cerrado es mas sensible que cancelar/validar/rechazar
+   * (reactiva el SLA, puede volver a tocar el folio de cierre): no lo puede
+   * hacer ni el solicitante ni el gestor que lo registro, solo el admin y la
+   * unica excepcion puntual de USUARIOS_REABREN_TICKETS (por rfc).
+   */
+  private async exigeReabrir(usuario: UsuarioToken) {
+    if (usuario.rol === 'admin') return;
+    const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+    if (!local?.rfc || !USUARIOS_REABREN_TICKETS.includes(local.rfc)) {
+      throw new ForbiddenException('Solo el administrador puede reabrir un ticket');
     }
   }
 
@@ -2382,7 +2413,7 @@ export class TicketsService {
 
   async reabrir(id: number, motivo: string, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
-    if (usuario.rol !== 'admin') this.exigeSolicitante(t, usuario);
+    await this.exigeReabrir(usuario);
     this.exigeEstatus(t, [ESTATUS.CERRADO]);
 
     await t.update({

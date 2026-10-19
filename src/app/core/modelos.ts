@@ -34,6 +34,8 @@ export interface UsuarioSesion {
   area_id: number | null;
   /** true: nunca ve "registrar a nombre de otro", sin importar su rol o el servicio. */
   siempreANombrePropio: boolean;
+  /** true: puede reabrir un ticket cerrado. Solo el admin, mas la unica excepcion puntual del backend. */
+  puedeReabrirTickets: boolean;
 }
 
 export interface Sesion {
