@@ -11,6 +11,7 @@ import {
 } from '../database/models';
 import { ReglasService } from '../tickets/reglas.service';
 import { TrazaService } from '../tickets/traza.service';
+import { fechaLocal } from '../common/fecha';
 
 /**
  * Sustituye al evento horario de MySQL (ev_mantenimiento_horario). Vive en el
@@ -39,7 +40,7 @@ export class MantenimientoService {
 
   /** §11 · genera los tickets del programa preventivo que ya tocan. */
   async generaPreventivos(): Promise<number> {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = fechaLocal();
     const pendientes = await this.programas.findAll({
       where: { activo: true, proxima_fecha: { [Op.lte]: hoy } },
     });
@@ -83,7 +84,7 @@ export class MantenimientoService {
         );
 
         const proxima = new Date(Date.now() + p.periodicidad_dias * 86_400_000);
-        await p.update({ proxima_fecha: proxima.toISOString().slice(0, 10) }, { transaction: tx });
+        await p.update({ proxima_fecha: fechaLocal(proxima) }, { transaction: tx });
 
         this.traza.registra('§11', `Alta programada ${folio} · ${p.alcance}.`);
       });

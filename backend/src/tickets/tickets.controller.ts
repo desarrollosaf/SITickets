@@ -32,6 +32,7 @@ import {
   ResolverDto,
 } from './dto/tickets.dto';
 import { AtenderCmpDto } from './dto/atender-cmp.dto';
+import { fechaLocal } from '../common/fecha';
 
 @Controller('tickets')
 export class TicketsController {
@@ -86,7 +87,7 @@ export class TicketsController {
     @UsuarioActual() usuario: UsuarioToken,
   ): Promise<StreamableFile> {
     const buffer = await this.tickets.reporteExcel(usuario, filtros);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaLocal();
     return new StreamableFile(Buffer.from(buffer), {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       disposition: `attachment; filename="reporte-tickets-${fecha}.xlsx"`,
@@ -111,7 +112,7 @@ export class TicketsController {
   @Get('bajas-excel')
   async bajasExcel(@UsuarioActual() usuario: UsuarioToken): Promise<StreamableFile> {
     const buffer = await this.tickets.bajasExcel(usuario);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = fechaLocal();
     return new StreamableFile(Buffer.from(buffer), {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       disposition: `attachment; filename="equipos-dados-de-baja-${fecha}.xlsx"`,

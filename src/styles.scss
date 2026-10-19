@@ -626,17 +626,23 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
 /* --------------------------------------------------------------------
    Pestañas tipo pildora (Abiertos / Por confirmar / Cerrados)
    -------------------------------------------------------------------- */
-/* Selector segmentado: contenedor gris y la pestaña activa como pastilla. */
+/*
+ * Selector segmentado: contenedor gris y la pestaña activa como pastilla.
+ * Siempre en un renglon: lo que no cabe se va al menu "Más" (comp/pildoras.ts).
+ */
 .pildoras {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.25rem;
+  max-width: 100%;
   padding: 0.3rem;
   background: #eceff3;
   border: 1px solid var(--linea);
   border-radius: 999px;
 }
 .pildora {
+  flex-shrink: 0;
+  white-space: nowrap;
   --tono: #2b6cb0;
   --tono-2: #1d4f86;
   display: inline-flex;
@@ -657,8 +663,6 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   background: linear-gradient(135deg, var(--tono), var(--tono-2));
   box-shadow: 0 4px 12px color-mix(in srgb, var(--tono) 40%, transparent);
 }
-.pildora-confirmar { --tono: #d4a21f; --tono-2: #a87a0c; }
-.pildora-cerrados { --tono: #2a9463; --tono-2: #1b6b46; }
 
 .pildora-cuenta {
   min-width: 1.4rem;
@@ -670,7 +674,15 @@ table.tickets tbody tr.por-confirmar:hover { background: #fdefd4; }
   text-align: center;
 }
 .pildora.activa .pildora-cuenta { background: rgb(255 255 255 / 25%); color: #fff; }
+
+/* Sin tickets: se queda (para que el estatus siga a la vista) pero no compite. */
+.pildora.vacia:not(.activa) { opacity: 0.5; }
+
+/* Pantallas medianas: pestañas mas compactas para que quepan mas a la vez. */
+@media (max-width: 1399.98px) {
+  .pildora { gap: 0.35rem; padding: 0.38rem 0.7rem; font-size: 0.8rem; }
+  .pildora-cuenta { min-width: 1.2rem; font-size: 0.68rem; }
+}
 @media (max-width: 575.98px) {
-  .pildoras { width: 100%; }
-  .pildora { flex: 1; justify-content: center; padding: 0.45rem 0.5rem; }
+  .pildora { padding: 0.38rem 0.6rem; }
 }

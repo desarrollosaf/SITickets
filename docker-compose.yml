@@ -45,6 +45,8 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3050
+      # Hora de Mexico (ver backend/DockerFile).
+      TZ: America/Mexico_City
       CHOKIDAR_USEPOLLING: "true"
       # Puppeteer usa el Chromium del sistema (instalado via apk abajo) en vez
       # de intentar descargar el suyo, que no corre bien en Alpine.

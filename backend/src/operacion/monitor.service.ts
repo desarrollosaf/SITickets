@@ -16,6 +16,7 @@ import {
 } from '../database/models';
 import { ReglasService } from '../tickets/reglas.service';
 import { TicketsService } from '../tickets/tickets.service';
+import { fechaLocal } from '../common/fecha';
 
 const ORDEN_PRI: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
 
@@ -414,7 +415,7 @@ export class MonitorService {
       }),
       this.calendario.findAll({
         where: {
-          fecha: { [Op.between]: [desde.toISOString().slice(0, 10), hasta.toISOString().slice(0, 10)] },
+          fecha: { [Op.between]: [fechaLocal(desde), fechaLocal(hasta)] },
         },
       }),
     ]);

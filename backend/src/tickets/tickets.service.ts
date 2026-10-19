@@ -57,6 +57,7 @@ import {
   ResolverDto,
 } from './dto/tickets.dto';
 import { AtenderCmpDto } from './dto/atender-cmp.dto';
+import { fechaExcel, fechaLocal } from '../common/fecha';
 
 /**
  * Carpeta donde se guardan los dictamenes de baja (pdf). Vive dentro de
@@ -86,6 +87,26 @@ const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe', 'sistemas'];
 
 /** Solicitud de toner/cartucho: aqui ademas del modelo se pide el color a cambiar. */
 const CLAVES_TONER = ['IMP-01', 'IMPA-01'];
+
+/** Lo que sigue en manos del area (el reporte los separa de resueltos y cerrados). */
+const ESTATUS_ABIERTOS_REPORTE = ['REGISTRADO', 'ASIGNADO', 'EN_ATENCION', 'EN_ESPERA'];
+
+/** Estatus como lo lee una persona en el Excel, con los mismos matices que el chip de la app. */
+function estatusLegible(t: Ticket): string {
+  if (t.en_cola) return 'En cola (sin técnico)';
+  if (t.estatus === 'CERRADO' && t.cierre_por_omision) return 'Cerrado por omisión';
+  return (
+    {
+      REGISTRADO: 'Registrado',
+      ASIGNADO: 'Asignado',
+      EN_ATENCION: 'En atención',
+      EN_ESPERA: 'En espera',
+      RESUELTO: 'Resuelto',
+      CERRADO: 'Validado / cerrado',
+      CANCELADO: 'Cancelado',
+    }[t.estatus] ?? t.estatus
+  );
+}
 
 const INCLUDES = [
   { model: Servicio, as: 'servicio' },
@@ -350,49 +371,213 @@ export class TicketsService {
       ),
     );
 
+    const ids = filas.map((t) => t.id);
+    const [sesiones, eventos] = ids.length
+      ? await Promise.all([
+          this.sesiones.findAll({
+            where: { ticket_id: { [Op.in]: ids } },
+            attributes: ['ticket_id', 'usuario_id', 'inicio', 'fin'],
+          }),
+          this.bitacora.findAll({
+            where: { ticket_id: { [Op.in]: ids } },
+            order: [['fecha', 'ASC'], ['id', 'ASC']],
+          }),
+        ])
+      : [[], []];
+
+    const servicioDe = (t: Ticket) => t.servicio?.nombre ?? 'Sin clasificar';
+    const horas = (min: number) => Math.round((min / 60) * 10) / 10;
+    const promedio = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    const enTiempo = (t: Ticket) =>
+      ReglasService.minutosActivos(t) <= (objetivos.get(t.prioridad) ?? 1440);
+    const vencidoAbierto = (t: Ticket) =>
+      ESTATUS_ABIERTOS_REPORTE.includes(t.estatus) &&
+      ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440);
+    const minSesion = (s: TicketSesion) =>
+      ((s.fin ? new Date(s.fin).getTime() : Date.now()) - new Date(s.inicio).getTime()) / 60_000;
+
+    /* Ordenados por servicio y, dentro de cada uno, lo mas reciente primero. */
+    const ordenados = filas
+      .map((t, i) => ({ t, org: orgs[i] }))
+      .sort(
+        (a, b) =>
+          servicioDe(a.t).localeCompare(servicioDe(b.t), 'es') ||
+          (b.t.f_registro?.getTime() ?? 0) - (a.t.f_registro?.getTime() ?? 0),
+      );
+
     const libro = new ExcelJS.Workbook();
+
+    /* ---------------------------------------------------- Por tecnico */
+    const hTec = libro.addWorksheet('Por técnico');
+    hTec.columns = [
+      { header: 'Técnico', key: 'tecnico', width: 32 },
+      { header: 'Tickets asignados', key: 'asignados', width: 12 },
+      { header: 'Abiertos', key: 'abiertos', width: 10 },
+      { header: 'En espera', key: 'espera', width: 10 },
+      { header: 'Resueltos', key: 'resueltos', width: 10 },
+      { header: 'Resueltos en tiempo', key: 'en_tiempo', width: 12 },
+      { header: '% en tiempo', key: 'pct', width: 11 },
+      { header: 'Abiertos vencidos', key: 'vencidos', width: 11 },
+      { header: 'Tiempo prom. de resolución (h)', key: 'prom', width: 16 },
+      { header: 'Visitas (reloj iniciado)', key: 'visitas', width: 13 },
+      { header: 'Tiempo total en sitio (h)', key: 'sitio', width: 14 },
+      { header: 'Reaperturas + rechazos', key: 'reab', width: 14 },
+    ];
+    const porTecnico = new Map<string, Ticket[]>();
+    for (const { t } of ordenados) {
+      const nombre = t.tecnico?.nombre ?? 'Sin asignar';
+      porTecnico.set(nombre, [...(porTecnico.get(nombre) ?? []), t]);
+    }
+    for (const [nombre, suyos] of [...porTecnico].sort((a, b) => a[0].localeCompare(b[0], 'es'))) {
+      const resueltos = suyos.filter((t) => t.f_resolucion);
+      const tecnicoId = suyos[0].tecnico_id;
+      const idsSuyos = new Set(suyos.map((t) => t.id));
+      const visitas = sesiones.filter((s) => s.usuario_id === tecnicoId && idsSuyos.has(s.ticket_id));
+      const prom = promedio(resueltos.map((t) => ReglasService.minutosActivos(t)));
+      hTec.addRow({
+        tecnico: nombre,
+        asignados: suyos.length,
+        abiertos: suyos.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
+        espera: suyos.filter((t) => t.estatus === 'EN_ESPERA').length,
+        resueltos: resueltos.length,
+        en_tiempo: resueltos.filter(enTiempo).length,
+        pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
+        vencidos: suyos.filter(vencidoAbierto).length,
+        prom: prom === null ? null : horas(prom),
+        visitas: visitas.length,
+        sitio: horas(visitas.reduce((a, s) => a + minSesion(s), 0)),
+        reab: suyos.reduce((a, t) => a + t.reaperturas + t.rechazos, 0),
+      });
+    }
+    hTec.getColumn('pct').numFmt = '0%';
+
+    /* --------------------------------------------------- Por servicio */
+    const hSrv = libro.addWorksheet('Por servicio');
+    hSrv.columns = [
+      { header: 'Servicio', key: 'servicio', width: 36 },
+      { header: 'Total', key: 'total', width: 9 },
+      { header: 'Abiertos', key: 'abiertos', width: 10 },
+      { header: 'Resueltos (por confirmar)', key: 'resueltos', width: 14 },
+      { header: 'Cerrados', key: 'cerrados', width: 10 },
+      { header: 'Cancelados', key: 'cancelados', width: 11 },
+      { header: 'Abiertos vencidos', key: 'vencidos', width: 11 },
+      { header: '% resueltos en tiempo', key: 'pct', width: 13 },
+      { header: 'Tiempo prom. de resolución (h)', key: 'prom', width: 16 },
+    ];
+    const porServicio = new Map<string, Ticket[]>();
+    for (const { t } of ordenados) {
+      porServicio.set(servicioDe(t), [...(porServicio.get(servicioDe(t)) ?? []), t]);
+    }
+    for (const [servicio, lista] of porServicio) {
+      const resueltos = lista.filter((t) => t.f_resolucion);
+      const prom = promedio(resueltos.map((t) => ReglasService.minutosActivos(t)));
+      hSrv.addRow({
+        servicio,
+        total: lista.length,
+        abiertos: lista.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
+        resueltos: lista.filter((t) => t.estatus === 'RESUELTO').length,
+        cerrados: lista.filter((t) => t.estatus === 'CERRADO').length,
+        cancelados: lista.filter((t) => t.estatus === 'CANCELADO').length,
+        vencidos: lista.filter(vencidoAbierto).length,
+        pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
+        prom: prom === null ? null : horas(prom),
+      });
+    }
+    hSrv.getColumn('pct').numFmt = '0%';
+
+    /* -------------------------------------------------------- Tickets */
     const hoja = libro.addWorksheet('Tickets');
     hoja.columns = [
+      { header: 'Servicio', key: 'servicio', width: 26 },
       { header: 'Folio', key: 'folio', width: 18 },
       { header: 'Folio general', key: 'folio_general', width: 18 },
-      { header: 'Servicio', key: 'servicio', width: 22 },
       { header: 'Problema', key: 'problema', width: 36 },
-      { header: 'Color de tóner', key: 'color_toner', width: 18 },
+      { header: 'Color de tóner', key: 'color_toner', width: 14 },
       { header: 'Prioridad', key: 'prioridad', width: 10 },
-      { header: 'Estatus', key: 'estatus', width: 14 },
+      { header: 'Estatus', key: 'estatus', width: 18 },
       { header: 'Solicitante', key: 'solicitante', width: 30 },
       { header: 'Dependencia', key: 'dependencia', width: 30 },
       { header: 'Dirección', key: 'direccion', width: 32 },
       { header: 'Departamento', key: 'departamento', width: 32 },
+      { header: 'Edificio de atención', key: 'edificio', width: 26 },
       { header: 'Técnico', key: 'tecnico', width: 26 },
-      { header: 'Fecha de registro', key: 'f_registro', width: 19 },
-      { header: 'Tiempo activo (h)', key: 'horas_activo', width: 15 },
-      { header: 'Vencido', key: 'vencido', width: 10 },
+      { header: 'Fecha de registro', key: 'f_registro', width: 17 },
+      { header: 'Fecha de resolución', key: 'f_resolucion', width: 17 },
+      { header: 'Fecha de cierre', key: 'f_validacion', width: 17 },
+      { header: 'Tiempo activo (h)', key: 'horas_activo', width: 12 },
+      { header: 'Vencido', key: 'vencido', width: 9 },
+      { header: 'Reaperturas', key: 'reaperturas', width: 11 },
     ];
-    hoja.getRow(1).font = { bold: true };
-    hoja.getColumn('f_registro').numFmt = 'dd/mm/yyyy hh:mm';
-
-    filas.forEach((t, i) => {
-      const objetivo = objetivos.get(t.prioridad) ?? 1440;
-      const org = orgs[i];
+    for (const { t, org } of ordenados) {
       hoja.addRow({
+        servicio: servicioDe(t),
         folio: t.folio,
         folio_general: t.folio_general,
-        servicio: t.servicio?.nombre ?? '—',
         problema: t.problema?.descripcion ?? 'Sin clasificar',
         color_toner: t.color_toner ?? '—',
         prioridad: t.prioridad,
-        estatus: t.estatus,
+        estatus: estatusLegible(t),
         solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
         dependencia: org.dependencia ?? '—',
         direccion: org.direccionCompleta ?? '—',
         departamento: org.departamento ?? '—',
+        edificio: t.edificio_atencion ?? '—',
         tecnico: t.tecnico?.nombre ?? 'Sin asignar',
-        f_registro: t.f_registro,
-        horas_activo: Math.round((ReglasService.minutosActivos(t) / 60) * 10) / 10,
-        vencido: ReglasService.vencido(t, objetivo) ? 'Sí' : 'No',
+        f_registro: fechaExcel(t.f_registro),
+        f_resolucion: fechaExcel(t.f_resolucion),
+        f_validacion: fechaExcel(t.f_validacion),
+        horas_activo: horas(ReglasService.minutosActivos(t)),
+        vencido: ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440) ? 'Sí' : 'No',
+        reaperturas: t.reaperturas,
       });
-    });
+    }
+    for (const c of ['f_registro', 'f_resolucion', 'f_validacion']) {
+      hoja.getColumn(c).numFmt = 'dd/mm/yyyy hh:mm';
+    }
+
+    /* ------------------------------------------------------- Bitacora */
+    const hBit = libro.addWorksheet('Bitácora');
+    hBit.columns = [
+      { header: 'Servicio', key: 'servicio', width: 26 },
+      { header: 'Folio', key: 'folio', width: 18 },
+      { header: 'Fecha', key: 'fecha', width: 17 },
+      { header: 'Usuario', key: 'usuario', width: 30 },
+      { header: 'Acción', key: 'accion', width: 22 },
+      { header: 'Detalle', key: 'detalle', width: 60 },
+      { header: 'Motivo', key: 'motivo', width: 24 },
+      { header: 'Antes', key: 'antes', width: 18 },
+      { header: 'Después', key: 'despues', width: 18 },
+    ];
+    const eventosDe = new Map<number, TicketBitacora[]>();
+    for (const e of eventos) eventosDe.set(e.ticket_id, [...(eventosDe.get(e.ticket_id) ?? []), e]);
+    for (const { t } of ordenados) {
+      for (const e of eventosDe.get(t.id) ?? []) {
+        hBit.addRow({
+          servicio: servicioDe(t),
+          folio: t.folio,
+          fecha: fechaExcel(e.fecha),
+          usuario: e.usuario_nombre ?? 'Sistema',
+          accion: e.accion,
+          detalle: e.detalle ?? '',
+          motivo: e.motivo ?? '',
+          antes: e.valor_antes ?? '',
+          despues: e.valor_nuevo ?? '',
+        });
+      }
+    }
+    hBit.getColumn('fecha').numFmt = 'dd/mm/yyyy hh:mm';
+    hBit.getColumn('detalle').alignment = { wrapText: true, vertical: 'top' };
+
+    /* Encabezado con color, fijo al desplazarse y con filtros en cada columna. */
+    for (const h of [hTec, hSrv, hoja, hBit]) {
+      const encabezado = h.getRow(1);
+      encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B2434' } };
+      encabezado.alignment = { vertical: 'middle', wrapText: true };
+      encabezado.height = 32;
+      h.views = [{ state: 'frozen', ySplit: 1 }];
+      h.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: h.columnCount } };
+    }
 
     return libro.xlsx.writeBuffer();
   }
@@ -422,7 +607,7 @@ export class TicketsService {
         solicitante: t.solicitante_nombre ?? t.solicitante?.nombre ?? '—',
         tecnico: t.tecnico?.nombre ?? 'Sin asignar',
         inventario: t.contexto ?? '—',
-        f_registro: t.f_registro,
+        f_registro: fechaExcel(t.f_registro),
       });
     }
 
@@ -463,7 +648,7 @@ export class TicketsService {
       if (ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440)) vencidos++;
       /* Pendiente de validacion: f_registro aun no existe, no cuenta por mes todavia. */
       if (t.f_registro) {
-        const mes = new Date(t.f_registro).toISOString().slice(0, 7);
+        const mes = fechaLocal(new Date(t.f_registro)).slice(0, 7);
         porMes.set(mes, (porMes.get(mes) ?? 0) + 1);
       }
 
