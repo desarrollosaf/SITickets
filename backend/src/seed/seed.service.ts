@@ -30,6 +30,7 @@ import {
   SERVICIOS,
   SOLICITANTES,
 } from './datos-iniciales';
+import { fechaLocal } from '../common/fecha';
 
 /**
  * Convierte 'SÁNCHEZ TINOCO ERIKA GUADALUPE' en 'sanchez.tinoco'.
@@ -167,7 +168,7 @@ export class SeedService implements OnApplicationBootstrap {
     const mto01 = await this.problemas.findOne({ where: { clave: 'MTO-01' } });
     const jefe = idUsuario.get('FABELA RENDON CHRISTIAN');
     if (mto01 && jefe) {
-      const enUnaSemana = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      const enUnaSemana = fechaLocal(new Date(Date.now() + 7 * 86_400_000));
       await this.preventivos.create({
         servicio_id: idSrv.get('MTO')!,
         problema_id: mto01.id,
@@ -186,7 +187,7 @@ export class SeedService implements OnApplicationBootstrap {
     if (sistemas) {
       await this.calendario.create({
         usuario_id: sistemas,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaLocal(),
         tipo: 'vacaciones',
         nota: 'Periodo vacacional',
       });

@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { TablaTickets } from '../../comp/tabla-tickets';
+import { Pildoras } from '../../comp/pildoras';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import { AuthService } from '../../core/auth.service';
 import { TicketsService, type FiltrosTicket } from '../../core/tickets.service';
@@ -34,7 +35,7 @@ function pestanaDe(t: Ticket): Pestana {
 
 @Component({
   selector: 'app-tickets',
-  imports: [FormsModule, TablaTickets, DetalleTicket],
+  imports: [FormsModule, TablaTickets, DetalleTicket, Pildoras],
   templateUrl: './tickets.html',
 })
 export class Tickets {

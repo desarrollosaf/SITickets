@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TablaTickets } from '../../comp/tabla-tickets';
+import { Pildoras } from '../../comp/pildoras';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import { TicketsService } from '../../core/tickets.service';
 import { AuthService } from '../../core/auth.service';
@@ -23,7 +24,7 @@ function normalizar(texto: string): string {
 
 @Component({
   selector: 'app-mis-tickets',
-  imports: [RouterLink, TablaTickets, DetalleTicket],
+  imports: [RouterLink, TablaTickets, DetalleTicket, Pildoras],
   template: `
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
       <div>
@@ -74,17 +75,8 @@ function normalizar(texto: string): string {
     }
 
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-      <div class="pildoras" role="tablist">
-        @for (p of pestanas; track p.clave) {
-          <button type="button" role="tab" class="pildora" [class]="'pildora-' + p.clave"
-                  [class.activa]="pestana() === p.clave" [attr.aria-selected]="pestana() === p.clave"
-                  (click)="cambiarPestana(p.clave)">
-            <i class="bi" [class]="p.icono"></i>
-            {{ p.texto }}
-            <span class="pildora-cuenta">{{ conteo()[p.clave] }}</span>
-          </button>
-        }
-      </div>
+      <app-pildoras [opciones]="pestanas" [activa]="pestana()" [conteo]="conteo()"
+                    (cambio)="cambiarPestana($any($event))" />
 
       <div class="buscador">
         <i class="bi bi-search"></i>
@@ -159,11 +151,11 @@ export class MisTickets {
   /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
   readonly enValidacion = signal<TicketPorValidar[]>([]);
 
-  readonly pestanas: { clave: Pestana; texto: string; icono: string }[] = [
-    { clave: 'abiertos', texto: 'Abiertos', icono: 'bi-ticket-perforated' },
-    { clave: 'confirmar', texto: 'Por confirmar', icono: 'bi-hourglass-split' },
-    { clave: 'cerrados', texto: 'Cerrados', icono: 'bi-check2-circle' },
-  ];
+  readonly pestanas = [
+    { clave: 'abiertos', texto: 'Abiertos', icono: 'bi-ticket-perforated', tono: '#2b6cb0' },
+    { clave: 'confirmar', texto: 'Por confirmar', icono: 'bi-hourglass-split', tono: '#c9971c' },
+    { clave: 'cerrados', texto: 'Cerrados', icono: 'bi-check2-circle', tono: '#1f8a56' },
+  ] as const;
   readonly pestana = signal<Pestana>('abiertos');
   readonly busqueda = signal('');
 

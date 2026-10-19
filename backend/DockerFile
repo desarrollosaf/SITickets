@@ -18,6 +18,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Hora de Mexico: sin esto Node corre en UTC y "hoy", los folios de fin de
+# año y las fechas del dictamen se recorren 6 horas (desde las 18:00 ya es
+# "manana"). Node trae sus propios datos de zonas (ICU), no hace falta tzdata.
+ENV TZ=America/Mexico_City
+
 # Chromium del sistema para Puppeteer (genera el dictamen en pdf). Se le pide
 # que no intente descargar el suyo propio: en Alpine no corre bien.
 RUN apk add --no-cache chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont

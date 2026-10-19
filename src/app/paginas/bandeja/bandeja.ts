@@ -2,6 +2,7 @@ import { Component, computed, inject, signal, OnDestroy } from '@angular/core';
 import { AuthService } from '../../core/auth.service';
 import { TicketsService } from '../../core/tickets.service';
 import { TablaTickets } from '../../comp/tabla-tickets';
+import { Pildoras } from '../../comp/pildoras';
 import { DetalleTicket } from '../../comp/detalle-ticket';
 import {
   cronometro,
@@ -15,7 +16,7 @@ import type { Catalogos, Ticket, TicketDetalle } from '../../core/modelos';
 
 @Component({
   selector: 'app-bandeja',
-  imports: [TablaTickets, DetalleTicket],
+  imports: [TablaTickets, DetalleTicket, Pildoras],
   templateUrl: './bandeja.html',
 })
 export class Bandeja implements OnDestroy {

@@ -16,6 +16,7 @@ import {
   Usuario,
 } from '../database/models';
 import { TrazaService } from './traza.service';
+import { fechaLocal } from '../common/fecha';
 
 /** Ventana de concentracion del escalamiento automatico (§4). */
 const VENTANA_ESCALAMIENTO_MIN = 60;
@@ -34,7 +35,7 @@ const DIAS_CIERRE_POR_OMISION = 3;
  */
 const DEPENDENCIA_OSFEM_ID = 3;
 
-const ISO = (d: Date) => d.toISOString().slice(0, 10);
+const ISO = fechaLocal;
 
 @Injectable()
 export class ReglasService {
