@@ -86,51 +86,58 @@
   </div>
 </div>
 
-<h2 class="h6 mb-2">Pendientes</h2>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+  <div class="pildoras" role="tablist">
+    @for (p of pestanas; track p.clave) {
+      <button type="button" role="tab" class="pildora" [style.--tono]="p.tono" [style.--tono-2]="p.tono"
+              [class.activa]="pestana() === p.clave" [attr.aria-selected]="pestana() === p.clave"
+              (click)="cambiarPestana(p.clave)">
+        <i class="bi" [class]="p.icono"></i>
+        {{ p.texto }}
+        <span class="pildora-cuenta">{{ conteo()[p.clave] }}</span>
+      </button>
+    }
+  </div>
+
+  <div class="buscador">
+    <i class="bi bi-search"></i>
+    <input type="search" class="form-control form-control-sm"
+           placeholder="Buscar por folio, solicitante, descripción, edificio…"
+           [value]="busqueda()" (input)="cambiarBusqueda($any($event.target).value)" />
+  </div>
+</div>
+
 <app-tabla-tickets
-  [tickets]="pendientesPagina()"
+  [tickets]="ticketsPagina()"
   [sinTecnico]="true"
-  vacio="Sin pendientes"
-  ayudaVacio="No tienes tickets turnados en este momento."
+  [boletos]="true"
+  [vacio]="busqueda().trim() ? 'Ningún ticket coincide con la búsqueda' : (pestana() === 'pendientes' ? 'Sin pendientes' : 'Sin historial')"
+  [ayudaVacio]="busqueda().trim() ? 'Prueba con otra palabra o revisa la otra pestaña.' : (pestana() === 'pendientes' ? 'No tienes tickets turnados en este momento.' : 'Aquí aparecen los tickets que ya se cerraron.')"
   (abrir)="abierto.set($event)" />
 
-@if (totalPaginasPendientes() > 1) {
-  <div class="d-flex align-items-center justify-content-between mt-2">
-    <span class="sub small">Página {{ paginaPendientes() }} de {{ totalPaginasPendientes() }}</span>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaPendientes() === 1"
-              (click)="paginaPendientesAnterior()">
-        <i class="bi bi-chevron-left"></i> Anterior
-      </button>
-      <button class="btn btn-outline-secondary btn-sm"
-              [disabled]="paginaPendientes() === totalPaginasPendientes()"
-              (click)="paginaPendientesSiguiente()">
-        Siguiente <i class="bi bi-chevron-right"></i>
-      </button>
-    </div>
+@if (filtrados().length) {
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+    <span class="sub small">{{ desde() }}–{{ hasta() }} de {{ filtrados().length }} ticket(s)</span>
+    @if (totalPaginas() > 1) {
+      <nav class="paginador" aria-label="Páginas">
+        <button type="button" [disabled]="paginaActual() === 1" (click)="irA(paginaActual() - 1)"
+                aria-label="Anterior">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        @for (n of paginas(); track $index) {
+          @if (n === null) {
+            <span class="sub px-1">…</span>
+          } @else {
+            <button type="button" [class.activa]="n === paginaActual()" (click)="irA(n)">{{ n }}</button>
+          }
+        }
+        <button type="button" [disabled]="paginaActual() === totalPaginas()"
+                (click)="irA(paginaActual() + 1)" aria-label="Siguiente">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </nav>
+    }
   </div>
-}
-
-@if (cerrados().length) {
-  <h2 class="h6 mb-2 mt-4">Historial</h2>
-  <app-tabla-tickets [tickets]="historialPagina()" [sinTecnico]="true" (abrir)="abierto.set($event)" />
-
-  @if (totalPaginasHistorial() > 1) {
-    <div class="d-flex align-items-center justify-content-between mt-2">
-      <span class="sub small">Página {{ paginaHistorial() }} de {{ totalPaginasHistorial() }}</span>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-secondary btn-sm" [disabled]="paginaHistorial() === 1"
-                (click)="paginaHistorialAnterior()">
-          <i class="bi bi-chevron-left"></i> Anterior
-        </button>
-        <button class="btn btn-outline-secondary btn-sm"
-                [disabled]="paginaHistorial() === totalPaginasHistorial()"
-                (click)="paginaHistorialSiguiente()">
-          Siguiente <i class="bi bi-chevron-right"></i>
-        </button>
-      </div>
-    </div>
-  }
 }
 
 <app-detalle-ticket

@@ -3,7 +3,14 @@ import { AuthService } from '../../core/auth.service';
 import { TicketsService } from '../../core/tickets.service';
 import { TablaTickets } from '../../comp/tabla-tickets';
 import { DetalleTicket } from '../../comp/detalle-ticket';
-import { cronometro, duracion, mensajeError, ubicacionActual } from '../../core/formato';
+import {
+  cronometro,
+  duracion,
+  mensajeError,
+  paginasConSalto,
+  quitarAcentos,
+  ubicacionActual,
+} from '../../core/formato';
 import type { Catalogos, Ticket, TicketDetalle } from '../../core/modelos';
 
 @Component({
@@ -50,38 +57,72 @@ export class Bandeja implements OnDestroy {
     () => this.abiertos().find((t) => ['ASIGNADO', 'EN_ATENCION'].includes(t.estatus)) ?? null,
   );
 
-  /* Pendientes e historial se paginan por separado: son listas independientes. */
+  /* Pendientes e historial en pestañas: son listas independientes, no se mezclan. */
+  readonly pestanas = [
+    { clave: 'pendientes', texto: 'Pendientes', icono: 'bi-ticket-perforated', tono: '#2b6cb0' },
+    { clave: 'historial', texto: 'Historial', icono: 'bi-clock-history', tono: '#1f8a56' },
+  ] as const;
+  readonly pestana = signal<'pendientes' | 'historial'>('pendientes');
+  readonly busqueda = signal('');
+
+  /** Por palabras, sin acentos: "osf toner" exige las dos, en cualquier campo. */
+  private buscar(lista: Ticket[]): Ticket[] {
+    const palabras = quitarAcentos(this.busqueda().trim().toLowerCase()).split(/\s+/).filter(Boolean);
+    if (!palabras.length) return lista;
+    return lista.filter((t) => {
+      const texto = quitarAcentos(
+        [
+          t.folio,
+          t.folio_general,
+          t.problema,
+          t.servicio,
+          t.solicitante,
+          t.dependencia,
+          t.contexto,
+          t.edificio_atencion,
+          t.registrado_por_nombre,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase(),
+      );
+      return palabras.every((p) => texto.includes(p));
+    });
+  }
+
+  readonly conteo = computed(() => ({
+    pendientes: this.buscar(this.abiertos()).length,
+    historial: this.buscar(this.cerrados()).length,
+  }));
+
+  readonly filtrados = computed(() =>
+    this.buscar(this.pestana() === 'pendientes' ? this.abiertos() : this.cerrados()),
+  );
+
   readonly porPagina = 10;
-  readonly paginaPendientes = signal(1);
-  readonly paginaHistorial = signal(1);
-
-  readonly totalPaginasPendientes = computed(() =>
-    Math.max(1, Math.ceil(this.abiertos().length / this.porPagina)),
+  readonly paginaActual = signal(1);
+  readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.filtrados().length / this.porPagina)),
   );
-  readonly pendientesPagina = computed(() => {
-    const inicio = (this.paginaPendientes() - 1) * this.porPagina;
-    return this.abiertos().slice(inicio, inicio + this.porPagina);
-  });
-
-  readonly totalPaginasHistorial = computed(() =>
-    Math.max(1, Math.ceil(this.cerrados().length / this.porPagina)),
+  readonly desde = computed(() => (this.paginaActual() - 1) * this.porPagina + 1);
+  readonly hasta = computed(() =>
+    Math.min(this.paginaActual() * this.porPagina, this.filtrados().length),
   );
-  readonly historialPagina = computed(() => {
-    const inicio = (this.paginaHistorial() - 1) * this.porPagina;
-    return this.cerrados().slice(inicio, inicio + this.porPagina);
-  });
+  readonly ticketsPagina = computed(() => this.filtrados().slice(this.desde() - 1, this.hasta()));
+  readonly paginas = computed(() => paginasConSalto(this.totalPaginas(), this.paginaActual()));
 
-  paginaPendientesAnterior() {
-    this.paginaPendientes.update((p) => Math.max(1, p - 1));
+  cambiarPestana(p: 'pendientes' | 'historial') {
+    this.pestana.set(p);
+    this.paginaActual.set(1);
   }
-  paginaPendientesSiguiente() {
-    this.paginaPendientes.update((p) => Math.min(this.totalPaginasPendientes(), p + 1));
+
+  cambiarBusqueda(texto: string) {
+    this.busqueda.set(texto);
+    this.paginaActual.set(1);
   }
-  paginaHistorialAnterior() {
-    this.paginaHistorial.update((p) => Math.max(1, p - 1));
-  }
-  paginaHistorialSiguiente() {
-    this.paginaHistorial.update((p) => Math.min(this.totalPaginasHistorial(), p + 1));
+
+  irA(n: number) {
+    this.paginaActual.set(Math.min(Math.max(1, n), this.totalPaginas()));
   }
 
   constructor() {
@@ -98,8 +139,7 @@ export class Bandeja implements OnDestroy {
     this.api.listar({ turnados: 'true' }).subscribe({
       next: (t) => {
         this.tickets.set(t);
-        this.paginaPendientes.set(1);
-        this.paginaHistorial.set(1);
+        this.paginaActual.set(Math.min(this.paginaActual(), this.totalPaginas()));
         this.buscaRelojActivo(t);
       },
       error: (e) => this.error.set(mensajeError(e)),
