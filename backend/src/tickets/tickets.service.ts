@@ -44,6 +44,7 @@ import {
   RFC_SIEMPRE_A_NOMBRE_PROPIO,
   USUARIOS_CIERRE_SERVICIO,
   USUARIOS_FILTRO_SERVICIO_GENERADOS,
+  USUARIOS_OCULTOS_LISTADO,
   USUARIOS_REABREN_TICKETS,
 } from '../catalogos/catalogos.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
@@ -306,6 +307,27 @@ export class TicketsService {
     if (!(usuario.rol === 'gestor' && modo === 'todo')) {
       where.pendiente_validacion = false;
       where.motivo_rechazo_validacion = { [Op.is]: null };
+    }
+
+    /*
+     * §listados: ver USUARIOS_OCULTOS_LISTADO — solo aplica en listados
+     * generales (modo 'todo'), nunca en la bandeja propia de quien registra
+     * (modo 'propios'/'turnados'), donde si necesita verlos.
+     */
+    if (modo === 'todo') {
+      for (const [rfc, claveServicio] of Object.entries(USUARIOS_OCULTOS_LISTADO)) {
+        const [quienRegistra, servicio] = await Promise.all([
+          this.usuarios.findOne({ where: { rfc }, attributes: ['id'] }),
+          this.serviciosM.findOne({ where: { clave: claveServicio }, attributes: ['id'] }),
+        ]);
+        if (!quienRegistra || !servicio) continue;
+        const exclusion = { [Op.not]: { registrado_por: quienRegistra.id, servicio_id: servicio.id } };
+        where[Op.and] = Array.isArray(where[Op.and])
+          ? [...(where[Op.and] as unknown[]), exclusion]
+          : where[Op.and]
+            ? [where[Op.and], exclusion]
+            : [exclusion];
+      }
     }
 
     if (filtros.servicio) where.servicio_id = Number(filtros.servicio);
