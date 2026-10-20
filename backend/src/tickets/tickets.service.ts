@@ -59,7 +59,7 @@ import {
   ResolverDto,
 } from './dto/tickets.dto';
 import { AtenderCmpDto } from './dto/atender-cmp.dto';
-import { fechaExcel, fechaLocal } from '../common/fecha';
+import { fechaExcel, fechaLocal, minutosHabiles } from '../common/fecha';
 
 /**
  * Carpeta donde se guardan los dictamenes de baja (pdf). Vive dentro de
@@ -894,10 +894,11 @@ export class TicketsService {
       sesiones: sesiones,
       min_ciclo: ReglasService.minutosCiclo(t),
       min_activo: ReglasService.minutosActivos(t),
+      /* Mismo criterio que minutosActivos(): solo jornada laboral, para que
+         coincida con lo que de verdad se le descuenta al ticket. */
       min_espera: Math.round(
-        (t.espera_acum_seg * 1000 +
-          (t.f_espera_desde ? Date.now() - new Date(t.f_espera_desde).getTime() : 0)) /
-          60_000,
+        t.espera_acum_seg / 60 +
+          (t.f_espera_desde ? minutosHabiles(new Date(t.f_espera_desde), new Date()) : 0),
       ),
       minutos_objetivo: objetivo,
       vencido: ReglasService.vencido(t, objetivo),
@@ -2010,15 +2011,24 @@ export class TicketsService {
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ESPERA]);
 
+    /*
+     * Dos tiempos distintos: pausaSeg es el real (reloj de pared), solo para
+     * que la bitacora diga cuanto duro la pausa de verdad. Lo que se
+     * acumula en espera_acum_seg (lo que de verdad se descuenta del tiempo
+     * activo) es en minutos de jornada laboral — igual criterio que
+     * minutosActivos(), si el reloj SLA no corria fuera de horario, pausarlo
+     * fuera de horario tampoco le "ahorra" nada al tecnico.
+     */
     const pausaSeg = t.f_espera_desde
       ? Math.round((Date.now() - new Date(t.f_espera_desde).getTime()) / 1000)
       : 0;
+    const pausaMinHabil = t.f_espera_desde ? minutosHabiles(new Date(t.f_espera_desde), new Date()) : 0;
 
     const veniaDeRetiroEquipo =
       t.motivo_espera === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t);
 
     await t.update({
-      espera_acum_seg: t.espera_acum_seg + pausaSeg,
+      espera_acum_seg: t.espera_acum_seg + pausaMinHabil * 60,
       f_espera_desde: null,
       estatus: ESTATUS.EN_ATENCION,
     });
@@ -2026,11 +2036,11 @@ export class TicketsService {
       t.id,
       usuario.id,
       'Reanudacion',
-      `Estuvo ${Math.round(pausaSeg / 60)} min en espera`,
+      `Estuvo ${Math.round(pausaSeg / 60)} min en espera (${pausaMinHabil} min de jornada laboral)`,
     );
     this.traza.registra(
       '§5',
-      `${t.folio} reanudado. Se descontaron ${Math.round(pausaSeg / 60)} min del tiempo de resolucion.`,
+      `${t.folio} reanudado. Se descontaron ${pausaMinHabil} min (jornada laboral) del tiempo de resolucion.`,
     );
 
     /* Regresa con el equipo: se documenta la entrada (ver generarCedulaEntrada). */
