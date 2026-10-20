@@ -1,353 +1,538 @@
-<div style="max-width: 80%">
-  <h1 class="h5 mb-1">Registrar ticket</h1>
-  <p class="sub mb-3">
-    Cuatro campos. En lugar de escribir el problema, se elige del catálogo: así el sistema sabe a qué
-    técnico turnarlo y con qué urgencia.
-  </p>
-
-  <div class="tarjeta p-4">
-    <div class="row g-3 mb-3">
-      @if (puedeElegirUsuario()) {
-        <div class="col-md-8">
-          <label class="form-label small fw-semibold" for="n-buscar">Registrar a nombre de</label>
-          @if (usuarioElegido(); as u) {
-            <div class="d-flex align-items-center gap-2">
-              <input class="form-control" [value]="u.nombre" disabled />
-              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarUsuario()">
-                Cambiar
-              </button>
-            </div>
-            <div class="form-text">{{ u.rfc }} · {{ u.dependencia || 'Sin dependencia identificada' }}</div>
-          } @else {
-            <input id="n-buscar" class="form-control" [(ngModel)]="busquedaUsuario" name="busquedaUsuario"
-                   (ngModelChange)="onBuscarUsuario()" placeholder="Mínimo 3 letras del nombre…"
-                   autocomplete="off" />
-            @if (buscandoUsuario()) {
-              <div class="form-text">
-                <span class="spinner-border spinner-border-sm me-2"></span>Buscando…
-              </div>
-            }
-            @if (resultadosUsuario().length) {
-              <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
-                @for (c of resultadosUsuario(); track c.id_usuario_saf) {
-                  <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
-                          (click)="elegirUsuario(c)">
-                    <div class="fw-semibold" style="font-size: 0.9rem">{{ c.nombre }}</div>
-                    <div class="sub" style="font-size: 0.78rem">
-                      {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
-                    </div>
-                  </button>
-                }
-              </div>
-            } @else if (busquedaUsuario.trim().length >= 3 && !buscandoUsuario()) {
-              <div class="form-text">Sin resultados.</div>
-            } @else {
-              <div class="form-text">
-                Si no eliges a nadie, el ticket queda registrado a tu propio nombre.
-              </div>
-            }
-          }
-        </div>
+@if (creado(); as t) {
+  <!-- ============================================================ Exito -->
+  <div class="exito">
+    <div class="exito-icono"><i class="bi bi-check-lg"></i></div>
+    <h1 class="h4 mb-1">¡Ticket registrado!</h1>
+    <p class="sub mb-4">
+      @if (t.pendiente_validacion) {
+        Quedó en espera de que tu validador lo apruebe. En cuanto lo haga se turna a un técnico.
       } @else {
-        <div class="col-md-8">
-          <label class="form-label small fw-semibold" for="n-usuario">Servidor público</label>
-          <input id="n-usuario" class="form-control" [value]="auth.usuario()?.nombre" disabled />
-          <div class="form-text">Tomado de tu sesión. No editable.</div>
-        </div>
+        Ya está en manos del área. Puedes seguir su avance en <b>Mis tickets</b>.
       }
-      <div class="col-md-4">
-        <label class="form-label small fw-semibold" for="n-ext">Extensión</label>
-        <input id="n-ext" class="form-control" [(ngModel)]="extension" name="extension" />
-        <div class="form-text">Precargada de tu perfil.</div>
+    </p>
+
+    <div class="previa-boleto exito-boleto mx-auto mb-4" [style.--acento]="tonoServicio(t.servicio_clave)">
+      <div class="previa-cuerpo">
+        <div class="previa-etiqueta">Tu folio</div>
+        <div class="exito-folio">{{ t.folio_general }}</div>
+        <div class="previa-asunto">{{ t.problema }}</div>
+        <div class="previa-dato">
+          <i class="bi" [class]="iconoServicio(t.servicio_clave)"></i> {{ t.servicio }}
+        </div>
       </div>
-      <div class="col-12">
-        <label class="form-label small fw-semibold" for="n-edificio">
-          Edificio o ubicación donde se atenderá el reporte
-        </label>
-        <input id="n-edificio" class="form-control" [(ngModel)]="edificioAtencion" name="edificioAtencion"
-               maxlength="160" placeholder="Opcional, p. ej. edificio, piso, oficina…" />
+      <div class="previa-talon">
+        <span class="previa-etiqueta">Guarda este folio para cualquier aclaración</span>
       </div>
     </div>
 
-    <div class="row g-3 mb-3">
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold" for="n-srv">Tipo de servicio</label>
-        <select id="n-srv" class="form-select" [value]="servicioId() ?? ''"
-                (change)="cambiaServicio($any($event.target).value)">
-          <option value="">Selecciona…</option>
-          @for (s of servicios(); track s.id) {
-            <option [value]="s.id">{{ s.nombre }}</option>
-          }
-        </select>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label small fw-semibold" for="n-prb">Problema</label>
-        <select id="n-prb" class="form-select" [disabled]="!servicioId()" [value]="claveProblema()"
-                (change)="cambiaProblema($any($event.target).value)">
-          <option value="">
-            {{ servicioId() ? 'Selecciona…' : 'Elige primero el servicio' }}
-          </option>
-          @for (p of problemas(); track p.id) {
-            <option [value]="p.clave">{{ p.descripcion }}</option>
-          }
-        </select>
-      </div>
-    </div>
-
-    @if (problema(); as p) {
-      @if (esTrasladoImpa()) {
-        <div class="mb-3">
-          <label class="form-label small fw-semibold" for="n-modelo-traslado">Modelo de impresora</label>
-          @if (cargandoModelos()) {
-            <div class="form-text">
-              <span class="spinner-border spinner-border-sm me-2"></span>
-              Consultando los modelos registrados…
-            </div>
-          } @else if (modelosImpresora().length) {
-            @if (modeloElegido(); as modelo) {
-              <div class="d-flex align-items-center gap-2">
-                <input class="form-control" [value]="modelo" disabled />
-                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
-                  Cambiar
-                </button>
-              </div>
-            } @else {
-              <input id="n-modelo-traslado" class="form-control" [(ngModel)]="modeloBusqueda" name="modeloTraslado"
-                     placeholder="Escribe para buscar el modelo…" autocomplete="off" />
-              <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
-                @for (m of modelosFiltrados(); track m) {
-                  <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
-                          (click)="elegirModelo(m)">
-                    {{ m }}
-                  </button>
-                } @empty {
-                  <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
-                }
-              </div>
-            }
-          } @else {
-            <input id="n-modelo-traslado" class="form-control" [ngModel]="modeloElegido()"
-                   (ngModelChange)="modeloElegido.set($event)" name="modeloTraslado"
-                   placeholder="Modelo de impresora" />
-            <div class="form-text">
-              No se pudo consultar el catálogo de modelos. Captúralo a mano.
-            </div>
-          }
-        </div>
-      }
-      @if (p.campo_adicional || esColorToner()) {
-      <div class="row g-3 mb-3">
-      @if (p.campo_adicional) {
-        <div [class]="esColorToner() ? 'col-md-6' : 'col-12'">
-          <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
-          @if (esCorreo()) {
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="n-correo-libre"
-                     [ngModel]="correoLibre()" (ngModelChange)="toggleCorreoLibre($event)"
-                     name="correoLibre" />
-              <label class="form-check-label small" for="n-correo-libre">
-                Usar otro correo (no es de &#64;{{ dominio() }})
-              </label>
-            </div>
-            @if (correoLibre()) {
-              <input id="n-ctx" class="form-control" type="email" inputmode="email"
-                     autocomplete="email" spellcheck="false" autocapitalize="off"
-                     [(ngModel)]="contextoV" name="contexto"
-                     [class.is-invalid]="avisoCorreo()"
-                     placeholder="nombre@dominio.com" />
-            } @else {
-              <div class="input-group">
-                <input id="n-ctx" class="form-control" type="text" inputmode="email"
-                       autocomplete="off" spellcheck="false" autocapitalize="off"
-                       [(ngModel)]="contextoV" name="contexto"
-                       [class.is-invalid]="avisoCorreo()"
-                       placeholder="nombre.apellido" />
-                <span class="input-group-text">&#64;{{ dominio() }}</span>
-              </div>
-            }
-            @if (avisoCorreo()) {
-              <div class="invalid-feedback d-block">{{ avisoCorreo() }}</div>
-            } @else if (!correoLibre()) {
-              <div class="form-text">
-                Se completa sola con el dominio institucional <b>&#64;{{ dominio() }}</b>.
-              </div>
-            }
-          } @else if (esInventario()) {
-            @if (cargandoBienes()) {
-              <div class="form-text">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Consultando tus bienes resguardados…
-              </div>
-            } @else if (bienes().length) {
-              @if (esCmp()) {
-                <!-- Un solo equipo: es el que se va a reparar. -->
-                <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
-                  @for (b of bienes(); track b.inventario) {
-                    <div class="form-check">
-                      <input class="form-check-input" type="radio" name="bienCmp"
-                             [id]="'bien-' + b.inventario" [disabled]="b.en_mantenimiento"
-                             [checked]="seleccion()[0] === b.inventario"
-                             (change)="elegirBienUnico(b.inventario)" />
-                      <label class="form-check-label small" [class.text-muted]="b.en_mantenimiento"
-                             [for]="'bien-' + b.inventario">
-                        <b>{{ b.inventario }}</b>
-                        @if (b.descripcion) {
-                          <span class="sub"> · {{ b.descripcion }}</span>
-                        }
-                        @if (b.en_mantenimiento) {
-                          <span class="chip chip-bandera ms-1">En atención</span>
-                        }
-                      </label>
-                    </div>
-                  }
-                </div>
-                <div class="form-text">
-                  @if (seleccion().length) {
-                    Equipo elegido: {{ contextoFinal() }}
-                  } @else {
-                    Elige el equipo que se va a reparar. Solo aparecen los que tienes asignados.
-                  }
-                </div>
-              } @else {
-                <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
-                <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
-                  @for (b of bienes(); track b.inventario) {
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" [id]="'bien-' + b.inventario"
-                             [checked]="seleccion().includes(b.inventario)"
-                             (change)="alternaBien(b.inventario)" />
-                      <label class="form-check-label small" [for]="'bien-' + b.inventario">
-                        <b>{{ b.inventario }}</b>
-                        @if (b.descripcion) {
-                          <span class="sub"> · {{ b.descripcion }}</span>
-                        }
-                      </label>
-                    </div>
-                  }
-                </div>
-                <div class="form-text" [class.text-danger]="excedeLargo()">
-                  @if (seleccion().length) {
-                    {{ seleccion().length }} bien(es) elegido(s): {{ contextoFinal() }}
-                  } @else {
-                    Marca los bienes que presentan la falla. Solo aparecen los que tienes bajo
-                    resguardo.
-                  }
-                </div>
-              }
-            } @else {
-              <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
-                     [placeholder]="p.campo_adicional" />
-              <div class="form-text">
-                {{ motivoBienes() || 'Captura el número de inventario que aparece en la etiqueta.' }}
-              </div>
-            }
-          } @else if (esModeloImpresoraCatalogo()) {
-            @if (cargandoModelos()) {
-              <div class="form-text">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Consultando los modelos registrados…
-              </div>
-            } @else if (modelosImpresora().length) {
-              @if (modeloElegido(); as modelo) {
-                <div class="d-flex align-items-center gap-2">
-                  <input class="form-control" [value]="modelo" disabled />
-                  <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
-                    Cambiar
-                  </button>
-                </div>
-              } @else {
-                <input id="n-ctx" class="form-control" [(ngModel)]="modeloBusqueda" name="contexto"
-                       placeholder="Escribe para buscar el modelo…" autocomplete="off" />
-                <div class="border rounded mt-2" style="max-height: 220px; overflow-y: auto">
-                  @for (m of modelosFiltrados(); track m) {
-                    <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
-                            (click)="elegirModelo(m)">
-                      {{ m }}
-                    </button>
-                  } @empty {
-                    <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
-                  }
-                </div>
-              }
-            } @else {
-              <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
-                     placeholder="Modelo de impresora" />
-              <div class="form-text">
-                No se pudo consultar el catálogo de modelos. Captúralo a mano.
-              </div>
-            }
-          } @else if (esModeloImpresoraLibre()) {
-            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
-                   placeholder="Modelo de impresora" autocomplete="off" />
-          } @else if (esCantidadEquipos()) {
-            <input id="n-ctx" class="form-control" type="number" inputmode="numeric" min="1" step="1"
-                   autocomplete="off"
-                   [ngModel]="contextoV()" (ngModelChange)="onCantidadEquiposChange($event)" name="contexto"
-                   [placeholder]="p.campo_adicional" />
-          } @else {
-            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
-                   [placeholder]="p.campo_adicional" />
-          }
-        </div>
-      }
-      @if (esColorToner()) {
-        <div class="col-md-6">
-          <label class="form-label small fw-semibold">Color de tóner a cambiar</label>
-          <div class="border rounded p-2">
-            @for (c of coloresToner; track c) {
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" [id]="'n-color-' + c"
-                       [checked]="coloresElegidos.includes(c)" (change)="alternarColorToner(c)" />
-                <label class="form-check-label small" [for]="'n-color-' + c">{{ c }}</label>
-              </div>
-            }
-          </div>
-          <div class="form-text">Puedes marcar más de uno.</div>
-        </div>
-      }
-      </div>
-      }
-
-      @if (p.requiere_texto) {
-        <div class="mb-3">
-          <label class="form-label small fw-semibold" for="n-txt">Describe el problema</label>
-          <textarea id="n-txt" rows="3" class="form-control" [(ngModel)]="texto" name="texto"
-                    placeholder="Solo esta opción habilita texto libre"></textarea>
-        </div>
-      }
-
-      @if (auth.rol() !== 'solicitante') {
-        <div class="alert alert-info py-2 small">
-          Prioridad asignada automáticamente:
-          <span class="chip" [class]="'chip-' + p.prioridad">
-            {{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}
-          </span>
-          @if (esAdmin()) {
-            &nbsp;Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>.
-          }
-        </div>
-      }
-    }
-
-    @if (error()) {
-      <div class="alert alert-danger py-2 small">{{ error() }}</div>
-    }
-
-    <div class="d-flex gap-2 justify-content-end">
-      <button class="btn btn-outline-secondary" (click)="regresar()">Regresar</button>
-      <button class="btn btn-outline-secondary" (click)="limpiarFormulario()">Limpiar</button>
-      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
-        @if (guardando()) {
-          <span class="spinner-border spinner-border-sm me-2"></span>
-        }
-        Guardar ticket
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+      <button type="button" class="btn btn-outline-secondary" (click)="registrarOtro()">
+        <i class="bi bi-plus-lg"></i> Registrar otro
+      </button>
+      <button type="button" class="btn btn-primary" (click)="regresar()">
+        <i class="bi bi-ticket-perforated"></i> Ver mis tickets
       </button>
     </div>
   </div>
+} @else {
+  <!-- ======================================================= Formulario -->
+  <div class="registro">
+    <div class="mb-4">
+      <h1 class="h5 mb-1">Registrar ticket</h1>
+      <p class="sub mb-0">
+        Elige qué necesitas: el sistema lo turna al técnico indicado y con la urgencia correcta.
+      </p>
+    </div>
 
-  <div class="alert alert-light border small mt-3 mb-0">
-    La prioridad no la eliges tú: la determina la opción del catálogo, para que el mismo problema
-    tenga siempre la misma urgencia. Si el tuyo no está en la lista usa <b>Otro</b> y el sistema
-    habilita un campo de texto.
+    <div class="registro-grid">
+      <div class="registro-pasos">
+        <!-- ------------------------------------------- Paso 1: servicio -->
+        <section class="paso" [class.hecho]="servicioId()">
+          <header class="paso-titulo">
+            <span class="paso-numero">@if (servicioId()) { <i class="bi bi-check-lg"></i> } @else { 1 }</span>
+            <div>
+              <h2>¿Con qué necesitas ayuda?</h2>
+              <p>Elige el tipo de servicio.</p>
+            </div>
+          </header>
+
+          @if (!catalogos()) {
+            <div class="sub"><span class="spinner-border spinner-border-sm me-2"></span>Cargando servicios…</div>
+          } @else if (servicioActual() && !cambiandoServicio()) {
+            <!-- Ya elegido: una sola linea para que el formulario no crezca hacia abajo. -->
+            <div class="servicio-elegido" [style.--tono]="tonoServicio(servicioActual()!.clave)">
+              <span class="servicio-icono"><i class="bi" [class]="iconoServicio(servicioActual()!.clave)"></i></span>
+              <span class="servicio-nombre flex-grow-1">{{ servicioActual()!.nombre }}</span>
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cambiandoServicio.set(true)">
+                Cambiar
+              </button>
+            </div>
+          } @else {
+            <div class="servicios" role="radiogroup" aria-label="Tipo de servicio">
+              @for (s of servicios(); track s.id) {
+                <button type="button" class="servicio" role="radio"
+                        [style.--tono]="tonoServicio(s.clave)"
+                        [class.activo]="servicioId() === s.id" [attr.aria-checked]="servicioId() === s.id"
+                        (click)="elegirServicio(s.id)">
+                  <span class="servicio-icono"><i class="bi" [class]="iconoServicio(s.clave)"></i></span>
+                  <span class="servicio-nombre">{{ s.nombre }}</span>
+                  @if (servicioId() === s.id) {
+                    <i class="bi bi-check-circle-fill servicio-check"></i>
+                  }
+                </button>
+              } @empty {
+                <div class="sub">No tienes servicios disponibles para registrar.</div>
+              }
+            </div>
+          }
+        </section>
+
+        <!-- ------------------------------------------- Paso 2: problema -->
+        <section class="paso" id="paso-problema" [class.bloqueado]="!servicioId()" [class.hecho]="problema()">
+          <header class="paso-titulo">
+            <span class="paso-numero">@if (problema()) { <i class="bi bi-check-lg"></i> } @else { 2 }</span>
+            <div>
+              <h2>¿Qué está pasando?</h2>
+              <p>
+                @if (servicioId()) {
+                  Elige la opción que mejor describe el problema. Si no está, usa <b>Otro</b>.
+                } @else {
+                  Primero elige el tipo de servicio.
+                }
+              </p>
+            </div>
+          </header>
+
+          @if (servicioId()) {
+            <!-- Desplegable con buscador: una sola linea cerrado, lista con scroll abierto. -->
+            <div class="combo" [class.abierto]="listaProblemas()" (click)="$event.stopPropagation()">
+              <button type="button" class="combo-campo" aria-haspopup="listbox"
+                      [attr.aria-expanded]="listaProblemas()" (click)="alternarListaProblemas()"
+                      (keydown.escape)="listaProblemas.set(false)">
+                @if (problema(); as p) {
+                  <span class="combo-valor">{{ p.descripcion }}</span>
+                  @if (muestraPrioridad()) {
+                    <span class="chip" [class]="'chip-' + p.prioridad">{{ p.prioridad }}</span>
+                  }
+                } @else {
+                  <span class="combo-placeholder">Selecciona el problema…</span>
+                }
+                <i class="bi bi-chevron-down combo-flecha"></i>
+              </button>
+
+              @if (listaProblemas()) {
+                <div class="combo-panel">
+                  <div class="combo-lista" role="listbox" aria-label="Problema">
+                    @for (pr of problemas(); track pr.id) {
+                      <button type="button" class="combo-opcion" role="option"
+                              [class.activo]="claveProblema() === pr.clave"
+                              [attr.aria-selected]="claveProblema() === pr.clave"
+                              (click)="elegirProblema(pr.clave)">
+                        <span class="flex-grow-1">{{ pr.descripcion }}</span>
+                        @if (muestraPrioridad()) {
+                          <span class="chip" [class]="'chip-' + pr.prioridad">{{ pr.prioridad }}</span>
+                        }
+                        @if (claveProblema() === pr.clave) {
+                          <i class="bi bi-check-lg combo-check"></i>
+                        }
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (problema(); as p) {
+            @if (esTrasladoImpa() || p.campo_adicional || esColorToner() || p.requiere_texto) {
+              <div class="detalles">
+                <div class="detalles-titulo"><i class="bi bi-info-circle"></i> Completa estos datos</div>
+
+                @if (esTrasladoImpa()) {
+                  <div class="mb-3">
+                    <label class="form-label small fw-semibold" for="n-modelo-traslado">Modelo de impresora</label>
+                    @if (cargandoModelos()) {
+                      <div class="form-text">
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                        Consultando los modelos registrados…
+                      </div>
+                    } @else if (modelosImpresora().length) {
+                      @if (modeloElegido(); as modelo) {
+                        <div class="d-flex align-items-center gap-2">
+                          <input class="form-control" [value]="modelo" disabled />
+                          <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
+                            Cambiar
+                          </button>
+                        </div>
+                      } @else {
+                        <input id="n-modelo-traslado" class="form-control" [(ngModel)]="modeloBusqueda" name="modeloTraslado"
+                               placeholder="Escribe para buscar el modelo…" autocomplete="off" />
+                        <div class="lista-opciones mt-2">
+                          @for (m of modelosFiltrados(); track m) {
+                            <button type="button" (click)="elegirModelo(m)">{{ m }}</button>
+                          } @empty {
+                            <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
+                          }
+                        </div>
+                      }
+                    } @else {
+                      <input id="n-modelo-traslado" class="form-control" [ngModel]="modeloElegido()"
+                             (ngModelChange)="modeloElegido.set($event)" name="modeloTraslado"
+                             placeholder="Modelo de impresora" />
+                      <div class="form-text">No se pudo consultar el catálogo de modelos. Captúralo a mano.</div>
+                    }
+                  </div>
+                }
+
+                @if (p.campo_adicional || esColorToner()) {
+                  <div class="row g-3 mb-1">
+                    @if (p.campo_adicional) {
+                      <div [class]="esColorToner() ? 'col-md-6' : 'col-12'">
+                        <label class="form-label small fw-semibold" for="n-ctx">{{ p.campo_adicional }}</label>
+                        @if (esCorreo()) {
+                          <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="n-correo-libre"
+                                   [ngModel]="correoLibre()" (ngModelChange)="toggleCorreoLibre($event)"
+                                   name="correoLibre" />
+                            <label class="form-check-label small" for="n-correo-libre">
+                              Usar otro correo (no es de &#64;{{ dominio() }})
+                            </label>
+                          </div>
+                          @if (correoLibre()) {
+                            <input id="n-ctx" class="form-control" type="email" inputmode="email"
+                                   autocomplete="email" spellcheck="false" autocapitalize="off"
+                                   [(ngModel)]="contextoV" name="contexto"
+                                   [class.is-invalid]="avisoCorreo()"
+                                   placeholder="nombre@dominio.com" />
+                          } @else {
+                            <div class="input-group">
+                              <input id="n-ctx" class="form-control" type="text" inputmode="email"
+                                     autocomplete="off" spellcheck="false" autocapitalize="off"
+                                     [(ngModel)]="contextoV" name="contexto"
+                                     [class.is-invalid]="avisoCorreo()"
+                                     placeholder="nombre.apellido" />
+                              <span class="input-group-text">&#64;{{ dominio() }}</span>
+                            </div>
+                          }
+                          @if (avisoCorreo()) {
+                            <div class="invalid-feedback d-block">{{ avisoCorreo() }}</div>
+                          } @else if (!correoLibre()) {
+                            <div class="form-text">
+                              Se completa sola con el dominio institucional <b>&#64;{{ dominio() }}</b>.
+                            </div>
+                          }
+                        } @else if (esInventario()) {
+                          @if (cargandoBienes()) {
+                            <div class="form-text">
+                              <span class="spinner-border spinner-border-sm me-2"></span>
+                              Consultando tus bienes resguardados…
+                            </div>
+                          } @else if (bienes().length) {
+                            @if (esCmp()) {
+                              <!-- Un solo equipo: es el que se va a reparar. -->
+                              <div class="bienes">
+                                @for (b of bienes(); track b.inventario) {
+                                  <label class="bien" [class.activo]="seleccion()[0] === b.inventario"
+                                         [class.deshabilitado]="b.en_mantenimiento">
+                                    <input class="form-check-input" type="radio" name="bienCmp"
+                                           [disabled]="b.en_mantenimiento"
+                                           [checked]="seleccion()[0] === b.inventario"
+                                           (change)="elegirBienUnico(b.inventario)" />
+                                    <span>
+                                      <b>{{ b.inventario }}</b>
+                                      @if (b.descripcion) { <span class="sub d-block">{{ b.descripcion }}</span> }
+                                    </span>
+                                    @if (b.en_mantenimiento) {
+                                      <span class="chip chip-bandera ms-auto">En atención</span>
+                                    }
+                                  </label>
+                                }
+                              </div>
+                              <div class="form-text">
+                                @if (seleccion().length) {
+                                  Equipo elegido: {{ contextoFinal() }}
+                                } @else {
+                                  Elige el equipo que se va a reparar. Solo aparecen los que tienes asignados.
+                                }
+                              </div>
+                            } @else {
+                              <!-- Multi-select: un reporte puede abarcar varios bienes del resguardo. -->
+                              <div class="bienes">
+                                @for (b of bienes(); track b.inventario) {
+                                  <label class="bien" [class.activo]="seleccion().includes(b.inventario)">
+                                    <input class="form-check-input" type="checkbox"
+                                           [checked]="seleccion().includes(b.inventario)"
+                                           (change)="alternaBien(b.inventario)" />
+                                    <span>
+                                      <b>{{ b.inventario }}</b>
+                                      @if (b.descripcion) { <span class="sub d-block">{{ b.descripcion }}</span> }
+                                    </span>
+                                  </label>
+                                }
+                              </div>
+                              <div class="form-text" [class.text-danger]="excedeLargo()">
+                                @if (seleccion().length) {
+                                  {{ seleccion().length }} bien(es) elegido(s): {{ contextoFinal() }}
+                                } @else {
+                                  Marca los bienes que presentan la falla. Solo aparecen los que tienes bajo
+                                  resguardo.
+                                }
+                              </div>
+                            }
+                          } @else {
+                            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                                   [placeholder]="p.campo_adicional" />
+                            <div class="form-text">
+                              {{ motivoBienes() || 'Captura el número de inventario que aparece en la etiqueta.' }}
+                            </div>
+                          }
+                        } @else if (esModeloImpresoraCatalogo()) {
+                          @if (cargandoModelos()) {
+                            <div class="form-text">
+                              <span class="spinner-border spinner-border-sm me-2"></span>
+                              Consultando los modelos registrados…
+                            </div>
+                          } @else if (modelosImpresora().length) {
+                            @if (modeloElegido(); as modelo) {
+                              <div class="d-flex align-items-center gap-2">
+                                <input class="form-control" [value]="modelo" disabled />
+                                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarModelo()">
+                                  Cambiar
+                                </button>
+                              </div>
+                            } @else {
+                              <input id="n-ctx" class="form-control" [(ngModel)]="modeloBusqueda" name="contexto"
+                                     placeholder="Escribe para buscar el modelo…" autocomplete="off" />
+                              <div class="lista-opciones mt-2">
+                                @for (m of modelosFiltrados(); track m) {
+                                  <button type="button" (click)="elegirModelo(m)">{{ m }}</button>
+                                } @empty {
+                                  <div class="form-text px-2 py-1 mb-0">Sin resultados.</div>
+                                }
+                              </div>
+                            }
+                          } @else {
+                            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                                   placeholder="Modelo de impresora" />
+                            <div class="form-text">No se pudo consultar el catálogo de modelos. Captúralo a mano.</div>
+                          }
+                        } @else if (esModeloImpresoraLibre()) {
+                          <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                                 placeholder="Modelo de impresora" autocomplete="off" />
+                        } @else if (esCantidadEquipos()) {
+                          <input id="n-ctx" class="form-control" type="number" inputmode="numeric" min="1" step="1"
+                                 autocomplete="off"
+                                 [ngModel]="contextoV()" (ngModelChange)="onCantidadEquiposChange($event)" name="contexto"
+                                 [placeholder]="p.campo_adicional" />
+                        } @else {
+                          <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                                 [placeholder]="p.campo_adicional" />
+                        }
+                      </div>
+                    }
+                    @if (esColorToner()) {
+                      <div class="col-md-6">
+                        <span class="form-label small fw-semibold d-block">Color de tóner a cambiar</span>
+                        <div class="colores">
+                          @for (c of coloresToner; track c) {
+                            <button type="button" class="color" [class.activo]="coloresElegidos.includes(c)"
+                                    [attr.aria-pressed]="coloresElegidos.includes(c)" (click)="alternarColorToner(c)">
+                              <span class="color-muestra" [style.background]="muestraColor[c]"></span>
+                              {{ c }}
+                            </button>
+                          }
+                        </div>
+                        <div class="form-text">Puedes marcar más de uno.</div>
+                      </div>
+                    }
+                  </div>
+                }
+
+                @if (p.requiere_texto) {
+                  <div class="mt-3">
+                    <label class="form-label small fw-semibold" for="n-txt">Describe el problema</label>
+                    <textarea id="n-txt" rows="3" class="form-control" [(ngModel)]="texto" name="texto"
+                              placeholder="Cuéntanos qué pasa con el mayor detalle posible…"></textarea>
+                  </div>
+                }
+              </div>
+            }
+          }
+        </section>
+
+        <!-- ---------------------------------------- Paso 3: donde y quien -->
+        <section class="paso" [class.bloqueado]="!problema()">
+          <header class="paso-titulo">
+            <span class="paso-numero">3</span>
+            <div>
+              <h2>¿Dónde y para quién?</h2>
+              <p>Para que el técnico sepa a dónde ir y a quién contactar.</p>
+            </div>
+          </header>
+
+          <div class="row g-3">
+            @if (puedeElegirUsuario()) {
+              <div class="col-md-8 col-xxl-5">
+                <label class="form-label small fw-semibold" for="n-buscar">Registrar a nombre de</label>
+                @if (usuarioElegido(); as u) {
+                  <div class="persona">
+                    <span class="persona-avatar">{{ iniciales(u.nombre) }}</span>
+                    <div class="flex-grow-1 min-w-0">
+                      <div class="fw-semibold text-truncate">{{ u.nombre }}</div>
+                      <div class="sub text-truncate">{{ u.rfc }} · {{ u.dependencia || 'Sin dependencia identificada' }}</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarUsuario()">Cambiar</button>
+                  </div>
+                } @else {
+                  <div class="buscador" style="max-width: none">
+                    <i class="bi bi-person-search"></i>
+                    <input id="n-buscar" class="form-control form-control-sm" [(ngModel)]="busquedaUsuario" name="busquedaUsuario"
+                           (ngModelChange)="onBuscarUsuario()" placeholder="Busca por nombre (mínimo 3 letras)…"
+                           autocomplete="off" />
+                  </div>
+                  @if (buscandoUsuario()) {
+                    <div class="form-text"><span class="spinner-border spinner-border-sm me-2"></span>Buscando…</div>
+                  }
+                  @if (resultadosUsuario().length) {
+                    <div class="lista-opciones mt-2">
+                      @for (c of resultadosUsuario(); track c.id_usuario_saf) {
+                        <button type="button" (click)="elegirUsuario(c)">
+                          <div class="fw-semibold" style="font-size: 0.9rem">{{ c.nombre }}</div>
+                          <div class="sub" style="font-size: 0.78rem">
+                            {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
+                          </div>
+                        </button>
+                      }
+                    </div>
+                  } @else if (busquedaUsuario.trim().length >= 3 && !buscandoUsuario()) {
+                    <div class="form-text">Sin resultados.</div>
+                  } @else {
+                    <div class="form-text">Si no eliges a nadie, el ticket queda registrado a tu nombre.</div>
+                  }
+                }
+              </div>
+            } @else {
+              <div class="col-md-8 col-xxl-5">
+                <span class="form-label small fw-semibold d-block">Servidor público</span>
+                <div class="persona">
+                  <span class="persona-avatar">{{ iniciales(auth.usuario()?.nombre ?? '') }}</span>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="fw-semibold text-truncate">{{ auth.usuario()?.nombre }}</div>
+                    <div class="sub">Tomado de tu sesión</div>
+                  </div>
+                </div>
+              </div>
+            }
+            <div class="col-md-4 col-xxl-2">
+              <label class="form-label small fw-semibold" for="n-ext">Extensión</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                <input id="n-ext" class="form-control" inputmode="numeric" maxlength="20"
+                       [(ngModel)]="extension" name="extension" placeholder="Ej. 1234"
+                       title="Precargada de tu perfil" />
+              </div>
+            </div>
+            <div class="col-12 col-xxl-5">
+              <label class="form-label small fw-semibold" for="n-edificio">
+                Edificio o ubicación donde se atenderá <span class="sub fw-normal">(opcional)</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                <input id="n-edificio" class="form-control" [(ngModel)]="edificioAtencion" name="edificioAtencion"
+                       maxlength="160" placeholder="Edificio, piso, oficina…" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Pantallas angostas: botones al pie. En anchas van bajo la vista previa (fija). -->
+        <div class="acciones acciones-pie">
+          <ng-container [ngTemplateOutlet]="botones" />
+        </div>
+      </div>
+
+      <ng-template #botones>
+        @if (error()) {
+          <div class="alert alert-danger py-2 small d-flex gap-2 align-items-center mb-0">
+            <i class="bi bi-exclamation-triangle"></i> {{ error() }}
+          </div>
+        }
+        <button type="button" class="btn btn-primary btn-registrar" [disabled]="guardando() || !problema()"
+                (click)="guardar()">
+          @if (guardando()) {
+            <span class="spinner-border spinner-border-sm me-2"></span>
+          } @else {
+            <i class="bi bi-send me-1"></i>
+          }
+          Registrar ticket
+        </button>
+        <div class="d-flex gap-2 acciones-secundarias">
+          <button type="button" class="btn btn-link text-secondary px-0 me-auto" (click)="regresar()">
+            <i class="bi bi-arrow-left"></i> Regresar
+          </button>
+          <button type="button" class="btn btn-sm" [class.btn-outline-secondary]="!confirmarLimpiar()"
+                  [class.btn-outline-danger]="confirmarLimpiar()" (click)="pedirLimpiar()">
+            {{ confirmarLimpiar() ? '¿Borrar todo?' : 'Limpiar' }}
+          </button>
+        </div>
+      </ng-template>
+
+      <!-- ------------------------------------------- Vista previa -->
+      <aside class="registro-previa">
+        <div class="previa-titulo">Así se verá tu ticket</div>
+        <div class="previa-boleto" [style.--acento]="servicioActual() ? tonoServicio(servicioActual()!.clave) : '#c5ccd6'">
+          <div class="previa-cuerpo">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+              <span class="previa-folio"><i class="bi bi-ticket-perforated"></i> TK/…/{{ anio }}</span>
+              @if (problema(); as p) {
+                @if (muestraPrioridad()) {
+                  <span class="chip" [class]="'chip-' + p.prioridad">{{ p.prioridad }} · {{ nombrePrioridad[p.prioridad] }}</span>
+                }
+              }
+            </div>
+            <div class="previa-asunto" [class.vacio]="!problema()">
+              {{ problema()?.descripcion ?? '¿Qué está pasando?' }}
+            </div>
+            <div class="previa-dato" [class.vacio]="!servicioActual()">
+              <i class="bi" [class]="servicioActual() ? iconoServicio(servicioActual()!.clave) : 'bi-grid'"></i>
+              {{ servicioActual()?.nombre ?? 'Tipo de servicio' }}
+            </div>
+            @if (contextoFinal()) {
+              <div class="previa-dato text-truncate">
+                <i class="bi bi-info-circle"></i> {{ problema()?.campo_adicional }}: {{ contextoFinal() }}
+              </div>
+            }
+            @if (esColorToner() && coloresElegidos.length) {
+              <div class="previa-dato"><i class="bi bi-droplet"></i> {{ coloresElegidos.join(', ') }}</div>
+            }
+            <div class="previa-dato" [class.vacio]="!edificioAtencion.trim()">
+              <i class="bi bi-geo-alt"></i> {{ edificioAtencion.trim() || 'Ubicación (opcional)' }}
+            </div>
+          </div>
+          <div class="previa-talon">
+            <div>
+              <span class="previa-etiqueta">Solicitante</span>
+              <b class="text-truncate d-block">{{ usuarioElegido()?.nombre ?? auth.usuario()?.nombre }}</b>
+            </div>
+            @if (extension.trim()) {
+              <div class="text-end">
+                <span class="previa-etiqueta">Ext.</span>
+                <b>{{ extension.trim() }}</b>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="acciones acciones-previa">
+          <ng-container [ngTemplateOutlet]="botones" />
+        </div>
+
+        @if (problema() && esAdmin()) {
+          <div class="previa-nota">
+            <i class="bi bi-stopwatch"></i> Tiempo objetivo de resolución: <b>{{ dur(objetivo()) }}</b>
+          </div>
+        }
+      </aside>
+    </div>
   </div>
-</div>
+}
