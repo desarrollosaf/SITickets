@@ -512,6 +512,15 @@ export class Nuevo {
       this.error.set('Elige el tipo de servicio y el problema.');
       return;
     }
+    /* Escribio un nombre pero no eligio a nadie de la lista: sin este aviso el
+       ticket quedaria a nombre de quien esta en sesion sin que lo note. */
+    if (this.puedeElegirUsuario() && !this.usuarioElegido() && this.busquedaUsuario.trim()) {
+      this.error.set(
+        'Escribiste un nombre en «Registrar a nombre de» pero no elegiste a nadie de la lista. ' +
+          'Elígelo, o borra el campo para registrarlo a tu nombre.',
+      );
+      return;
+    }
     if (p.campo_adicional && !this.contextoFinal()) {
       this.error.set(
         this.esInventario() && this.bienes().length
