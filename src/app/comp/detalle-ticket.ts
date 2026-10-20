@@ -18,6 +18,7 @@ import {
 import type {
   Bien,
   BienTicket,
+  CandidatoSaf,
   Catalogos,
   LineaBitacora,
   NivelTonerImpresora,
@@ -29,6 +30,7 @@ import type {
 type Formulario =
   | null
   | 'datos'
+  | 'solicitante'
   | 'espera'
   | 'resolver'
   | 'atender-cmp'
@@ -282,6 +284,86 @@ export class DetalleTicket {
    * esto; aqui solo se decide que se ofrece.
    */
   readonly puedeCorregir = computed(() => this.esMiSolicitud() || this.esAdmin());
+
+  /**
+   * Cambiar a nombre de quien quedo el ticket: admin/operador, o el gestor
+   * que lo registro (a nombre de otro o a su propio nombre). Mientras siga
+   * abierto. El backend vuelve a revisar todo.
+   */
+  readonly puedeCambiarSolicitante = computed(() => {
+    const t = this.ticket();
+    if (!t || ['CERRADO', 'CANCELADO'].includes(t.estatus)) return false;
+    if (this.esAdminUOperador()) return true;
+    return this.rol() === 'gestor' && (this.esGestorQueRegistro() || this.esMiSolicitud());
+  });
+
+  /* ---- Cambiar solicitante: buscador igual al de "Registrar a nombre de" ---- */
+  readonly sBusqueda = signal('');
+  readonly sResultados = signal<CandidatoSaf[]>([]);
+  readonly sBuscando = signal(false);
+  readonly sElegido = signal<CandidatoSaf | null>(null);
+  /** true = devolverlo a nombre propio de quien corrige. */
+  readonly sPropio = signal(false);
+  private sTemporizador: ReturnType<typeof setTimeout> | null = null;
+
+  abrirSolicitante() {
+    this.sBusqueda.set('');
+    this.sResultados.set([]);
+    this.sElegido.set(null);
+    this.sPropio.set(false);
+    this.error.set('');
+    this.formulario.set('solicitante');
+  }
+
+  sBuscar(texto: string) {
+    this.sBusqueda.set(texto);
+    this.sElegido.set(null);
+    this.sPropio.set(false);
+    if (this.sTemporizador) clearTimeout(this.sTemporizador);
+    const q = texto.trim();
+    if (q.length < 3) {
+      this.sResultados.set([]);
+      return;
+    }
+    this.sTemporizador = setTimeout(() => {
+      this.sBuscando.set(true);
+      this.api.buscarSolicitantes(q).subscribe({
+        next: (r) => {
+          this.sBuscando.set(false);
+          this.sResultados.set(r);
+        },
+        error: (e) => {
+          this.sBuscando.set(false);
+          this.falla(e);
+        },
+      });
+    }, 350);
+  }
+
+  sElegir(c: CandidatoSaf) {
+    this.sElegido.set(c);
+    this.sPropio.set(false);
+    this.sResultados.set([]);
+  }
+
+  sElegirPropio() {
+    this.sPropio.set(true);
+    this.sElegido.set(null);
+    this.sBusqueda.set('');
+    this.sResultados.set([]);
+  }
+
+  enviarSolicitante() {
+    const elegido = this.sElegido();
+    if (!elegido && !this.sPropio()) {
+      this.error.set('Busca y elige a la persona correcta de la lista.');
+      return;
+    }
+    this.ocupado.set(true);
+    this.api
+      .cambiarSolicitante(this.id(), elegido?.id_usuario_saf ?? null)
+      .subscribe({ next: (t) => this.aplicar(t), error: (e) => this.falla(e) });
+  }
   readonly enEspera = computed(() => this.ticket()?.estatus === 'EN_ESPERA');
 
   /** Opciones de reclasificacion: servicios de usuario distintos al actual. */

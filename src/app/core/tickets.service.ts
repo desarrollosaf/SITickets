@@ -126,6 +126,14 @@ export class TicketsService {
   }
 
   /** Solo el administrador: usuarios activos de saf para registrar a nombre de otro (§2). */
+  /** Corrige a nombre de quien quedo el ticket. Sin aNombreDe = a nombre propio. */
+  cambiarSolicitante(id: number, aNombreDe: number | null) {
+    return this.http.post<TicketDetalle>(
+      `${API}/tickets/${id}/solicitante`,
+      aNombreDe ? { a_nombre_de: aNombreDe } : {},
+    );
+  }
+
   buscarSolicitantes(q: string) {
     return this.http.get<CandidatoSaf[]>(`${API}/tickets/solicitantes`, { params: { q } });
   }

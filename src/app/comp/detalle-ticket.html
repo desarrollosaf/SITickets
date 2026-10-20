@@ -37,6 +37,11 @@
               <i class="bi bi-pencil"></i> Corregir datos
             </button>
           }
+          @if (puedeCambiarSolicitante()) {
+            <button class="btn btn-sm btn-outline-secondary" (click)="abrirSolicitante()">
+              <i class="bi bi-person-gear"></i> Cambiar solicitante
+            </button>
+          }
 
           <!-- Técnico asignado -->
           @if ((atiende() && esMio()) || esAdmin()) {
@@ -425,6 +430,70 @@
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
                 <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="enviarAtenderCmp()">
                   Finalizar ticket
+                </button>
+              </div>
+            }
+
+            @case ('solicitante') {
+              <div class="alert alert-info py-2 small">
+                Hoy está a nombre de <b>{{ t.solicitante }}</b>. El folio no cambia y el cambio queda en
+                la bitácora.
+              </div>
+
+              @if (sElegido(); as c) {
+                <div class="d-flex align-items-center gap-2 p-2 mb-2 bg-white border rounded">
+                  <i class="bi bi-person-check text-success"></i>
+                  <div class="flex-grow-1" style="min-width: 0">
+                    <div class="fw-semibold small text-truncate">{{ c.nombre }}</div>
+                    <div class="sub text-truncate" style="font-size: 0.75rem">
+                      {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-sm btn-link" (click)="sElegido.set(null)">Cambiar</button>
+                </div>
+              } @else if (sPropio()) {
+                <div class="d-flex align-items-center gap-2 p-2 mb-2 bg-white border rounded">
+                  <i class="bi bi-person-check text-success"></i>
+                  <div class="flex-grow-1 fw-semibold small">A mi nombre</div>
+                  <button type="button" class="btn btn-sm btn-link" (click)="sPropio.set(false)">Cambiar</button>
+                </div>
+              } @else {
+                <label class="form-label small fw-semibold" for="fm-sol">Nuevo solicitante</label>
+                <input id="fm-sol" class="form-control form-control-sm" autocomplete="off"
+                       placeholder="Busca por nombre (mínimo 3 letras)…"
+                       [value]="sBusqueda()" (input)="sBuscar($any($event.target).value)" />
+                @if (sBuscando()) {
+                  <div class="form-text"><span class="spinner-border spinner-border-sm me-2"></span>Buscando…</div>
+                } @else if (sResultados().length) {
+                  <div class="border rounded mt-2 bg-white" style="max-height: 220px; overflow-y: auto">
+                    @for (c of sResultados(); track c.id_usuario_saf) {
+                      <button type="button" class="d-block w-100 text-start btn btn-light border-0 rounded-0 py-2 px-3"
+                              (click)="sElegir(c)">
+                        <div class="fw-semibold" style="font-size: 0.86rem">{{ c.nombre }}</div>
+                        <div class="sub" style="font-size: 0.75rem">
+                          {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
+                        </div>
+                      </button>
+                    }
+                  </div>
+                } @else if (sBusqueda().trim().length >= 3) {
+                  <div class="form-text">Sin resultados.</div>
+                }
+                @if (!esMiSolicitud()) {
+                  <button type="button" class="btn btn-sm btn-link px-0 mt-1" (click)="sElegirPropio()">
+                    <i class="bi bi-person"></i> Dejarlo a mi nombre
+                  </button>
+                }
+              }
+
+              <div class="d-flex gap-2 justify-content-end mt-2">
+                <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
+                <button class="btn btn-sm btn-primary" [disabled]="ocupado() || (!sElegido() && !sPropio())"
+                        (click)="enviarSolicitante()">
+                  @if (ocupado()) {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                  }
+                  Guardar cambio
                 </button>
               </div>
             }

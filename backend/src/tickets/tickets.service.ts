@@ -52,6 +52,7 @@ import { dominioInstitucional, esCampoCuentaCorreo, revisaCuentaCorreo } from '.
 import {
   CrearInternoDto,
   CrearTicketDto,
+  CambiarSolicitanteDto,
   DatosGeneralesDto,
   PrioridadDto,
   ReasignarDto,
@@ -1424,6 +1425,108 @@ export class TicketsService {
      si —problema, servicio, prioridad, tecnico— no se mueve por aqui: para eso
      estan reclasificar, prioridad y reasignar, que piden motivo y otro rol.
      ================================================================== */
+
+  /**
+   * Corrige a nombre de quien quedo el ticket (p. ej. el gestor escribio el
+   * nombre pero no eligio a nadie y quedo a su propio nombre). Lo puede hacer
+   * el admin/operador, o el gestor sobre los tickets que el mismo registro,
+   * con las mismas reglas que al registrar "a nombre de": persona activa de
+   * saf y, para el gestor, de su misma dependencia. El folio no cambia (es
+   * inmutable) y el cambio queda en la bitacora con el antes y el despues.
+   */
+  async cambiarSolicitante(id: number, dto: CambiarSolicitanteDto, usuario: UsuarioToken) {
+    if (!['admin', 'operador', 'gestor'].includes(usuario.rol)) {
+      throw new ForbiddenException('Tu perfil no puede cambiar el solicitante de un ticket');
+    }
+    const ticket = await this.tickets.findOne({
+      where: { id, ...(await this.alcanceTicket(usuario)) },
+      include: [{ model: Servicio, as: 'servicio' }],
+    });
+    if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
+    if (ESTATUS_FINALES.includes(ticket.estatus)) {
+      throw new BadRequestException('El ticket ya esta cerrado o cancelado: el solicitante no se cambia');
+    }
+
+    if (usuario.rol === 'gestor') {
+      const loRegistro =
+        ticket.registrado_por === usuario.id ||
+        (ticket.solicitante_id === usuario.id && ticket.solicitante_nombre === usuario.nombre);
+      if (!loRegistro) {
+        throw new ForbiddenException('Solo puedes cambiar el solicitante de los tickets que tu registraste');
+      }
+      if (dto.a_nombre_de) {
+        if (ticket.servicio?.restringido && !ticket.servicio.permite_a_nombre_de) {
+          throw new ForbiddenException('Ese servicio no se puede registrar a nombre de otro usuario');
+        }
+        const local = await this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] });
+        if (local?.rfc && RFC_SIEMPRE_A_NOMBRE_PROPIO.includes(local.rfc)) {
+          throw new ForbiddenException('Tu perfil siempre registra el ticket a tu propio nombre');
+        }
+      }
+    }
+
+    let quien: { nombre: string; dependencia_id: number | null };
+    let solicitanteId: number;
+    let registradoPor: number | null;
+    let registradoPorNombre: string | null;
+
+    if (dto.a_nombre_de) {
+      const datos = await this.datosSaf(dto.a_nombre_de);
+      if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
+      if (usuario.rol === 'gestor') {
+        const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([
+          this.dependenciaSafDeGestor(usuario.id),
+          this.sUsuarios.findByPk(dto.a_nombre_de),
+        ]);
+        if (!dependenciaGestor || sUsuarioObjetivo?.id_Dependencia !== dependenciaGestor) {
+          throw new ForbiddenException(
+            'Solo puedes registrar tickets a nombre de alguien de tu misma dependencia',
+          );
+        }
+      }
+      quien = datos;
+      solicitanteId = dto.a_nombre_de;
+      /* Quien lo dio de alta de verdad se conserva; si no habia (estaba a
+         nombre propio), queda quien hace la correccion. */
+      registradoPor = ticket.registrado_por ?? usuario.id;
+      registradoPorNombre = ticket.registrado_por_nombre ?? usuario.nombre;
+    } else {
+      const propio = await this.resolverQuien(usuario);
+      quien = { nombre: propio.nombre, dependencia_id: propio.dependencia_id };
+      solicitanteId = usuario.id;
+      registradoPor = null;
+      registradoPorNombre = null;
+    }
+
+    if (solicitanteId === ticket.solicitante_id && quien.nombre === ticket.solicitante_nombre) {
+      throw new BadRequestException('Esa persona ya es el solicitante del ticket');
+    }
+
+    const anterior = ticket.solicitante_nombre ?? '—';
+    await this.db.transaction(async (tx) => {
+      await ticket.update(
+        {
+          solicitante_id: solicitanteId,
+          solicitante_nombre: quien.nombre,
+          dependencia_id: quien.dependencia_id,
+          registrado_por: registradoPor,
+          registrado_por_nombre: registradoPorNombre,
+        },
+        { transaction: tx },
+      );
+      await this.reglas.anota(
+        ticket.id,
+        usuario.id,
+        'Cambio de solicitante',
+        `${anterior} → ${quien.nombre}`,
+        tx,
+        { antes: anterior.slice(0, 80), nuevo: quien.nombre.slice(0, 80) },
+        usuario.nombre,
+      );
+    });
+
+    return this.detalle(ticket.id, usuario);
+  }
 
   async actualizarDatos(id: number, dto: DatosGeneralesDto, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({

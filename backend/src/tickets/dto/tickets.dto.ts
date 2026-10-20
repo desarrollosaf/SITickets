@@ -100,6 +100,14 @@ export class DatosGeneralesDto {
   edificio_atencion?: string;
 }
 
+/** Corregir a nombre de quien quedo el ticket. Sin a_nombre_de = a nombre propio. */
+export class CambiarSolicitanteDto {
+  /** id_Usuario de saf, igual que a_nombre_de al registrar. */
+  @IsOptional()
+  @IsInt()
+  a_nombre_de?: number;
+}
+
 export class CrearInternoDto {
   @IsString()
   @MaxLength(20)
