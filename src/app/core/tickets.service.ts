@@ -134,8 +134,11 @@ export class TicketsService {
     );
   }
 
-  buscarSolicitantes(q: string) {
-    return this.http.get<CandidatoSaf[]>(`${API}/tickets/solicitantes`, { params: { q } });
+  /** servicioId: en Cartas de no adeudo el backend incluye tambien a los dados de baja. */
+  buscarSolicitantes(q: string, servicioId?: number | null) {
+    return this.http.get<CandidatoSaf[]>(`${API}/tickets/solicitantes`, {
+      params: servicioId ? { q, servicio: servicioId } : { q },
+    });
   }
 
   /* ---------------- §16 validacion previa (rol validador) ---------------- */

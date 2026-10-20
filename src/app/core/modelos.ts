@@ -467,6 +467,8 @@ export interface CandidatoSaf {
   rfc: string;
   dependencia_id: number | null;
   dependencia: string | null;
+  /** false = dado de baja en saf (solo salen en Cartas de no adeudo). */
+  activo?: boolean;
 }
 
 export interface UsuarioStaff {

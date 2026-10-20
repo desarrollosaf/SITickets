@@ -58,8 +58,13 @@ export class TicketsController {
    */
   @Roles('admin', 'operador', 'gestor', 'validador', 'sistemas')
   @Get('solicitantes')
-  buscarSolicitantes(@Query('q') q: string = '', @UsuarioActual() usuario: UsuarioToken) {
-    return this.tickets.buscarSolicitantes(q, usuario);
+  buscarSolicitantes(
+    @Query('q') q: string = '',
+    @UsuarioActual() usuario: UsuarioToken,
+    /* Servicio que se esta registrando: en CARTAS DE NO ADEUDO tambien salen los dados de baja. */
+    @Query('servicio') servicio?: string,
+  ) {
+    return this.tickets.buscarSolicitantes(q, usuario, servicio ? Number(servicio) : undefined);
   }
 
   /** Bandeja del validador: tickets pendientes de sus dependencias asignadas. */
