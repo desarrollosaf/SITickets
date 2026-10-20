@@ -175,6 +175,23 @@ export class TicketsService {
    *   'turnados' — "Mis tickets turnados": solo lo que le toca atender.
    * Para el resto de roles el modo no cambia nada.
    */
+  /**
+   * Alcance para UN ticket puntual (detalle, confirmar, corregir datos…). Para
+   * gestor y validador, alcance('todo') es su lista de "Tickets generados"
+   * (lo registrado a nombre de otros) y deja fuera lo que registraron a su
+   * propio nombre: sin la union, al crear un ticket propio el detalle que se
+   * devuelve fallaba con "no existe o no esta a tu alcance" — aunque el
+   * ticket SI se habia creado — y tampoco podian abrirlo ni confirmarlo.
+   */
+  private async alcanceTicket(usuario: UsuarioToken): Promise<Record<string, unknown>> {
+    if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
+      return {
+        [Op.or]: [await this.alcance(usuario, 'todo'), await this.alcance(usuario, 'propios')],
+      };
+    }
+    return this.alcance(usuario);
+  }
+
   private async alcance(
     usuario: UsuarioToken,
     modo: 'todo' | 'propios' | 'turnados' = 'todo',
@@ -719,14 +736,14 @@ export class TicketsService {
 
   /** Admin/operador dieron clic en "Copiar datos": queda grabado, no solo en su navegador. */
   async marcarCopiado(id: number, usuario: UsuarioToken): Promise<void> {
-    const ticket = await this.tickets.findOne({ where: { id, ...(await this.alcance(usuario)) } });
+    const ticket = await this.tickets.findOne({ where: { id, ...(await this.alcanceTicket(usuario)) } });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
     if (!ticket.datos_copiados) await ticket.update({ datos_copiados: true });
   }
 
   async detalle(id: number, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
-      where: { id, ...(await this.alcance(usuario)) },
+      where: { id, ...(await this.alcanceTicket(usuario)) },
       include: INCLUDES,
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
@@ -1410,7 +1427,7 @@ export class TicketsService {
 
   async actualizarDatos(id: number, dto: DatosGeneralesDto, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
-      where: { id, ...(await this.alcance(usuario)) },
+      where: { id, ...(await this.alcanceTicket(usuario)) },
       include: INCLUDES,
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
@@ -1655,7 +1672,7 @@ export class TicketsService {
       if (t && USUARIOS_CIERRE_SERVICIO[t.servicio?.clave ?? ''] === usuario.id) return t;
     }
     const t = await this.tickets.findOne({
-      where: { id, ...(await this.alcance(usuario)) },
+      where: { id, ...(await this.alcanceTicket(usuario)) },
       include: [{ model: Servicio, as: 'servicio' }],
     });
     if (!t) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
@@ -1795,7 +1812,7 @@ export class TicketsService {
    */
   async bienesParaCorregir(id: number, usuario: UsuarioToken) {
     const ticket = await this.tickets.findOne({
-      where: { id, ...(await this.alcance(usuario)) },
+      where: { id, ...(await this.alcanceTicket(usuario)) },
       include: INCLUDES,
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
