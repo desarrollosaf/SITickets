@@ -79,6 +79,19 @@
         </div>
       }
 
+      @if (rol === 'gestor') {
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="u-cualquier-dep"
+                 [(ngModel)]="cualquierDependencia" name="u-cualquier-dep" />
+          <label class="form-check-label small" for="u-cualquier-dep">
+            Puede registrar tickets para <b>cualquier dependencia</b>
+          </label>
+          <div class="form-text">
+            Sin marcar, solo puede registrar a nombre de gente de su propia dependencia.
+          </div>
+        </div>
+      }
+
       @if (mostrarDependencias()) {
         <div class="mb-3">
           <label class="form-label small fw-semibold">Dependencias que valida</label>
@@ -182,6 +195,11 @@
                   <span class="badge" [class]="claseRol[u.rol] ?? 'text-bg-light'">
                     {{ nombreRol[u.rol] ?? u.rol }}
                   </span>
+                  @if (u.rol === 'gestor' && u.registra_cualquier_dependencia) {
+                    <span class="badge text-bg-light border ms-1" title="Registra para cualquier dependencia">
+                      <i class="bi bi-globe2"></i> Todas
+                    </span>
+                  }
                 </td>
                 <td class="sub">{{ u.dependencia || '—' }} @if (u.area) { · {{ u.area }} }</td>
                 <td class="sub">{{ u.servicios.length ? u.servicios.join(', ') : '—' }}</td>
@@ -261,6 +279,19 @@
           <div class="form-text">
             Quitar un servicio no borra nada del historial de tickets que este técnico ya atendió con
             él — solo deja de recibir tickets nuevos de ese tipo.
+          </div>
+        </div>
+      }
+
+      @if (editRol === 'gestor') {
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="e-cualquier-dep"
+                 [(ngModel)]="editCualquierDependencia" name="e-cualquier-dep" />
+          <label class="form-check-label small" for="e-cualquier-dep">
+            Puede registrar tickets para <b>cualquier dependencia</b>
+          </label>
+          <div class="form-text">
+            Sin marcar, solo puede registrar a nombre de gente de su propia dependencia.
           </div>
         </div>
       }
