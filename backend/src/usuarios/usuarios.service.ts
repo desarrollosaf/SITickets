@@ -159,6 +159,8 @@ export class UsuariosService {
         dependencia: dependenciaSaf ?? null,
         area: u.area?.nombre ?? null,
         activo: u.activo,
+        /** Solo rol gestor: registra a nombre de gente de cualquier dependencia. */
+        registra_cualquier_dependencia: u.registra_cualquier_dependencia,
       };
     });
   }
@@ -237,6 +239,7 @@ export class UsuariosService {
         area_id: null,
         rol: dto.rol,
         activo: true,
+        registra_cualquier_dependencia: dto.rol === 'gestor' && !!dto.registra_cualquier_dependencia,
       });
 
       if (dto.servicio_ids?.length) {
@@ -291,6 +294,12 @@ export class UsuariosService {
         correo: dto.correo?.trim().toLowerCase() || null,
         extension: dto.extension?.trim() || null,
         ...(dto.activo !== undefined && { activo: dto.activo }),
+        /* Solo tiene sentido para el gestor: si cambia a otro rol, se apaga. */
+        ...(dto.rol !== 'gestor'
+          ? { registra_cualquier_dependencia: false }
+          : dto.registra_cualquier_dependencia !== undefined && {
+              registra_cualquier_dependencia: dto.registra_cualquier_dependencia,
+            }),
       });
 
       if (dto.rol !== 'tecnico') {

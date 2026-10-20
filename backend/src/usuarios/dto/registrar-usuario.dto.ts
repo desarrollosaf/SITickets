@@ -1,4 +1,4 @@
-import { IsEmail, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -49,4 +49,9 @@ export class RegistrarUsuarioDto {
   @Type(() => Number)
   @IsInt({ each: true })
   servicio_ids_validador?: number[];
+
+  /** Solo aplica si rol es gestor: registrar a nombre de gente de cualquier dependencia. */
+  @IsOptional()
+  @IsBoolean()
+  registra_cualquier_dependencia?: boolean;
 }

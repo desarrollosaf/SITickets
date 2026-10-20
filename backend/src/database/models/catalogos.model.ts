@@ -202,6 +202,14 @@ export class Usuario extends Model {
   @Column(DataType.BOOLEAN)
   declare activo: boolean;
 
+  /**
+   * Solo rol gestor: registra tickets a nombre de gente de cualquier
+   * dependencia, no solo de la suya (ver migracion 027).
+   */
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare registra_cualquier_dependencia: boolean;
+
   @BelongsTo(() => Area)
   declare area: Area;
 

@@ -1013,6 +1013,17 @@ export class TicketsService {
    * dependencia. Sin rfc (o sin match en saf) no se le puede identificar
    * dependencia, asi que no se le ofrece nadie: es el default seguro.
    */
+  /**
+   * Gestor "general" (usuario.registra_cualquier_dependencia): registra a
+   * nombre de gente de cualquier dependencia, sin el candado de "su misma
+   * dependencia". Solo aplica al rol gestor.
+   */
+  private async registraCualquierDependencia(usuario: UsuarioToken): Promise<boolean> {
+    if (usuario.rol !== 'gestor' || usuario.externo) return false;
+    const u = await this.usuarios.findByPk(usuario.id, { attributes: ['registra_cualquier_dependencia'] });
+    return !!u?.registra_cualquier_dependencia;
+  }
+
   private async dependenciaSafDeGestor(usuarioId: number): Promise<number | null> {
     const local = await this.usuarios.findByPk(usuarioId);
     if (!local?.rfc) return null;
@@ -1033,7 +1044,10 @@ export class TicketsService {
     if (texto.length < 3) return [];
 
     const where: Record<string, unknown> = { Estado: 1, Nombre: { [Op.like]: `%${texto}%` } };
-    if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
+    if (
+      (usuario.rol === 'gestor' || usuario.rol === 'validador') &&
+      !(await this.registraCualquierDependencia(usuario))
+    ) {
       const dependenciaSaf = await this.dependenciaSafDeGestor(usuario.id);
       if (!dependenciaSaf) return [];
       where.id_Dependencia = dependenciaSaf;
@@ -1154,7 +1168,10 @@ export class TicketsService {
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
 
       /* El gestor (y el validador, que ve lo mismo) solo registra a nombre de gente de su misma dependencia (saf). */
-      if (usuario.rol === 'gestor' || usuario.rol === 'validador') {
+      if (
+        (usuario.rol === 'gestor' || usuario.rol === 'validador') &&
+        !(await this.registraCualquierDependencia(usuario))
+      ) {
         const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([
           this.dependenciaSafDeGestor(usuario.id),
           this.sUsuarios.findByPk(dto.a_nombre_de),
@@ -1473,7 +1490,7 @@ export class TicketsService {
     if (dto.a_nombre_de) {
       const datos = await this.datosSaf(dto.a_nombre_de);
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
-      if (usuario.rol === 'gestor') {
+      if (usuario.rol === 'gestor' && !(await this.registraCualquierDependencia(usuario))) {
         const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([
           this.dependenciaSafDeGestor(usuario.id),
           this.sUsuarios.findByPk(dto.a_nombre_de),

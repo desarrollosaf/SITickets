@@ -105,6 +105,10 @@ export class Usuarios {
     return this.rol === 'validador';
   }
 
+  /** Gestor "general": registra a nombre de gente de cualquier dependencia. */
+  cualquierDependencia = false;
+  editCualquierDependencia = false;
+
   alternarServicio(id: number) {
     this.servicioIds = this.servicioIds.includes(id)
       ? this.servicioIds.filter((s) => s !== id)
@@ -224,6 +228,7 @@ export class Usuarios {
           this.mostrarDependencias() && this.servicioIdsValidador.length
             ? this.servicioIdsValidador
             : undefined,
+        registra_cualquier_dependencia: this.rol === 'gestor' ? this.cualquierDependencia : undefined,
       })
       .subscribe({
         next: (r) => {
@@ -286,6 +291,7 @@ export class Usuarios {
     this.editServicioIds = [...u.servicio_ids];
     this.editDependenciaIds = [...u.dependencia_ids_validador];
     this.editServicioIdsValidador = [...u.servicio_ids_validador];
+    this.editCualquierDependencia = u.registra_cualquier_dependencia;
     this.errorEdicion.set('');
   }
 
@@ -308,6 +314,8 @@ export class Usuarios {
         servicio_ids_validador: this.mostrarDependenciasEdicion()
           ? this.editServicioIdsValidador
           : undefined,
+        registra_cualquier_dependencia:
+          this.editRol === 'gestor' ? this.editCualquierDependencia : undefined,
         activo: u.activo,
       })
       .subscribe({
@@ -333,6 +341,7 @@ export class Usuarios {
         servicio_ids: u.servicio_ids,
         dependencia_ids: u.dependencia_ids_validador,
         servicio_ids_validador: u.servicio_ids_validador,
+        registra_cualquier_dependencia: u.registra_cualquier_dependencia,
         activo: !u.activo,
       })
       .subscribe({

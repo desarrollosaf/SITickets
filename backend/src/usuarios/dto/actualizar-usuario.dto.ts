@@ -56,4 +56,9 @@ export class ActualizarUsuarioDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Solo aplica si rol es gestor. Sin valor conserva lo que ya tenia. */
+  @IsOptional()
+  @IsBoolean()
+  registra_cualquier_dependencia?: boolean;
 }

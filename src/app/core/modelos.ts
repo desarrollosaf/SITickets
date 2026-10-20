@@ -488,6 +488,8 @@ export interface UsuarioStaff {
   dependencia: string | null;
   area: string | null;
   activo: boolean;
+  /** Solo rol gestor: registra a nombre de gente de cualquier dependencia. */
+  registra_cualquier_dependencia: boolean;
 }
 
 export interface RegistrarUsuarioForm {
@@ -502,6 +504,8 @@ export interface RegistrarUsuarioForm {
   dependencia_ids?: number[];
   /** Servicios que puede autorizar. Solo aplica si rol es validador. Vacio = sin restriccion. */
   servicio_ids_validador?: number[];
+  /** Solo aplica si rol es gestor. */
+  registra_cualquier_dependencia?: boolean;
 }
 
 /** Edicion de personal ya registrado: rfc y nombre no se tocan (vienen de saf). */
@@ -514,4 +518,6 @@ export interface ActualizarUsuarioForm {
   dependencia_ids?: number[];
   servicio_ids_validador?: number[];
   activo?: boolean;
+  /** Solo aplica si rol es gestor. Sin valor conserva lo que ya tenia. */
+  registra_cualquier_dependencia?: boolean;
 }
