@@ -16,7 +16,7 @@ import {
   Usuario,
 } from '../database/models';
 import { TrazaService } from './traza.service';
-import { fechaLocal } from '../common/fecha';
+import { fechaLocal, minutosHabiles } from '../common/fecha';
 
 /** Ventana de concentracion del escalamiento automatico (§4). */
 const VENTANA_ESCALAMIENTO_MIN = 60;
@@ -302,19 +302,24 @@ export class ReglasService {
      ------------------------------------------------------------------ */
 
   /**
-   * Tiempo que corre contra el objetivo: ciclo total menos lo que el ticket
+   * Tiempo que corre contra el objetivo: ciclo total (solo jornada laboral —
+   * lunes a viernes 9:00 a 18:30, ver minutosHabiles) menos lo que el ticket
    * paso EN ESPERA. La pausa no se le carga al tecnico porque la causa suele
-   * ser ajena (refaccion, autorizacion, usuario ausente).
+   * ser ajena (refaccion, autorizacion, usuario ausente); si cae fuera de
+   * jornada tampoco resta nada, porque el reloj ya no corria ahi de todos
+   * modos (ver reanudar() en TicketsService, que acumula la pausa ya en
+   * minutos de jornada).
    */
   static minutosActivos(t: Ticket): number {
     /* f_registro es null mientras pendiente_validacion: el SLA todavia no arranca. */
     if (!t.f_registro) return 0;
-    const fin = t.f_resolucion ? new Date(t.f_resolucion).getTime() : Date.now();
-    const ciclo = fin - new Date(t.f_registro).getTime();
-    const espera =
-      t.espera_acum_seg * 1000 +
-      (t.f_espera_desde ? Date.now() - new Date(t.f_espera_desde).getTime() : 0);
-    return Math.max(0, Math.round((ciclo - espera) / 60_000));
+    const fin = t.f_resolucion ? new Date(t.f_resolucion) : new Date();
+    const cicloHabil = minutosHabiles(new Date(t.f_registro), fin);
+    const esperaAbiertaHabil = t.f_espera_desde
+      ? minutosHabiles(new Date(t.f_espera_desde), new Date())
+      : 0;
+    const esperaMin = t.espera_acum_seg / 60 + esperaAbiertaHabil;
+    return Math.max(0, Math.round(cicloHabil - esperaMin));
   }
 
   static minutosCiclo(t: Ticket): number {
