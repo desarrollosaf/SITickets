@@ -127,6 +127,8 @@ export interface Ticket {
   min_espera: number;
   minutos_objetivo: number;
   vencido: boolean;
+  /** Solo viene en /tickets/por-validar: descripcion libre (ej. al elegir "Otro"). */
+  texto_libre?: string | null;
 }
 
 export interface SesionReloj {

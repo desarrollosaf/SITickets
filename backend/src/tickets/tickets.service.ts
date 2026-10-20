@@ -1345,7 +1345,13 @@ export class TicketsService {
     });
     const objetivos = await this.reglas.objetivos();
     const mapaDependencias = await this.mapaDependenciasSaf();
-    return filas.map((t) => this.resumen(t, objetivos, 0, mapaDependencias));
+    /* texto_libre no viene en resumen() (solo en detalle()): el validador
+       necesita verlo de una vez en la tarjeta, sin tener que abrir el
+       detalle del ticket. */
+    return filas.map((t) => ({
+      ...this.resumen(t, objetivos, 0, mapaDependencias),
+      texto_libre: t.texto_libre,
+    }));
   }
 
   /**
@@ -1468,7 +1474,7 @@ export class TicketsService {
    * inmutable) y el cambio queda en la bitacora con el antes y el despues.
    */
   async cambiarSolicitante(id: number, dto: CambiarSolicitanteDto, usuario: UsuarioToken) {
-    if (!['admin', 'operador', 'gestor'].includes(usuario.rol)) {
+    if (!['admin', 'operador', 'gestor', 'sistemas'].includes(usuario.rol)) {
       throw new ForbiddenException('Tu perfil no puede cambiar el solicitante de un ticket');
     }
     const ticket = await this.tickets.findOne({
@@ -1476,11 +1482,21 @@ export class TicketsService {
       include: [{ model: Servicio, as: 'servicio' }],
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
-    if (ESTATUS_FINALES.includes(ticket.estatus)) {
+    /*
+     * "Sistemas" es la unica excepcion: sus tickets de SISTEMAS/PROGRESS se
+     * cierran solos casi al instante (ver cierreInmediato en resolver()),
+     * asi que en la practica siempre los va a encontrar ya cerrados — sin
+     * esta excepcion nunca podria corregir un error de captura. Gestor y
+     * admin se quedan con la regla de siempre: nada de tickets cerrados.
+     */
+    if (usuario.rol !== 'sistemas' && ESTATUS_FINALES.includes(ticket.estatus)) {
       throw new BadRequestException('El ticket ya esta cerrado o cancelado: el solicitante no se cambia');
     }
 
-    if (usuario.rol === 'gestor') {
+    /* Igual que el gestor: "sistemas" (Castañeda, SISTEMAS/PROGRESS) solo
+       corrige lo que el mismo registro, no cualquier ticket de su alcance
+       (que para el es lo turnado como tecnico). */
+    if (usuario.rol === 'gestor' || usuario.rol === 'sistemas') {
       const loRegistro =
         ticket.registrado_por === usuario.id ||
         (ticket.solicitante_id === usuario.id && ticket.solicitante_nombre === usuario.nombre);
@@ -1550,11 +1566,15 @@ export class TicketsService {
         },
         { transaction: tx },
       );
+      /* Sin detalle: la accion ya dice "Cambio de solicitante" y
+         valor_antes/valor_nuevo ya pintan el "antes → nuevo" solos (ver
+         detalleBitacora() en el frontend) — mandarlo tambien en detalle
+         lo duplicaba en pantalla. */
       await this.reglas.anota(
         ticket.id,
         usuario.id,
         'Cambio de solicitante',
-        `${anterior} → ${quien.nombre}`,
+        undefined,
         tx,
         { antes: anterior.slice(0, 80), nuevo: quien.nombre.slice(0, 80) },
         usuario.nombre,

@@ -286,15 +286,22 @@ export class DetalleTicket {
   readonly puedeCorregir = computed(() => this.esMiSolicitud() || this.esAdmin());
 
   /**
-   * Cambiar a nombre de quien quedo el ticket: admin/operador, o el gestor
-   * que lo registro (a nombre de otro o a su propio nombre). Mientras siga
-   * abierto. El backend vuelve a revisar todo.
+   * Cambiar a nombre de quien quedo el ticket: admin/operador, o quien lo
+   * registro (gestor, o "sistemas" — Castañeda en SISTEMAS/PROGRESS) a
+   * nombre de otro o a su propio nombre. Mientras siga abierto — salvo
+   * "sistemas", que se cierra solo casi al instante y sin esta excepcion
+   * nunca podria corregir un error de captura. El backend vuelve a revisar
+   * todo.
    */
   readonly puedeCambiarSolicitante = computed(() => {
     const t = this.ticket();
-    if (!t || ['CERRADO', 'CANCELADO'].includes(t.estatus)) return false;
+    if (!t) return false;
+    if (this.rol() !== 'sistemas' && ['CERRADO', 'CANCELADO'].includes(t.estatus)) return false;
     if (this.esAdminUOperador()) return true;
-    return this.rol() === 'gestor' && (this.esGestorQueRegistro() || this.esMiSolicitud());
+    return (
+      ['gestor', 'sistemas'].includes(this.rol() ?? '') &&
+      (t.registrado_por === this.auth.usuario()?.id || this.esMiSolicitud())
+    );
   });
 
   /* ---- Cambiar solicitante: buscador igual al de "Registrar a nombre de" ---- */
