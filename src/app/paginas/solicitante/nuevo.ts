@@ -348,7 +348,7 @@ export class Nuevo {
     }
     this.temporizadorUsuario = setTimeout(() => {
       this.buscandoUsuario.set(true);
-      this.api.buscarSolicitantes(texto).subscribe({
+      this.api.buscarSolicitantes(texto, this.servicioId()).subscribe({
         next: (r) => {
           this.buscandoUsuario.set(false);
           this.resultadosUsuario.set(r);
@@ -411,6 +411,10 @@ export class Nuevo {
     this.limpiar();
     /* Un servicio restringido (ver puedeElegirUsuario) siempre es a nombre propio. */
     if (!this.puedeElegirUsuario()) this.usuarioElegido.set(null);
+    /* Los dados de baja solo valen para Cartas de no adeudo: al cambiar de
+       servicio se descarta la eleccion y la busqueda, que dependian de el. */
+    if (this.usuarioElegido()?.activo === false) this.usuarioElegido.set(null);
+    this.resultadosUsuario.set([]);
   }
 
   /**

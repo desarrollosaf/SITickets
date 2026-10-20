@@ -327,7 +327,7 @@ export class DetalleTicket {
     }
     this.sTemporizador = setTimeout(() => {
       this.sBuscando.set(true);
-      this.api.buscarSolicitantes(q).subscribe({
+      this.api.buscarSolicitantes(q, this.ticket()?.servicio_id).subscribe({
         next: (r) => {
           this.sBuscando.set(false);
           this.sResultados.set(r);

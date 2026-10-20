@@ -91,6 +91,13 @@ const ROLES_TECNICOS = ['tecnico', 'proveedor', 'jefe', 'sistemas'];
 /** Solicitud de toner/cartucho: aqui ademas del modelo se pide el color a cambiar. */
 const CLAVES_TONER = ['IMP-01', 'IMPA-01'];
 
+/**
+ * Servicios que se registran tambien a nombre de gente dada de baja en saf
+ * (Estado 0): la carta de no adeudo se tramita justo cuando alguien deja la
+ * institucion, asi que casi siempre ya esta inactivo.
+ */
+const SERVICIOS_ACEPTAN_BAJAS = ['CNA'];
+
 /** Lo que sigue en manos del area (el reporte los separa de resueltos y cerrados). */
 const ESTATUS_ABIERTOS_REPORTE = ['REGISTRADO', 'ASIGNADO', 'EN_ATENCION', 'EN_ESPERA'];
 
@@ -997,9 +1004,10 @@ export class TicketsService {
    */
   private async datosSaf(
     idUsuarioSaf: number,
+    incluirBajas = false,
   ): Promise<{ nombre: string; dependencia_id: number | null } | null> {
     const sUsuario = await this.sUsuarios.findByPk(idUsuarioSaf);
-    if (!sUsuario || sUsuario.Estado !== 1) return null;
+    if (!sUsuario || (!incluirBajas && sUsuario.Estado !== 1)) return null;
     return {
       nombre: sUsuario.Nombre,
       dependencia_id: sUsuario.id_Dependencia,
@@ -1039,11 +1047,14 @@ export class TicketsService {
    * activo puede ser solicitante. El gestor solo ve gente de su misma
    * dependencia (saf); admin y operador ven a todos.
    */
-  async buscarSolicitantes(q: string, usuario: UsuarioToken) {
+  async buscarSolicitantes(q: string, usuario: UsuarioToken, servicioId?: number) {
     const texto = q.trim();
     if (texto.length < 3) return [];
 
-    const where: Record<string, unknown> = { Estado: 1, Nombre: { [Op.like]: `%${texto}%` } };
+    const servicio = servicioId ? await this.serviciosM.findByPk(servicioId) : null;
+    const incluirBajas = SERVICIOS_ACEPTAN_BAJAS.includes(servicio?.clave ?? '');
+    const where: Record<string, unknown> = { Nombre: { [Op.like]: `%${texto}%` } };
+    if (!incluirBajas) where.Estado = 1;
     if (
       (usuario.rol === 'gestor' || usuario.rol === 'validador') &&
       !(await this.registraCualquierDependencia(usuario))
@@ -1066,12 +1077,14 @@ export class TicketsService {
       rfc: string;
       dependencia_id: number | null;
       dependencia: string | null;
+      activo: boolean;
     }[] = [];
     for (const s of candidatos) {
       resultado.push({
         id_usuario_saf: s.id_Usuario,
         nombre: s.Nombre,
         rfc: s.N_Usuario,
+        activo: s.Estado === 1,
         dependencia_id: s.id_Dependencia,
         dependencia: s.id_Dependencia ? (mapaDependencias.get(s.id_Dependencia) ?? null) : null,
       });
@@ -1164,7 +1177,10 @@ export class TicketsService {
           throw new ForbiddenException('Tu perfil siempre registra el ticket a tu propio nombre');
         }
       }
-      const datos = await this.datosSaf(dto.a_nombre_de);
+      const datos = await this.datosSaf(
+        dto.a_nombre_de,
+        SERVICIOS_ACEPTAN_BAJAS.includes(problema.servicio.clave),
+      );
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
 
       /* El gestor (y el validador, que ve lo mismo) solo registra a nombre de gente de su misma dependencia (saf). */
@@ -1488,7 +1504,10 @@ export class TicketsService {
     let registradoPorNombre: string | null;
 
     if (dto.a_nombre_de) {
-      const datos = await this.datosSaf(dto.a_nombre_de);
+      const datos = await this.datosSaf(
+        dto.a_nombre_de,
+        SERVICIOS_ACEPTAN_BAJAS.includes(ticket.servicio?.clave ?? ''),
+      );
       if (!datos) throw new BadRequestException('Ese usuario no existe o ya no esta activo en saf');
       if (usuario.rol === 'gestor' && !(await this.registraCualquierDependencia(usuario))) {
         const [dependenciaGestor, sUsuarioObjetivo] = await Promise.all([

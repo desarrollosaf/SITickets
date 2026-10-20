@@ -378,7 +378,10 @@
                   <div class="persona">
                     <span class="persona-avatar">{{ iniciales(u.nombre) }}</span>
                     <div class="flex-grow-1 min-w-0">
-                      <div class="fw-semibold text-truncate">{{ u.nombre }}</div>
+                      <div class="fw-semibold text-truncate">
+                        {{ u.nombre }}
+                        @if (u.activo === false) { <span class="chip chip-bandera ms-1">Dado de baja</span> }
+                      </div>
                       <div class="sub text-truncate">{{ u.rfc }} · {{ u.dependencia || 'Sin dependencia identificada' }}</div>
                     </div>
                     <button type="button" class="btn btn-outline-secondary btn-sm" (click)="quitarUsuario()">Cambiar</button>
@@ -397,7 +400,10 @@
                     <div class="lista-opciones mt-2">
                       @for (c of resultadosUsuario(); track c.id_usuario_saf) {
                         <button type="button" (click)="elegirUsuario(c)">
-                          <div class="fw-semibold" style="font-size: 0.9rem">{{ c.nombre }}</div>
+                          <div class="fw-semibold" style="font-size: 0.9rem">
+                            {{ c.nombre }}
+                            @if (c.activo === false) { <span class="chip chip-bandera ms-1">Dado de baja</span> }
+                          </div>
                           <div class="sub" style="font-size: 0.78rem">
                             {{ c.rfc }} · {{ c.dependencia || 'Sin dependencia identificada' }}
                           </div>
