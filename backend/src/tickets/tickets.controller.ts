@@ -185,8 +185,8 @@ export class TicketsController {
    * ticket o el administrador— lo decide el servicio, que es donde consta de
    * quien es el reporte.
    */
-  /** Corrige a nombre de quien quedo el ticket (admin, operador y el gestor que lo registro). */
-  @Roles('admin', 'operador', 'gestor')
+  /** Corrige a nombre de quien quedo el ticket (admin, operador, y el gestor o "sistemas" que lo registro). */
+  @Roles('admin', 'operador', 'gestor', 'sistemas')
   @HttpCode(200)
   @Post(':id/solicitante')
   solicitante(

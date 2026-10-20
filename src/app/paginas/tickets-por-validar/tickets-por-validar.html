@@ -51,6 +51,9 @@
             </div>
 
             <div class="boleto-asunto">{{ t.problema }}</div>
+            @if (t.texto_libre) {
+              <div class="boleto-dato"><i class="bi bi-card-text"></i> {{ t.texto_libre }}</div>
+            }
             <div class="boleto-datos">
               <span class="boleto-dato"><i class="bi bi-tools"></i> {{ t.servicio }}</span>
               @if (t.edificio_atencion) {
