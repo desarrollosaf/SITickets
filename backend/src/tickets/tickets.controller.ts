@@ -21,6 +21,7 @@ import { UsuarioActual, type UsuarioToken } from '../common/usuario-actual.decor
 import {
   CrearInternoDto,
   CrearTicketDto,
+  CambiarSolicitanteDto,
   DatosGeneralesDto,
   MotivoDto,
   PrioridadDto,
@@ -179,6 +180,18 @@ export class TicketsController {
    * ticket o el administrador— lo decide el servicio, que es donde consta de
    * quien es el reporte.
    */
+  /** Corrige a nombre de quien quedo el ticket (admin, operador y el gestor que lo registro). */
+  @Roles('admin', 'operador', 'gestor')
+  @HttpCode(200)
+  @Post(':id/solicitante')
+  solicitante(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarSolicitanteDto,
+    @UsuarioActual() usuario: UsuarioToken,
+  ) {
+    return this.tickets.cambiarSolicitante(id, dto, usuario);
+  }
+
   @HttpCode(200)
   @Post(':id/datos')
   datos(
