@@ -53,7 +53,7 @@ export class Tickets {
    * backend): TODOS sus tickets (ya acotados a CARTAS DE NO ADEUDO) en
    * RESUELTO esperan que ella los confirme, los haya registrado ella o no.
    */
-  private readonly USUARIOS_CIERRE_ESPECIAL = [38];
+  private readonly USUARIOS_CIERRE_ESPECIAL = [39];
   readonly esCierreEspecial = computed(() =>
     this.USUARIOS_CIERRE_ESPECIAL.includes(this.auth.usuario()?.id ?? -1),
   );

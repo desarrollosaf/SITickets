@@ -244,13 +244,15 @@ export class TicketsService {
          */
         const claveServicio = USUARIOS_FILTRO_SERVICIO_GENERADOS[usuario.id];
         if (claveServicio) {
-          /* Caso especial (ver USUARIOS_CIERRE_SERVICIO): ve todo el servicio
-             de su dependencia, lo haya registrado el o no — es quien cierra
-             esos tickets en lugar del solicitante, necesita verlos todos. */
-          const dependenciaIds = await this.dependenciasDelGestor(usuario.id);
-          if (!dependenciaIds.length) return { id: null };
+          /*
+           * Caso especial (ver USUARIOS_CIERRE_SERVICIO): ve TODO el
+           * servicio, de cualquier dependencia, lo haya registrado el o
+           * no — es quien cierra esos tickets en lugar del solicitante
+           * real, y ese servicio (Cartas de no adeudo) lo puede pedir
+           * gente de cualquier dependencia, no solo la suya.
+           */
           const servicio = await this.serviciosM.findOne({ where: { clave: claveServicio } });
-          return { dependencia_id: { [Op.in]: dependenciaIds }, servicio_id: servicio?.id ?? null };
+          return { servicio_id: servicio?.id ?? null };
         }
         return { registrado_por: usuario.id };
       }
