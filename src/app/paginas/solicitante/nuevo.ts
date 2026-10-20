@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
@@ -14,15 +15,33 @@ import {
   quitarAcentos,
   revisaCuentaCorreo,
 } from '../../core/formato';
-import type { Bien, CandidatoSaf, Catalogos, Problema } from '../../core/modelos';
+import type { Bien, CandidatoSaf, Catalogos, Problema, TicketDetalle } from '../../core/modelos';
 
 /** Lo que cabe en ticket.contexto (VARCHAR 160). */
 const LARGO_CONTEXTO = 160;
 
+/** Icono y color de cada tarjeta de servicio, por clave del catalogo. */
+const ASPECTO_SERVICIO: Record<string, { icono: string; tono: string }> = {
+  CMP: { icono: 'bi-pc-display', tono: '#2b6cb0' },
+  IMP: { icono: 'bi-printer', tono: '#6d35c9' },
+  IMPA: { icono: 'bi-printer-fill', tono: '#8e44ad' },
+  TEL: { icono: 'bi-telephone', tono: '#0f8a8a' },
+  NET: { icono: 'bi-wifi', tono: '#1f8a56' },
+  SIS: { icono: 'bi-window-stack', tono: '#d17b1f' },
+  COR: { icono: 'bi-envelope-at', tono: '#c0392b' },
+  CAM: { icono: 'bi-camera-video', tono: '#45566b' },
+  CNA: { icono: 'bi-file-earmark-check', tono: '#b8860b' },
+  CAB: { icono: 'bi-ethernet', tono: '#1d4f86' },
+  INV: { icono: 'bi-clipboard-check', tono: '#5b6b7c' },
+  MTO: { icono: 'bi-tools', tono: '#0f8a8a' },
+  CFG: { icono: 'bi-gear', tono: '#45566b' },
+};
+
 @Component({
   selector: 'app-nuevo',
-  imports: [FormsModule],
+  imports: [FormsModule, NgTemplateOutlet],
   templateUrl: './nuevo.html',
+  styleUrl: './nuevo.scss',
 })
 export class Nuevo {
   private readonly api = inject(TicketsService);
@@ -43,6 +62,72 @@ export class Nuevo {
 
   readonly dur = duracion;
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
+  readonly anio = new Date().getFullYear();
+
+  /** Ticket recien creado: con valor, la pantalla muestra el folio en vez del formulario. */
+  readonly creado = signal<TicketDetalle | null>(null);
+
+  /** El solicitante no ve prioridades (igual que en sus listas); el resto si. */
+  readonly muestraPrioridad = computed(() => this.auth.rol() !== 'solicitante');
+
+  iconoServicio(clave: string | null | undefined): string {
+    return ASPECTO_SERVICIO[clave ?? '']?.icono ?? 'bi-life-preserver';
+  }
+
+  tonoServicio(clave: string | null | undefined): string {
+    return ASPECTO_SERVICIO[clave ?? '']?.tono ?? '#2b6cb0';
+  }
+
+  iniciales(nombre: string): string {
+    return nombre
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join('')
+      .toUpperCase();
+  }
+
+  /** Desplegable de problemas: abierto o cerrado. */
+  readonly listaProblemas = signal(false);
+
+  alternarListaProblemas() {
+    this.listaProblemas.update((a) => !a);
+  }
+
+  elegirProblema(clave: string) {
+    this.cambiaProblema(clave);
+    this.listaProblemas.set(false);
+  }
+
+  /** Clic en cualquier parte fuera del desplegable lo cierra (el desplegable detiene su propio clic). */
+  @HostListener('document:click')
+  cerrarListaProblemas() {
+    this.listaProblemas.set(false);
+  }
+
+  /** Muestra del color en los botones de toner. */
+  readonly muestraColor: Record<string, string> = {
+    Negro: '#1b2434',
+    Cyan: '#00aeef',
+    Magenta: '#ec008c',
+    Amarillo: '#ffd400',
+  };
+
+  /** "Limpiar" pide un segundo clic: borra todo y esta junto a "Registrar". */
+  readonly confirmarLimpiar = signal(false);
+  private temporizadorLimpiar: ReturnType<typeof setTimeout> | null = null;
+
+  pedirLimpiar() {
+    if (this.confirmarLimpiar()) {
+      this.confirmarLimpiar.set(false);
+      this.limpiarFormulario();
+      return;
+    }
+    this.confirmarLimpiar.set(true);
+    if (this.temporizadorLimpiar) clearTimeout(this.temporizadorLimpiar);
+    this.temporizadorLimpiar = setTimeout(() => this.confirmarLimpiar.set(false), 3000);
+  }
 
   /** Dominio que exige el backend. Viaja en los catalogos. */
   readonly dominio = computed(() => this.catalogos()?.correo_dominio ?? '');
@@ -309,6 +394,17 @@ export class Nuevo {
     });
   }
 
+  /** Tarjeta de servicio: la elige y baja al paso del problema. */
+  /** Con servicio elegido el paso 1 se reduce a una linea; "Cambiar" vuelve a mostrar las tarjetas. */
+  readonly cambiandoServicio = signal(false);
+
+  elegirServicio(id: number) {
+    this.cambiandoServicio.set(false);
+    if (this.servicioId() === id) return;
+    this.cambiaServicio(String(id));
+    this.listaProblemas.set(false);
+  }
+
   cambiaServicio(valor: string) {
     this.servicioId.set(valor ? Number(valor) : null);
     this.claveProblema.set('');
@@ -392,7 +488,16 @@ export class Nuevo {
     this.extension = this.auth.usuario()?.extension ?? '';
     this.edificioAtencion = '';
     this.error.set('');
+    this.cambiandoServicio.set(false);
     this.limpiar();
+  }
+
+  /** Desde la pantalla de exito: formulario en blanco para otro reporte. */
+  registrarOtro() {
+    this.creado.set(null);
+    this.usuarioElegido.set(null);
+    this.limpiarFormulario();
+    window.scrollTo({ top: 0 });
   }
 
   regresar() {
@@ -467,9 +572,10 @@ export class Nuevo {
           : undefined,
       })
       .subscribe({
-        next: () => {
+        next: (t) => {
           this.guardando.set(false);
-          void this.router.navigate(['/mis-tickets']);
+          this.creado.set(t);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         error: (e) => {
           this.guardando.set(false);
