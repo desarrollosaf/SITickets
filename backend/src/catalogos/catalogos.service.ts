@@ -41,7 +41,7 @@ export const RFC_SIEMPRE_A_NOMBRE_PROPIO = ['TOMJ820727', 'NATL830315'];
  * como tecnico normal via ROLES_TECNICOS en tickets.service.ts.
  */
 export const USUARIOS_FILTRO_SERVICIO_GENERADOS: Record<number, string> = {
-  38: 'CNA', // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
+  39: 'CNA', // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
 };
 
 /**
@@ -51,7 +51,7 @@ export const USUARIOS_FILTRO_SERVICIO_GENERADOS: Record<number, string> = {
  * id local de quien cierra.
  */
 export const USUARIOS_CIERRE_SERVICIO: Record<string, number> = {
-  CNA: 38, // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
+  CNA: 39, // SALGADO SEGURA ANGELICA MARIBEL (SASA920502) -> CARTAS DE NO ADEUDO
 };
 
 /**

@@ -168,7 +168,7 @@ export class DetalleTicket {
    * en el backend): esta persona reemplaza al solicitante real para
    * confirmar/rechazar/reabrir el ticket — no se suma a el, lo sustituye.
    */
-  private readonly USUARIOS_CIERRE_SERVICIO: Record<string, number> = { CNA: 38 };
+  private readonly USUARIOS_CIERRE_SERVICIO: Record<string, number> = { CNA: 39 };
   /** true si el servicio de este ticket tiene encargado especial (reemplaza al solicitante, no se suma). */
   readonly tieneCierreEspecial = computed(() => {
     const clave = this.ticket()?.servicio_clave;
