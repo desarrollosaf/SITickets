@@ -113,7 +113,7 @@ function estatusLegible(t: Ticket): string {
       EN_ATENCION: 'En atención',
       EN_ESPERA: 'En espera',
       RESUELTO: 'Resuelto',
-      CERRADO: 'Validado / cerrado',
+      CERRADO: 'Cerrado por el usuario',
       CANCELADO: 'Cancelado',
     }[t.estatus] ?? t.estatus
   );
@@ -540,7 +540,8 @@ export class TicketsService {
       { header: 'Total', key: 'total', width: 9 },
       { header: 'Abiertos', key: 'abiertos', width: 10 },
       { header: 'Resueltos (por confirmar)', key: 'resueltos', width: 14 },
-      { header: 'Cerrados', key: 'cerrados', width: 10 },
+      { header: 'Cerrados (usuario)', key: 'cerrados_usuario', width: 15 },
+      { header: 'Cerrados (omisión)', key: 'cerrados_omision', width: 15 },
       { header: 'Cancelados', key: 'cancelados', width: 11 },
       { header: 'Abiertos vencidos', key: 'vencidos', width: 11 },
       { header: '% resueltos en tiempo', key: 'pct', width: 13 },
@@ -558,7 +559,8 @@ export class TicketsService {
         total: lista.length,
         abiertos: lista.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
         resueltos: lista.filter((t) => t.estatus === 'RESUELTO').length,
-        cerrados: lista.filter((t) => t.estatus === 'CERRADO').length,
+        cerrados_usuario: lista.filter((t) => t.estatus === 'CERRADO' && !t.cierre_por_omision).length,
+        cerrados_omision: lista.filter((t) => t.estatus === 'CERRADO' && t.cierre_por_omision).length,
         cancelados: lista.filter((t) => t.estatus === 'CANCELADO').length,
         vencidos: lista.filter(vencidoAbierto).length,
         pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
@@ -723,7 +725,10 @@ export class TicketsService {
     let finalizadosHoy = 0;
 
     for (const t of filas) {
-      porEstatus.set(t.estatus, (porEstatus.get(t.estatus) ?? 0) + 1);
+      /* Mismo criterio que la pestaña de /tickets: CERRADO se separa segun quien lo cerro. */
+      const claveEstatus =
+        t.estatus === 'CERRADO' ? (t.cierre_por_omision ? 'CERRADO_OMISION' : 'CERRADO_USUARIO') : t.estatus;
+      porEstatus.set(claveEstatus, (porEstatus.get(claveEstatus) ?? 0) + 1);
       porPrioridad.set(t.prioridad, (porPrioridad.get(t.prioridad) ?? 0) + 1);
       const servicio = t.servicio?.nombre ?? 'Sin clasificar';
       porServicio.set(servicio, (porServicio.get(servicio) ?? 0) + 1);
@@ -745,6 +750,23 @@ export class TicketsService {
     const aOrdenado = (m: Map<string, number>) =>
       [...m.entries()].sort((a, b) => b[1] - a[1]).map(([clave, total]) => ({ clave, total }));
 
+    /* Para estatus no tiene caso ordenar por cantidad: la grafica debe leerse
+       en el orden del ciclo de vida del ticket, no saltando segun quien tiene
+       mas. */
+    const ORDEN_ESTATUS = [
+      'REGISTRADO',
+      'ASIGNADO',
+      'EN_ATENCION',
+      'EN_ESPERA',
+      'RESUELTO',
+      'CERRADO_USUARIO',
+      'CERRADO_OMISION',
+      'CANCELADO',
+    ];
+    const porEstatusOrdenado = [...porEstatus.entries()]
+      .sort((a, b) => ORDEN_ESTATUS.indexOf(a[0]) - ORDEN_ESTATUS.indexOf(b[0]))
+      .map(([clave, total]) => ({ clave, total }));
+
     return {
       total: filas.length,
       vencidos,
@@ -757,7 +779,7 @@ export class TicketsService {
       cerrados_hoy: cerradosHoy,
       fuera_de_tiempo: vencidos,
       finalizados_hoy: finalizadosHoy,
-      por_estatus: aOrdenado(porEstatus),
+      por_estatus: porEstatusOrdenado,
       por_prioridad: aOrdenado(porPrioridad),
       por_servicio: aOrdenado(porServicio),
       tendencia_mensual: [...porMes.entries()]
