@@ -22,15 +22,18 @@ const PESTANAS = [
   { clave: 'EN_ATENCION', texto: 'En atención', icono: 'bi-tools', tono: '#0f8a8a' },
   { clave: 'EN_ESPERA', texto: 'En espera', icono: 'bi-pause-circle', tono: '#d17b1f' },
   { clave: 'RESUELTO', texto: 'Resuelto', icono: 'bi-hourglass-split', tono: '#6d35c9' },
-  { clave: 'CERRADO', texto: 'Cerrado', icono: 'bi-check2-circle', tono: '#1f8a56' },
+  { clave: 'CERRADO_USUARIO', texto: 'Cerrado (usuario)', icono: 'bi-check2-circle', tono: '#1f8a56' },
+  { clave: 'CERRADO_OMISION', texto: 'Cerrado (omisión)', icono: 'bi-clock-history', tono: '#5e8a6e' },
   { clave: 'CANCELADO', texto: 'Cancelado', icono: 'bi-x-circle', tono: '#77808c' },
 ] as const;
 
 type Pestana = (typeof PESTANAS)[number]['clave'];
 
-/** Misma regla que el chip de estatus: si esta en cola, cuenta como "En cola". */
+/** Misma regla que el chip de estatus: si esta en cola, cuenta como "En cola". CERRADO se separa segun quien lo cerro. */
 function pestanaDe(t: Ticket): Pestana {
-  return t.en_cola ? 'EN_COLA' : (t.estatus as Pestana);
+  if (t.en_cola) return 'EN_COLA';
+  if (t.estatus === 'CERRADO') return t.cierre_por_omision ? 'CERRADO_OMISION' : 'CERRADO_USUARIO';
+  return t.estatus as Pestana;
 }
 
 @Component({

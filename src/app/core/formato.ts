@@ -45,7 +45,7 @@ const NOMBRE_ESTATUS: Record<string, string> = {
   EN_ATENCION: 'En atención',
   EN_ESPERA: 'En espera',
   RESUELTO: 'Resuelto',
-  CERRADO: 'Validado / cerrado',
+  CERRADO: 'Cerrado por el usuario',
   CANCELADO: 'Cancelado',
 };
 
