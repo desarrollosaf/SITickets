@@ -921,6 +921,10 @@ export class TicketsService {
       area_id: t.area_id,
       extension: t.extension,
       edificio_atencion: t.edificio_atencion,
+      inmueble_id: t.inmueble_id,
+      piso: t.piso,
+      /** Solo servicio CNA: dia y hora en que el tecnico puede ir a revisar los bienes. */
+      hora_atencion: t.hora_atencion,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
       tecnico: t.tecnico?.nombre ?? null,
@@ -1154,6 +1158,9 @@ export class TicketsService {
     if (problema.clave === 'IMPA-09' && !dto.modelo_traslado?.trim()) {
       throw new BadRequestException('Indica que modelo de impresora se va a trasladar');
     }
+    if (problema.servicio.clave === 'CNA' && !dto.hora_atencion) {
+      throw new BadRequestException('Indica el dia y la hora en que el tecnico puede ir a revisar los bienes');
+    }
 
     /* El campo adicional del catalogo. Si pide cuenta de correo se valida aqui
        con la misma regla que la correccion de datos generales. */
@@ -1269,6 +1276,9 @@ export class TicketsService {
           sede_id: quien.sede_id,
           extension: dto.extension?.trim() || quien.extension,
           edificio_atencion: dto.edificio_atencion?.trim() || null,
+          inmueble_id: dto.inmueble_id ?? null,
+          piso: dto.piso?.trim() || null,
+          hora_atencion: problema.servicio.clave === 'CNA' ? new Date(dto.hora_atencion!) : null,
           contexto,
           color_toner: CLAVES_TONER.includes(problema.clave) ? dto.color_toner!.trim() : null,
           modelo_traslado: problema.clave === 'IMPA-09' ? dto.modelo_traslado!.trim() : null,

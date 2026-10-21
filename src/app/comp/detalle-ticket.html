@@ -733,6 +733,16 @@
               <dd class="col-7">{{ t.edificio_atencion }}</dd>
             }
 
+            @if (t.piso) {
+              <dt class="col-5 sub fw-normal">Piso / oficina</dt>
+              <dd class="col-7">{{ t.piso }}</dd>
+            }
+
+            @if (t.hora_atencion) {
+              <dt class="col-5 sub fw-normal">Hora de atención</dt>
+              <dd class="col-7">{{ fmt(t.hora_atencion) }}</dd>
+            }
+
             @if (!t.interno) {
               <dt class="col-5 sub fw-normal">Dependencia</dt>
               <dd class="col-7">{{ t.dependencia_saf || '—' }}</dd>

@@ -8,6 +8,7 @@ import {
   CatalogoProblema,
   CatalogoRol,
   Estatus,
+  Inmueble,
   MotivoReasignacion,
   Prioridad,
   Sede,
@@ -84,6 +85,7 @@ export class CatalogosService {
     @InjectModel(MotivoReasignacion) private readonly motivos: typeof MotivoReasignacion,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
+    @InjectModel(Inmueble) private readonly inmuebles: typeof Inmueble,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidos: typeof ServicioUsuarioPermitido,
@@ -115,7 +117,7 @@ export class CatalogosService {
   }
 
   async todo(usuario: UsuarioToken) {
-    const [servicios, problemas, prioridades, estatus, motivos, sedes] = await Promise.all([
+    const [servicios, problemas, prioridades, estatus, motivos, sedes, inmuebles] = await Promise.all([
       this.servicios.findAll({
         where: { activo: true },
         order: [
@@ -128,6 +130,7 @@ export class CatalogosService {
       this.estatus.findAll({ order: [['orden', 'ASC']] }),
       this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
       this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
+      this.inmuebles.findAll({ where: { activo: true }, order: [['dependencia', 'ASC']] }),
     ]);
     /*
      * El dominio viaja con los catalogos para que el formulario valide la
@@ -171,6 +174,7 @@ export class CatalogosService {
       estatus,
       motivos,
       sedes,
+      inmuebles,
       correo_dominio,
     };
   }

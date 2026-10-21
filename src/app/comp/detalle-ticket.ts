@@ -211,6 +211,7 @@ export class DetalleTicket {
       /** Solo cuando el problema elegido es «Otro»: ahi el detalle real va en texto_libre, no en contexto. */
       t.texto_libre ? `Descripción: ${t.texto_libre}` : null,
       t.edificio_atencion ? `Edificio o ubicación: ${t.edificio_atencion}` : null,
+      t.piso ? `Piso / oficina: ${t.piso}` : null,
       /** Siempre al final. */
       `Departamento/área: ${t.departamento_saf || '—'}`,
     ].filter((l): l is string => !!l);

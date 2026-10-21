@@ -144,7 +144,7 @@
           }
 
           @if (problema(); as p) {
-            @if (esTrasladoImpa() || p.campo_adicional || esColorToner() || p.requiere_texto) {
+            @if (esTrasladoImpa() || p.campo_adicional || esColorToner() || p.requiere_texto || esCna()) {
               <div class="detalles">
                 <div class="detalles-titulo"><i class="bi bi-info-circle"></i> Completa estos datos</div>
 
@@ -181,6 +181,30 @@
                              placeholder="Modelo de impresora" />
                       <div class="form-text">No se pudo consultar el catálogo de modelos. Captúralo a mano.</div>
                     }
+                  </div>
+                }
+
+                @if (esCna()) {
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold" for="n-cna-fecha">Día de atención</label>
+                      <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-calendar-event"></i></span>
+                        <input id="n-cna-fecha" type="date" class="form-control" [(ngModel)]="fechaAtencion"
+                               name="fechaAtencion" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small fw-semibold" for="n-cna-hora">Hora de atención</label>
+                      <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-clock"></i></span>
+                        <input id="n-cna-hora" type="time" class="form-control" [(ngModel)]="horaAtencion"
+                               name="horaAtencion" />
+                      </div>
+                    </div>
+                    <div class="form-text">
+                      ¿En qué día y horario puede ir el técnico a revisar los bienes? Solo horario laboral.
+                    </div>
                   </div>
                 }
 
@@ -372,7 +396,7 @@
 
           <div class="row g-3">
             @if (puedeElegirUsuario()) {
-              <div class="col-md-8 col-xxl-5">
+              <div class="col-md-6">
                 <label class="form-label small fw-semibold" for="n-buscar">Registrar a nombre de</label>
                 @if (usuarioElegido(); as u) {
                   <div class="persona">
@@ -418,7 +442,7 @@
                 }
               </div>
             } @else {
-              <div class="col-md-8 col-xxl-5">
+              <div class="col-md-6">
                 <span class="form-label small fw-semibold d-block">Servidor público</span>
                 <div class="persona">
                   <span class="persona-avatar">{{ iniciales(auth.usuario()?.nombre ?? '') }}</span>
@@ -429,7 +453,7 @@
                 </div>
               </div>
             }
-            <div class="col-md-4 col-xxl-2">
+            <div class="col-md-6">
               <label class="form-label small fw-semibold" for="n-ext">Extensión</label>
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-telephone"></i></span>
@@ -438,14 +462,28 @@
                        title="Precargada de tu perfil" />
               </div>
             </div>
-            <div class="col-12 col-xxl-5">
+            <div class="col-md-6">
               <label class="form-label small fw-semibold" for="n-edificio">
-                Edificio o ubicación donde se atenderá <span class="sub fw-normal">(opcional)</span>
+                Edificio o ubicación donde se atenderá
               </label>
               <div class="input-group">
                 <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
-                <input id="n-edificio" class="form-control" [(ngModel)]="edificioAtencion" name="edificioAtencion"
-                       maxlength="160" placeholder="Edificio, piso, oficina…" />
+                <select id="n-edificio" class="form-select" [(ngModel)]="inmuebleId" name="inmuebleId" required>
+                  <option value="">Elige un inmueble…</option>
+                  @for (i of catalogos()?.inmuebles; track i.id) {
+                    <option [value]="i.id">{{ i.dependencia }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold" for="n-piso">
+                Piso / oficina <span class="sub fw-normal">(opcional)</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-building"></i></span>
+                <input id="n-piso" class="form-control" [(ngModel)]="piso" name="piso"
+                       maxlength="60" placeholder="Ej. Planta baja" />
               </div>
             </div>
           </div>
@@ -511,8 +549,9 @@
             @if (esColorToner() && coloresElegidos.length) {
               <div class="previa-dato"><i class="bi bi-droplet"></i> {{ coloresElegidos.join(', ') }}</div>
             }
-            <div class="previa-dato" [class.vacio]="!edificioAtencion.trim()">
-              <i class="bi bi-geo-alt"></i> {{ edificioAtencion.trim() || 'Ubicación (opcional)' }}
+            <div class="previa-dato" [class.vacio]="!edificioAtencion()">
+              <i class="bi bi-geo-alt"></i>
+              {{ edificioAtencion() || 'Ubicación' }}{{ piso.trim() ? ', ' + piso.trim() : '' }}
             </div>
           </div>
           <div class="previa-talon">
