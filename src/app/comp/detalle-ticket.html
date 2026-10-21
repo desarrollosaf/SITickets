@@ -351,6 +351,16 @@
                 <label class="form-label small fw-semibold" for="fm-ref">Refacciones o insumos</label>
                 <input id="fm-ref" class="form-control form-control-sm mb-2" [(ngModel)]="refacciones"
                        name="refacciones" placeholder="Ninguna, o descripción y cantidad" />
+                @if (esImpa()) {
+                  <label class="form-label small fw-semibold" for="fm-tec-ext">Técnico que atendió</label>
+                  <select id="fm-tec-ext" class="form-select form-select-sm mb-2" [(ngModel)]="tecnicoExternoId"
+                          name="tecnicoExternoId">
+                    <option value="">Selecciona…</option>
+                    @for (tx of catalogos()?.tecnicos_externos; track tx.id) {
+                      <option [value]="tx.id">{{ tx.nombre }}</option>
+                    }
+                  </select>
+                }
               }
               <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
@@ -902,6 +912,10 @@
                 <dd class="col-7">{{ t.solucion }}</dd>
                 <dt class="col-5 sub fw-normal">Refacciones</dt>
                 <dd class="col-7">{{ t.refacciones || 'Ninguna' }}</dd>
+              }
+              @if (t.tecnico_externo) {
+                <dt class="col-5 sub fw-normal">Técnico que atendió</dt>
+                <dd class="col-7">{{ t.tecnico_externo }}</dd>
               }
               <dt class="col-5 sub fw-normal">Resuelto</dt>
               <dd class="col-7">{{ fmt(t.f_resolucion) }}</dd>

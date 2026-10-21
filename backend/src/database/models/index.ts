@@ -13,6 +13,7 @@ import {
   Servicio,
   ServicioUsuarioPermitido,
   ServicioValidador,
+  TecnicoExterno,
   TecnicoServicio,
   Usuario,
 } from './catalogos.model';
@@ -39,6 +40,7 @@ export const MODELOS = [
   Dependencia,
   Sede,
   Inmueble,
+  TecnicoExterno,
   Area,
   Usuario,
   CatalogoRol,

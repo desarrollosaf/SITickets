@@ -13,6 +13,7 @@ import {
   ServicioUsuarioPermitido,
   SDependencia,
   SUsuario,
+  TecnicoExterno,
   TecnicoServicio,
   Usuario,
 } from '../database/models';
@@ -31,6 +32,7 @@ import { CatalogosService } from './catalogos.service';
       Area,
       Sede,
       Inmueble,
+      TecnicoExterno,
       Usuario,
       TecnicoServicio,
       CatalogoRol,

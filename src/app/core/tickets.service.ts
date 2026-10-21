@@ -21,6 +21,7 @@ import type {
   Servicio,
   Tablero,
   Tecnico,
+  TecnicoExterno,
   Ticket,
   TicketAtendidoCmp,
   TicketDetalle,
@@ -210,6 +211,8 @@ export class TicketsService {
       /** Solo servicio CNA (Cartas de no adeudo), en vez de diagnostico/solucion. */
       revision?: 'completa' | 'incompleta';
       observaciones?: string;
+      /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio. */
+      tecnico_externo_id?: number;
     },
   ) {
     return this.accion(id, 'resolver', d);
@@ -411,6 +414,18 @@ export class TicketsService {
   /** Captura/corrige las coordenadas (sede) del inmueble, para el geofencing del reloj (§16). */
   capturarSedeInmueble(id: number, datos: { latitud: number; longitud: number; radio_m?: number }) {
     return this.http.patch<InmuebleAdmin>(`${API}/catalogos/inmuebles/${id}/sede`, datos);
+  }
+
+  /* ---------------- catalogo de tecnicos externos (IMPA) ---------------- */
+
+  tecnicosExternosAdmin() {
+    return this.http.get<TecnicoExterno[]>(`${API}/catalogos/tecnicos-externos/admin`);
+  }
+  crearTecnicoExterno(datos: { nombre: string }) {
+    return this.http.post<TecnicoExterno>(`${API}/catalogos/tecnicos-externos`, datos);
+  }
+  actualizarTecnicoExterno(id: number, datos: Partial<{ nombre: string; activo: boolean }>) {
+    return this.http.patch<TecnicoExterno>(`${API}/catalogos/tecnicos-externos/${id}`, datos);
   }
 
   monitor() {

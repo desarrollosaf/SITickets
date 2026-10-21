@@ -121,6 +121,8 @@ export class DetalleTicket {
   /** Solo servicio CNA (Cartas de no adeudo): revision de los bienes del solicitante, en vez de diagnostico/solucion. */
   revisionBienes: 'completa' | 'incompleta' | '' = '';
   observacionesRevision = '';
+  /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio. */
+  tecnicoExternoId = '';
   nota = '';
   tecnicoDestino: number | null = null;
   problemaDestino = '';
@@ -134,6 +136,10 @@ export class DetalleTicket {
   constructor() {
     effect(() => {
       const id = this.ticketId();
+      /* Un formulario abierto (p. ej. "Marcar resuelto") sin enviar no debe
+         sobrevivir a cerrar el panel o cambiar de ticket: si no, reaparece
+         en el siguiente ticket que se abra, sin importar su estatus real. */
+      this.formulario.set(null);
       if (id === null) {
         this.ticket.set(null);
         return;
@@ -163,6 +169,8 @@ export class DetalleTicket {
   readonly esRevisionBienes = computed(() => this.ticket()?.servicio_clave === 'CNA');
   /** Servicio SIS (SISTEMAS/PROGRESS): al resolver, el ticket cierra de una vez, sin pasar por RESUELTO. */
   readonly esCierreInmediato = computed(() => this.ticket()?.servicio_clave === 'SIS');
+  /** Servicio IMPA (impresoras arrendadas): al resolver, ademas se elige que tecnico del proveedor atendio. */
+  readonly esImpa = computed(() => this.ticket()?.servicio_clave === 'IMPA');
   /**
    * Caso especial, solo para el servicio indicado (ver USUARIOS_CIERRE_SERVICIO
    * en el backend): esta persona reemplaza al solicitante real para
@@ -429,6 +437,7 @@ export class DetalleTicket {
     this.refacciones = '';
     this.revisionBienes = '';
     this.observacionesRevision = '';
+    this.tecnicoExternoId = '';
     this.nota = '';
     this.tecnicoDestino = null;
     this.problemaDestino = '';
@@ -590,6 +599,10 @@ export class DetalleTicket {
         return;
       }
     }
+    if (this.esImpa() && !this.tecnicoExternoId) {
+      this.error.set('Indica qué técnico atendió el ticket.');
+      return;
+    }
     this.error.set('');
     this.ocupado.set(true);
     this.api
@@ -599,6 +612,7 @@ export class DetalleTicket {
         refacciones: this.esRevisionBienes() ? undefined : this.refacciones || undefined,
         revision: this.esRevisionBienes() ? (this.revisionBienes as 'completa' | 'incompleta') : undefined,
         observaciones: this.esRevisionBienes() ? this.observacionesRevision.trim() || undefined : undefined,
+        tecnico_externo_id: this.esImpa() ? Number(this.tecnicoExternoId) : undefined,
       })
       .subscribe({ next: (t) => this.aplicar(t), error: (e) => this.falla(e) });
   }

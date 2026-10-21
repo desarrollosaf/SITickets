@@ -199,6 +199,12 @@ export class ResolverDto {
   @IsString()
   @MaxLength(400)
   observaciones?: string;
+
+  /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio. */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  tecnico_externo_id?: number;
 }
 
 export class ReasignarDto {

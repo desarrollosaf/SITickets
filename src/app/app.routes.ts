@@ -120,6 +120,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalogo-tecnicos-externos',
+        canActivate: [guardRol('admin')],
+        loadComponent: () =>
+          import('./paginas/catalogo-tecnicos-externos/catalogo-tecnicos-externos').then(
+            (m) => m.CatalogoTecnicosExternos,
+          ),
+      },
+      {
         path: 'prioridades',
         canActivate: [guardRol('admin')],
         loadComponent: () =>
