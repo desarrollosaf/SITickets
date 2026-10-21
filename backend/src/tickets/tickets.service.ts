@@ -18,6 +18,7 @@ import {
   ESTATUS,
   ESTATUS_FINALES,
   EstatusClave,
+  Inmueble,
   SDependencia,
   SDepartamento,
   SDireccion,
@@ -140,6 +141,7 @@ export class TicketsService {
     @InjectModel(Servicio) private readonly serviciosM: typeof Servicio,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
+    @InjectModel(Inmueble) private readonly inmuebles: typeof Inmueble,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
     @InjectModel(DependenciaValidador)
@@ -1248,6 +1250,16 @@ export class TicketsService {
       !!quien.dependencia_id &&
       (await this.dependenciaValidador.count({ where: { dependencia_id: quien.dependencia_id } })) > 0;
 
+    /*
+     * §16 el inmueble que el usuario eligio al registrar es mas preciso que
+     * el area del solicitante para saber donde va a estar el tecnico: si
+     * tiene sede capturada, manda sobre la que resolvio resolverQuien().
+     */
+    const sedeId = dto.inmueble_id
+      ? ((await this.inmuebles.findByPk(dto.inmueble_id, { attributes: ['sede_id'] }))?.sede_id ??
+        quien.sede_id)
+      : quien.sede_id;
+
     const ticket = await this.db.transaction(async (tx) => {
       /*
        * El folio por servicio (TK/CMP/N, TK/TEL/N…) se asigna hasta que el
@@ -1273,7 +1285,7 @@ export class TicketsService {
           registrado_por_nombre: registradoPorNombre,
           dependencia_id: quien.dependencia_id,
           area_id: quien.area_id,
-          sede_id: quien.sede_id,
+          sede_id: sedeId,
           extension: dto.extension?.trim() || quien.extension,
           edificio_atencion: dto.edificio_atencion?.trim() || null,
           inmueble_id: dto.inmueble_id ?? null,

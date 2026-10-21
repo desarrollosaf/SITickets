@@ -8,6 +8,7 @@ import type {
   CandidatoSaf,
   Catalogos,
   Geo,
+  InmuebleAdmin,
   LineaTraza,
   Monitor,
   NivelToner,
@@ -386,6 +387,32 @@ export class TicketsService {
   actualizarRol(id: number, datos: Partial<{ nombre: string; activo: boolean }>) {
     return this.http.patch<RolCatalogo>(`${API}/catalogos/roles/${id}`, datos);
   }
+
+  /* ---------------- catalogo de inmuebles ---------------- */
+
+  inmueblesAdmin() {
+    return this.http.get<InmuebleAdmin[]>(`${API}/catalogos/inmuebles/admin`);
+  }
+  crearInmueble(datos: { dependencia: string; ubicacion: string; propiedad: 'propio' | 'renta'; tipo: string }) {
+    return this.http.post<InmuebleAdmin>(`${API}/catalogos/inmuebles`, datos);
+  }
+  actualizarInmueble(
+    id: number,
+    datos: Partial<{
+      dependencia: string;
+      ubicacion: string;
+      propiedad: 'propio' | 'renta';
+      tipo: string;
+      activo: boolean;
+    }>,
+  ) {
+    return this.http.patch<InmuebleAdmin>(`${API}/catalogos/inmuebles/${id}`, datos);
+  }
+  /** Captura/corrige las coordenadas (sede) del inmueble, para el geofencing del reloj (§16). */
+  capturarSedeInmueble(id: number, datos: { latitud: number; longitud: number; radio_m?: number }) {
+    return this.http.patch<InmuebleAdmin>(`${API}/catalogos/inmuebles/${id}/sede`, datos);
+  }
+
   monitor() {
     return this.http.get<Monitor>(`${API}/monitor`);
   }

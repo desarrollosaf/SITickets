@@ -7,6 +7,7 @@ import {
   Dependencia,
   DependenciaValidador,
   FolioSerie,
+  Inmueble,
   Prioridad,
   SDependencia,
   SDepartamento,
@@ -55,6 +56,7 @@ import { ImpresorasModule } from '../impresoras/impresoras.module';
       CalendarioTecnico,
       FolioSerie,
       Prioridad,
+      Inmueble,
     ]),
     SequelizeModule.forFeature(
       [SUsuario, SDependencia, SDireccion, SDepartamento, SUbicacion, SUbicacionDepartamento],

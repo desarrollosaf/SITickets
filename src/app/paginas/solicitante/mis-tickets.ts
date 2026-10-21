@@ -147,8 +147,13 @@ export class MisTickets {
   readonly abierto = signal<number | null>(null);
   readonly error = signal('');
   readonly fmt = fecha;
-  /** Aqui todo lo que esta en pantalla ya es del visitante: siempre le toca confirmar. */
-  readonly todosConfirman = (_t: Ticket) => true;
+  /**
+   * Aqui todo lo que esta en pantalla ya es del visitante: siempre le toca
+   * confirmar, salvo dependencia_id 3 (OSFEM, id de saf): ahi no se le pide
+   * confirmar — misma dinamica que los botones "Si/No quedo resuelto" del
+   * detalle del ticket (ver detalle-ticket.html).
+   */
+  readonly todosConfirman = (t: Ticket) => t.dependencia_id !== 3;
 
   /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
   readonly enValidacion = signal<TicketPorValidar[]>([]);

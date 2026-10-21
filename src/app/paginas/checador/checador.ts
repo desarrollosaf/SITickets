@@ -36,8 +36,13 @@ export class Checador {
   }
 
   private async registrarLlegada() {
-    /* La ubicacion nunca detiene el reloj: si no llega, se guarda el motivo. */
+    /* Solo se bloquea si el tecnico nego el permiso: mala señal o timeout no detienen el reloj. */
     const geo = await ubicacionActual();
+    if (geo.permiso_denegado) {
+      this.cargando.set(false);
+      this.error.set('Necesitas dar permiso de ubicación en el navegador para iniciar el reloj.');
+      return;
+    }
     this.api.relojInicio(this.ticketId, geo).subscribe({
       next: () => {
         this.cargando.set(false);

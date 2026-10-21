@@ -1,0 +1,216 @@
+<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Catálogo de inmuebles</h1>
+    <p class="sub mb-0">
+      Edificios propios y arrendados que aparecen al registrar un ticket. Cada uno puede tener
+      coordenadas capturadas, que es lo que usa el reloj checador para confirmar que el técnico
+      llegó al sitio.
+    </p>
+  </div>
+  <button class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+    <i class="bi bi-plus-lg"></i> Nuevo inmueble
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
+}
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 mb-2">
+  <div class="input-group input-group-sm" style="max-width: 320px">
+    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+    <input class="form-control" [(ngModel)]="busqueda" name="busqueda"
+           placeholder="Buscar por nombre, dirección o tipo…" />
+  </div>
+  <div class="sub small d-flex align-items-center gap-3">
+    <span>{{ inmuebles().length }} inmuebles</span>
+    @if (sinCoordenadas()) {
+      <span class="text-warning-emphasis">
+        <i class="bi bi-exclamation-triangle"></i> {{ sinCoordenadas() }} sin coordenadas
+      </span>
+    }
+  </div>
+</div>
+
+<div class="tarjeta mb-3 overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr class="sub">
+          <th>Inmueble</th>
+          <th style="width: 110px">Tipo</th>
+          <th style="width: 100px">Régimen</th>
+          <th style="width: 140px">Coordenadas</th>
+          <th style="width: 90px">Estado</th>
+          <th style="width: 150px" class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (i of filtrados(); track i.id) {
+          <tr [class.text-muted]="!i.activo" [class.opacity-75]="!i.activo">
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <span class="d-inline-flex align-items-center justify-content-center flex-shrink-0 rounded-circle bg-light text-secondary"
+                      style="width: 34px; height: 34px">
+                  <i class="bi" [class]="iconoTipo(i.tipo)"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="fw-semibold">{{ i.dependencia }}</div>
+                  <div class="sub small">{{ i.ubicacion }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="small">{{ i.tipo }}</td>
+            <td>
+              <span class="badge rounded-pill"
+                    [class.text-bg-info-subtle]="i.propiedad === 'propio'"
+                    [class.text-info-emphasis]="i.propiedad === 'propio'"
+                    [class.text-bg-light]="i.propiedad === 'renta'">
+                {{ i.propiedad === 'propio' ? 'Propio' : 'Renta' }}
+              </span>
+            </td>
+            <td>
+              @if (i.sede) {
+                <span class="badge rounded-pill text-bg-success-subtle text-success-emphasis">
+                  <i class="bi bi-geo-alt-fill"></i> Capturadas
+                </span>
+              } @else {
+                <span class="badge rounded-pill text-bg-warning-subtle text-warning-emphasis">
+                  <i class="bi bi-geo-alt"></i> Sin capturar
+                </span>
+              }
+            </td>
+            <td>
+              @if (i.activo) {
+                <span class="badge rounded-pill text-bg-success-subtle text-success-emphasis">Activo</span>
+              } @else {
+                <span class="badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+              }
+            </td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-outline-primary btn-sm" title="Capturar/editar coordenadas"
+                      (click)="abrirSede(i)">
+                <i class="bi bi-geo-alt"></i>
+              </button>
+              <button class="btn btn-outline-secondary btn-sm ms-1" title="Editar inmueble"
+                      (click)="abrirEditar(i)">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm ms-1"
+                      [class.btn-outline-danger]="i.activo"
+                      [class.btn-outline-success]="!i.activo"
+                      [title]="i.activo ? 'Dar de baja' : 'Reactivar'"
+                      (click)="alternarActivo(i)">
+                <i class="bi" [class.bi-dash-circle]="i.activo" [class.bi-arrow-counterclockwise]="!i.activo"></i>
+              </button>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="text-center sub py-4">
+              <i class="bi bi-search"></i> Sin resultados para "{{ busqueda }}".
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- -------------------------------------------- Alta / edición del inmueble -->
+@if (mostrarForm()) {
+  <div class="cajon-fondo" (click)="cancelar()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(560px, 94vw)">
+    <h2 class="h6 mb-3">{{ editandoId() ? 'Editar inmueble' : 'Nuevo inmueble' }}</h2>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <label class="form-label small fw-semibold" for="im-dependencia">Nombre del inmueble</label>
+        <input id="im-dependencia" class="form-control" [(ngModel)]="iDependencia" name="imDependencia"
+               maxlength="150" placeholder="Ej. Biblioteca Legislativa &quot;Dr. José María Luis Mora&quot;" />
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold" for="im-ubicacion">Dirección completa</label>
+        <textarea id="im-ubicacion" class="form-control" rows="2" [(ngModel)]="iUbicacion" name="imUbicacion"
+                   maxlength="300" placeholder="Calle, número, colonia, municipio, estado"></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="im-tipo">Tipo</label>
+        <input id="im-tipo" class="form-control" [(ngModel)]="iTipo" name="imTipo" maxlength="60"
+               placeholder="Ej. Oficinas, Bodega" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="im-propiedad">Régimen</label>
+        <select id="im-propiedad" class="form-select" [(ngModel)]="iPropiedad" name="imPropiedad">
+          <option value="propio">Propio</option>
+          <option value="renta">Renta</option>
+        </select>
+      </div>
+    </div>
+
+    @if (errorForm()) {
+      <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar
+      </button>
+    </div>
+  </div>
+}
+
+<!-- -------------------------------------------- Captura de coordenadas (sede) -->
+@if (inmuebleSede(); as i) {
+  <div class="cajon-fondo" (click)="cancelarSede()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(520px, 94vw)">
+    <h2 class="h6 mb-1">Coordenadas de {{ i.dependencia }}</h2>
+    <p class="sub small mb-3">{{ i.ubicacion }}</p>
+
+    <a class="btn btn-outline-primary btn-sm mb-3" [href]="urlMapa(i.ubicacion)" target="_blank" rel="noopener">
+      <i class="bi bi-map"></i> Abrir la dirección en Google Maps
+    </a>
+    <div class="form-text mt-0 mb-3">
+      Ubica el edificio en el mapa, da clic derecho sobre el punto exacto y copia las coordenadas
+      que aparecen arriba (latitud, longitud) para pegarlas aquí abajo.
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="sd-lat">Latitud</label>
+        <input id="sd-lat" class="form-control" inputmode="decimal" [(ngModel)]="sLatitud" name="sdLat"
+               placeholder="Ej. 19.2925000" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="sd-lng">Longitud</label>
+        <input id="sd-lng" class="form-control" inputmode="decimal" [(ngModel)]="sLongitud" name="sdLng"
+               placeholder="Ej. -99.6570000" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold" for="sd-radio">Radio de tolerancia (m)</label>
+        <input id="sd-radio" class="form-control" inputmode="numeric" [(ngModel)]="sRadio" name="sdRadio" />
+        <div class="form-text">Qué tan lejos puede estar el técnico y aun así contar como "en sitio".</div>
+      </div>
+    </div>
+
+    @if (errorSede()) {
+      <div class="alert alert-danger py-2 small">{{ errorSede() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelarSede()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardandoSede()" (click)="guardarSede()">
+        @if (guardandoSede()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar coordenadas
+      </button>
+    </div>
+  </div>
+}
