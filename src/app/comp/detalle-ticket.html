@@ -127,7 +127,7 @@
 
           <!-- Solicitante (o quien cierra en su lugar: ver USUARIOS_CIERRE_SERVICIO, o el gestor que registro a nombre de otro) -->
           @if (esCierreEspecial() || esGestorQueRegistro() || (rol() === 'solicitante' && esMiSolicitud() && !tieneCierreEspecial())) {
-            @if (t.estatus === 'RESUELTO') {
+            @if (t.estatus === 'RESUELTO' && !(rol() === 'solicitante' && t.dependencia_id === 3)) {
               <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="validar()">
                 Sí quedó resuelto
               </button>
@@ -930,9 +930,11 @@
                   @if (s.motivo) {
                     <span class="sub">· {{ s.motivo }}</span>
                   }
-                  <div class="mt-1">
-                    <span class="geo" [class]="geo(s).clase">{{ geo(s).texto }}</span>
-                  </div>
+                  @if (geo(s); as g) {
+                    <div class="mt-1">
+                      <span class="geo" [class]="g.clase">{{ g.texto }}</span>
+                    </div>
+                  }
                 </div>
                 <b class="mono">{{ s.fin ? crono(s.segundos) : 'en curso' }}</b>
               </div>

@@ -188,7 +188,13 @@ export class Bandeja implements OnDestroy {
   }
 
   async iniciarReloj(id: number) {
+    /* Solo se bloquea si el tecnico nego el permiso: mala señal o timeout no detienen el reloj. */
     const geo = await ubicacionActual();
+    if (geo.permiso_denegado) {
+      this.permisoGeo.set('denied');
+      this.error.set('Necesitas dar permiso de ubicación en el navegador para iniciar el reloj.');
+      return;
+    }
     this.api.relojInicio(id, geo).subscribe({
       next: () => this.cargar(),
       error: (e) => this.error.set(mensajeError(e)),

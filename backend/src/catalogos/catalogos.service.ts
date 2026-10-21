@@ -23,6 +23,7 @@ import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { AgregarUsuarioPermitidoDto, ActualizarServicioDto, CrearServicioDto } from './dto/servicio.dto';
 import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
+import { ActualizarInmuebleDto, CapturarSedeInmuebleDto, CrearInmuebleDto } from './dto/inmueble.dto';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 /**
@@ -284,6 +285,96 @@ export class CatalogosService {
       ...(dto.activo !== undefined && { activo: dto.activo }),
     });
     return rol;
+  }
+
+  /* ------------------------------------------------------------------
+     Catalogo de inmuebles: edificios propios/arrendados para elegir al
+     registrar un ticket. La sede (coordenadas) se administra aparte, ver
+     capturarSedeInmueble — un inmueble puede no tener sede capturada aun.
+     ------------------------------------------------------------------ */
+
+  /** Activos e inactivos, con su sede si ya la tiene: pantalla de administracion. */
+  async inmueblesAdmin() {
+    return this.inmuebles.findAll({
+      include: [{ model: Sede, attributes: ['id', 'nombre', 'latitud', 'longitud', 'radio_m'] }],
+      order: [['dependencia', 'ASC']],
+    });
+  }
+
+  async crearInmueble(dto: CrearInmuebleDto) {
+    try {
+      return await this.inmuebles.create({
+        dependencia: dto.dependencia.trim(),
+        ubicacion: dto.ubicacion.trim(),
+        propiedad: dto.propiedad,
+        tipo: dto.tipo.trim(),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un inmueble con ese nombre');
+      }
+      throw e;
+    }
+  }
+
+  async actualizarInmueble(id: number, dto: ActualizarInmuebleDto) {
+    const inmueble = await this.inmuebles.findByPk(id);
+    if (!inmueble) throw new NotFoundException('El inmueble no existe');
+
+    try {
+      await inmueble.update({
+        ...(dto.dependencia !== undefined && { dependencia: dto.dependencia.trim() }),
+        ...(dto.ubicacion !== undefined && { ubicacion: dto.ubicacion.trim() }),
+        ...(dto.propiedad !== undefined && { propiedad: dto.propiedad }),
+        ...(dto.tipo !== undefined && { tipo: dto.tipo.trim() }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un inmueble con ese nombre');
+      }
+      throw e;
+    }
+    return inmueble;
+  }
+
+  /**
+   * Captura o corrige las coordenadas (Sede) de un inmueble. Si ya tenia una
+   * sede ligada se actualiza esa misma fila (nombre/direccion incluidos, por
+   * si el inmueble cambio de nombre o direccion desde que se capturo); si no,
+   * se crea una nueva y se liga.
+   */
+  async capturarSedeInmueble(id: number, dto: CapturarSedeInmuebleDto) {
+    const inmueble = await this.inmuebles.findByPk(id);
+    if (!inmueble) throw new NotFoundException('El inmueble no existe');
+
+    const datosSede = {
+      nombre: inmueble.dependencia,
+      direccion: inmueble.ubicacion,
+      latitud: dto.latitud,
+      longitud: dto.longitud,
+      radio_m: dto.radio_m ?? 120,
+    };
+
+    if (inmueble.sede_id) {
+      const sede = await this.sedes.findByPk(inmueble.sede_id);
+      if (sede) {
+        await sede.update(datosSede);
+        return this.inmuebles.findByPk(id, { include: [Sede] });
+      }
+    }
+
+    let sede;
+    try {
+      sede = await this.sedes.create(datosSede);
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe una sede con ese nombre');
+      }
+      throw e;
+    }
+    await inmueble.update({ sede_id: sede.id });
+    return this.inmuebles.findByPk(id, { include: [Sede] });
   }
 
   /** Alta de un nuevo tipo de servicio. Nace activo; el resto de banderas por defecto en false. */

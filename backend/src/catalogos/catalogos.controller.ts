@@ -20,6 +20,7 @@ import {
   CrearServicioDto,
 } from './dto/servicio.dto';
 import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
+import { ActualizarInmuebleDto, CapturarSedeInmuebleDto, CrearInmuebleDto } from './dto/inmueble.dto';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -128,6 +129,33 @@ export class CatalogosController {
   @Patch('roles/:id')
   actualizarRol(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarRolDto) {
     return this.catalogos.actualizarRol(id, dto);
+  }
+
+  /* ---------------- catalogo de inmuebles ---------------- */
+
+  @Roles('admin')
+  @Get('inmuebles/admin')
+  inmueblesAdmin() {
+    return this.catalogos.inmueblesAdmin();
+  }
+
+  @Roles('admin')
+  @Post('inmuebles')
+  crearInmueble(@Body() dto: CrearInmuebleDto) {
+    return this.catalogos.crearInmueble(dto);
+  }
+
+  @Roles('admin')
+  @Patch('inmuebles/:id')
+  actualizarInmueble(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarInmuebleDto) {
+    return this.catalogos.actualizarInmueble(id, dto);
+  }
+
+  /** Captura/corrige las coordenadas (sede) de un inmueble, para el geofencing del reloj (§16). */
+  @Roles('admin')
+  @Patch('inmuebles/:id/sede')
+  capturarSedeInmueble(@Param('id', ParseIntPipe) id: number, @Body() dto: CapturarSedeInmuebleDto) {
+    return this.catalogos.capturarSedeInmueble(id, dto);
   }
 
   /** Padron de tecnicos: lo consulta el admin/operador para reasignar, y gestor/validador para filtrar su bandeja de "Tickets generados". */

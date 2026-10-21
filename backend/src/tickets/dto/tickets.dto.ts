@@ -70,11 +70,10 @@ export class CrearTicketDto {
   @MaxLength(160)
   edificio_atencion?: string;
 
-  /** Inmueble del catalogo elegido al registrar (ver tabla `inmueble`). */
-  @IsOptional()
-  @IsInt()
+  /** Inmueble del catalogo elegido al registrar (ver tabla `inmueble`). Obligatorio. */
+  @IsInt({ message: 'Elige el edificio o ubicación donde se atenderá' })
   @Type(() => Number)
-  inmueble_id?: number;
+  inmueble_id!: number;
 
   /** Piso u oficina dentro del inmueble elegido. */
   @IsOptional()

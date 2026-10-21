@@ -48,10 +48,10 @@ export class Sede extends Model {
 
   @Unique
   @AllowNull(false)
-  @Column(DataType.STRING(80))
+  @Column(DataType.STRING(150))
   declare nombre: string;
 
-  @Column(DataType.STRING(200))
+  @Column(DataType.STRING(300))
   declare direccion: string | null;
 
   @AllowNull(false)
@@ -106,6 +106,18 @@ export class Inmueble extends Model {
   @Default(true)
   @Column(DataType.BOOLEAN)
   declare activo: boolean;
+
+  /**
+   * Sede fisica (coordenadas) que le corresponde, para que el reloj checador
+   * (RelojService.evalua) pueda comparar la ubicacion del tecnico. Nulo
+   * mientras nadie haya capturado las coordenadas de este inmueble.
+   */
+  @ForeignKey(() => Sede)
+  @Column(DataType.SMALLINT.UNSIGNED)
+  declare sede_id: number | null;
+
+  @BelongsTo(() => Sede)
+  declare sede?: Sede;
 }
 
 @Table({ tableName: 'area', timestamps: false })

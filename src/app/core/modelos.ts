@@ -290,6 +290,13 @@ export interface Inmueble {
   propiedad: 'propio' | 'renta';
   tipo: string;
   activo: boolean;
+  /** Sede (coordenadas) para el geofencing del reloj checador; null si no se ha capturado. */
+  sede_id: number | null;
+}
+
+/** Inmueble con su sede ligada (si ya la tiene), para la pantalla de administracion. */
+export interface InmuebleAdmin extends Inmueble {
+  sede: { id: number; nombre: string; latitud: number; longitud: number; radio_m: number } | null;
 }
 
 /** Un valor agregado del reporte (clave del catalogo + cuantos tickets caen ahi). */

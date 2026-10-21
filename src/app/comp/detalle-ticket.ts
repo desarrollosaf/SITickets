@@ -537,8 +537,15 @@ export class DetalleTicket {
 
   async iniciarReloj() {
     this.ocupado.set(true);
-    /* La ubicacion nunca detiene el reloj: si no llega, se guarda el motivo. */
+    /* La ubicacion nunca detiene el reloj por mala señal o timeout: solo se
+       bloquea cuando el usuario niega el permiso, porque eso si es una
+       decision suya, no una falla del GPS. */
     const geo = await ubicacionActual();
+    if (geo.permiso_denegado) {
+      this.ocupado.set(false);
+      this.error.set('Necesitas dar permiso de ubicación en el navegador para iniciar el reloj.');
+      return;
+    }
     this.api.relojInicio(this.id(), geo).subscribe({
       next: (t) => this.aplicar(t),
       error: (e) => this.falla(e),

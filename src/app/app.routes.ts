@@ -112,6 +112,14 @@ export const routes: Routes = [
           import('./paginas/catalogo-roles/catalogo-roles').then((m) => m.CatalogoRoles),
       },
       {
+        path: 'catalogo-inmuebles',
+        canActivate: [guardRol('admin')],
+        loadComponent: () =>
+          import('./paginas/catalogo-inmuebles/catalogo-inmuebles').then(
+            (m) => m.CatalogoInmuebles,
+          ),
+      },
+      {
         path: 'prioridades',
         canActivate: [guardRol('admin')],
         loadComponent: () =>
