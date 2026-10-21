@@ -226,7 +226,27 @@ export class TicketsService {
       return {};
     }
     if (usuario.rol === 'solicitante') {
-      return { solicitante_id: usuario.id, solicitante_nombre: usuario.nombre };
+      /*
+       * Servicios con cierre especial (ver USUARIOS_CIERRE_SERVICIO, p.ej.
+       * Cartas de no adeudo): quien los cierra reemplaza por completo al
+       * solicitante real —confirma, rechaza y reabre en su lugar— asi que
+       * tampoco debe aparecerle en su propia lista ni poder abrirlos.
+       */
+      const where: Record<string, unknown> = {
+        solicitante_id: usuario.id,
+        solicitante_nombre: usuario.nombre,
+      };
+      const clavesCierreEspecial = Object.keys(USUARIOS_CIERRE_SERVICIO);
+      if (clavesCierreEspecial.length) {
+        const servicios = await this.serviciosM.findAll({
+          where: { clave: { [Op.in]: clavesCierreEspecial } },
+          attributes: ['id'],
+        });
+        if (servicios.length) {
+          where.servicio_id = { [Op.notIn]: servicios.map((s) => s.id) };
+        }
+      }
+      return where;
     }
     /**
      * "Mis tickets" (modo 'propios'): solo lo que el gestor/validador
