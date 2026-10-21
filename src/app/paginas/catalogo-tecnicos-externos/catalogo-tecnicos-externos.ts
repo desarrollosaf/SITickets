@@ -1,7 +1,7 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TicketsService } from '../../core/tickets.service';
-import { mensajeError } from '../../core/formato';
+import { mensajeError, quitarAcentos } from '../../core/formato';
 import type { TecnicoExterno } from '../../core/modelos';
 
 /**
@@ -20,6 +20,15 @@ export class CatalogoTecnicosExternos {
   readonly tecnicos = signal<TecnicoExterno[]>([]);
   readonly error = signal('');
 
+  busqueda = '';
+  readonly filtrados = computed(() => {
+    const texto = quitarAcentos(this.busqueda.trim().toLowerCase());
+    const lista = this.tecnicos();
+    if (!texto) return lista;
+    return lista.filter((t) => quitarAcentos(t.nombre.toLowerCase()).includes(texto));
+  });
+  readonly activos = computed(() => this.tecnicos().filter((t) => t.activo).length);
+
   readonly mostrarForm = signal(false);
   readonly editandoId = signal<number | null>(null);
   readonly guardando = signal(false);
@@ -29,6 +38,16 @@ export class CatalogoTecnicosExternos {
 
   constructor() {
     this.cargar();
+  }
+
+  iniciales(nombre: string): string {
+    return nombre
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join('')
+      .toUpperCase();
   }
 
   private cargar() {
