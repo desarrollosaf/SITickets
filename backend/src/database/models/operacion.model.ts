@@ -13,7 +13,7 @@ import {
   HasMany,
   Index,
 } from 'sequelize-typescript';
-import { Area, CatalogoProblema, Inmueble, Prioridad, Sede, Servicio, Usuario } from './catalogos.model';
+import { Area, CatalogoProblema, Inmueble, Prioridad, Sede, Servicio, TecnicoExterno, Usuario } from './catalogos.model';
 
 /* =====================================================================
    Operacion. Equivale a la seccion 2 de 01_esquema_mysql.sql.
@@ -156,6 +156,14 @@ export class Ticket extends Model {
   /** Solo servicio CNA (Cartas de no adeudo): dia y hora en que el tecnico puede ir a revisar los bienes. */
   @Column(DataType.DATE)
   declare hora_atencion: Date | null;
+
+  /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio, capturado al resolver. */
+  @ForeignKey(() => TecnicoExterno)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare tecnico_externo_id: number | null;
+
+  @BelongsTo(() => TecnicoExterno)
+  declare tecnico_externo?: TecnicoExterno;
 
   /** §16 sede esperada del servicio, para verificar la ubicacion del reloj. */
   @ForeignKey(() => Sede)

@@ -120,6 +120,28 @@ export class Inmueble extends Model {
   declare sede?: Sede;
 }
 
+/**
+ * Tecnicos de proveedores externos (ej. IMPA: arrendadora de impresoras
+ * Ricoh/Kyocera) que no tienen cuenta en el sistema — solo se eligen de aqui
+ * para dejar registrado quien atendio el ticket, no se les da acceso.
+ */
+@Table({ tableName: 'tecnico_externo', timestamps: false })
+export class TecnicoExterno extends Model {
+  @PrimaryKey
+  @AutoIncrement
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare id: number;
+
+  @Unique
+  @AllowNull(false)
+  @Column(DataType.STRING(120))
+  declare nombre: string;
+
+  @Default(true)
+  @Column(DataType.BOOLEAN)
+  declare activo: boolean;
+}
+
 @Table({ tableName: 'area', timestamps: false })
 export class Area extends Model {
   @PrimaryKey

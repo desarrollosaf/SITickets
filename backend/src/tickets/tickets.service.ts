@@ -29,6 +29,7 @@ import {
   SUbicacion,
   SUbicacionDepartamento,
   SUsuario,
+  TecnicoExterno,
   Ticket,
   TicketBitacora,
   TicketSesion,
@@ -127,6 +128,7 @@ const INCLUDES = [
   { model: Usuario, as: 'tecnico', attributes: ['id', 'nombre'] },
   { model: Area },
   { model: Sede },
+  { model: TecnicoExterno },
 ];
 
 @Injectable()
@@ -949,6 +951,9 @@ export class TicketsService {
       piso: t.piso,
       /** Solo servicio CNA: dia y hora en que el tecnico puede ir a revisar los bienes. */
       hora_atencion: t.hora_atencion,
+      /** Solo servicio IMPA: tecnico externo (proveedor) que atendio, capturado al resolver. */
+      tecnico_externo_id: t.tecnico_externo_id,
+      tecnico_externo: t.tecnico_externo?.nombre ?? null,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
       tecnico: t.tecnico?.nombre ?? null,
@@ -2374,6 +2379,11 @@ export class TicketsService {
       if (!dto.diagnostico?.trim()) throw new BadRequestException('El diagnostico es obligatorio');
       if (!dto.solucion?.trim()) throw new BadRequestException('La solucion es obligatoria');
     }
+    /* IMPA (impresoras arrendadas): ademas de diagnostico/solucion, deja registrado que tecnico del proveedor atendio. */
+    const esImpa = t.servicio?.clave === 'IMPA';
+    if (esImpa && !dto.tecnico_externo_id) {
+      throw new BadRequestException('Indica que tecnico atendio el ticket');
+    }
 
     /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
     const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
@@ -2401,6 +2411,7 @@ export class TicketsService {
           refacciones: esRevisionBienes ? null : dto.refacciones?.trim() || 'Ninguna',
           revision_bienes: esRevisionBienes ? dto.revision! : null,
           observaciones_revision: esRevisionBienes ? dto.observaciones?.trim() || null : null,
+          tecnico_externo_id: esImpa ? dto.tecnico_externo_id! : null,
         },
         { transaction: tx },
       );

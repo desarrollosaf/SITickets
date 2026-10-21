@@ -1,0 +1,83 @@
+<div class="d-flex align-items-start justify-content-between mb-1 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Catálogo de técnicos externos</h1>
+    <p class="sub mb-0">
+      Técnicos de proveedores (ej. la arrendadora de impresoras) que no tienen cuenta ni acceso al
+      sistema: solo se eligen aquí al resolver un ticket de ese servicio, para dejar registrado
+      quién atendió.
+    </p>
+  </div>
+  <button class="btn btn-primary btn-sm" (click)="abrirNuevo()">
+    <i class="bi bi-plus-lg"></i> Nuevo técnico
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small mt-3">{{ error() }}</div>
+}
+
+<div class="tarjeta mb-3 overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr class="sub">
+          <th>Nombre</th>
+          <th style="width: 90px">Estado</th>
+          <th style="width: 180px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of tecnicos(); track t.id) {
+          <tr [class.text-muted]="!t.activo">
+            <td class="fw-semibold">{{ t.nombre }}</td>
+            <td>
+              @if (t.activo) {
+                <span class="badge rounded-pill text-bg-success-subtle text-success-emphasis">Activo</span>
+              } @else {
+                <span class="badge rounded-pill text-bg-secondary-subtle text-secondary-emphasis">Inactivo</span>
+              }
+            </td>
+            <td class="text-end">
+              <button class="btn btn-outline-secondary btn-sm" (click)="abrirEditar(t)">Editar</button>
+              <button class="btn btn-sm ms-1"
+                      [class.btn-outline-danger]="t.activo"
+                      [class.btn-outline-success]="!t.activo"
+                      (click)="alternarActivo(t)">
+                {{ t.activo ? 'Dar de baja' : 'Reactivar' }}
+              </button>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="3" class="text-center sub py-4">Sin técnicos registrados todavía.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+
+@if (mostrarForm()) {
+  <div class="cajon-fondo" (click)="cancelar()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(420px, 94vw)">
+    <h2 class="h6 mb-3">{{ editandoId() ? 'Editar técnico' : 'Nuevo técnico' }}</h2>
+
+    <label class="form-label small fw-semibold" for="tx-nombre">Nombre</label>
+    <input id="tx-nombre" class="form-control mb-3" [(ngModel)]="tNombre" name="txNombre" maxlength="120" />
+
+    @if (errorForm()) {
+      <div class="alert alert-danger py-2 small">{{ errorForm() }}</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end">
+      <button class="btn btn-outline-secondary" (click)="cancelar()">Cancelar</button>
+      <button class="btn btn-primary" [disabled]="guardando()" (click)="guardar()">
+        @if (guardando()) {
+          <span class="spinner-border spinner-border-sm me-2"></span>
+        }
+        Guardar
+      </button>
+    </div>
+  </div>
+}

@@ -107,6 +107,9 @@ export interface Ticket {
   piso: string | null;
   /** Solo servicio CNA: dia y hora en que el tecnico puede ir a revisar los bienes. */
   hora_atencion: string | null;
+  /** Solo servicio IMPA: tecnico externo (proveedor) que atendio, capturado al resolver. */
+  tecnico_externo_id: number | null;
+  tecnico_externo: string | null;
   sede: string | null;
   tecnico_id: number | null;
   tecnico: string | null;
@@ -278,8 +281,16 @@ export interface Catalogos {
   motivos: { id: number; nombre: string }[];
   sedes: { id: number; nombre: string; radio_m: number }[];
   inmuebles: Inmueble[];
+  tecnicos_externos: TecnicoExterno[];
   /** Dominio institucional que exige el campo «Cuenta de correo». Lo fija el backend. */
   correo_dominio: string;
+}
+
+/** Tecnico de un proveedor externo (ej. IMPA) sin cuenta en el sistema: solo se elige para registrar quien atendio. */
+export interface TecnicoExterno {
+  id: number;
+  nombre: string;
+  activo: boolean;
 }
 
 /** Inmuebles propios y arrendados: para elegir el edificio al registrar un ticket. */

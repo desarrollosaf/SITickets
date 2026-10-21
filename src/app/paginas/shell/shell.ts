@@ -39,6 +39,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     icono: 'bi-person-badge', grupo: 'Catálogos' },
     { ruta: '/catalogo-inmuebles', etiqueta: 'Catálogo de inmuebles',
     icono: 'bi-building', grupo: 'Catálogos' },
+    { ruta: '/catalogo-tecnicos-externos', etiqueta: 'Técnicos externos',
+    icono: 'bi-person-gear', grupo: 'Catálogos' },
     { ruta: '/usuarios', etiqueta: 'Registrar usuario', icono: 'bi-person-plus' },
     { ruta: '/reportes', etiqueta: 'Reporte de tickets', icono: 'bi-file-earmark-excel' },
     { ruta: '/bajas', etiqueta: 'Equipos dados de baja', icono: 'bi-pc-display-horizontal' },

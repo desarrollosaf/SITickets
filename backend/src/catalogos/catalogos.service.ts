@@ -16,6 +16,7 @@ import {
   ServicioUsuarioPermitido,
   SDependencia,
   SUsuario,
+  TecnicoExterno,
   TecnicoServicio,
   Usuario,
 } from '../database/models';
@@ -24,6 +25,7 @@ import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { AgregarUsuarioPermitidoDto, ActualizarServicioDto, CrearServicioDto } from './dto/servicio.dto';
 import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
 import { ActualizarInmuebleDto, CapturarSedeInmuebleDto, CrearInmuebleDto } from './dto/inmueble.dto';
+import { ActualizarTecnicoExternoDto, CrearTecnicoExternoDto } from './dto/tecnico-externo.dto';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 /**
@@ -87,6 +89,7 @@ export class CatalogosService {
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
     @InjectModel(Inmueble) private readonly inmuebles: typeof Inmueble,
+    @InjectModel(TecnicoExterno) private readonly tecnicosExternos: typeof TecnicoExterno,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidos: typeof ServicioUsuarioPermitido,
@@ -118,21 +121,23 @@ export class CatalogosService {
   }
 
   async todo(usuario: UsuarioToken) {
-    const [servicios, problemas, prioridades, estatus, motivos, sedes, inmuebles] = await Promise.all([
-      this.servicios.findAll({
-        where: { activo: true },
-        order: [
-          ['origen', 'ASC'],
-          ['nombre', 'ASC'],
-        ],
-      }),
-      this.problemas(),
-      this.prioridades.findAll({ order: [['orden', 'ASC']] }),
-      this.estatus.findAll({ order: [['orden', 'ASC']] }),
-      this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
-      this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
-      this.inmuebles.findAll({ where: { activo: true }, order: [['dependencia', 'ASC']] }),
-    ]);
+    const [servicios, problemas, prioridades, estatus, motivos, sedes, inmuebles, tecnicosExternos] =
+      await Promise.all([
+        this.servicios.findAll({
+          where: { activo: true },
+          order: [
+            ['origen', 'ASC'],
+            ['nombre', 'ASC'],
+          ],
+        }),
+        this.problemas(),
+        this.prioridades.findAll({ order: [['orden', 'ASC']] }),
+        this.estatus.findAll({ order: [['orden', 'ASC']] }),
+        this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
+        this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
+        this.inmuebles.findAll({ where: { activo: true }, order: [['dependencia', 'ASC']] }),
+        this.tecnicosExternos.findAll({ where: { activo: true }, order: [['nombre', 'ASC']] }),
+      ]);
     /*
      * El dominio viaja con los catalogos para que el formulario valide la
      * cuenta de correo contra el mismo valor que exige el backend. Si el area
@@ -176,6 +181,7 @@ export class CatalogosService {
       motivos,
       sedes,
       inmuebles,
+      tecnicos_externos: tecnicosExternos,
       correo_dominio,
     };
   }
@@ -375,6 +381,45 @@ export class CatalogosService {
     }
     await inmueble.update({ sede_id: sede.id });
     return this.inmuebles.findByPk(id, { include: [Sede] });
+  }
+
+  /* ------------------------------------------------------------------
+     Catalogo de tecnicos externos (ej. IMPA): sin cuenta ni acceso, solo
+     para dejar registrado quien atendio el ticket.
+     ------------------------------------------------------------------ */
+
+  /** Activos e inactivos: pantalla de administracion del catalogo. */
+  async tecnicosExternosAdmin() {
+    return this.tecnicosExternos.findAll({ order: [['nombre', 'ASC']] });
+  }
+
+  async crearTecnicoExterno(dto: CrearTecnicoExternoDto) {
+    try {
+      return await this.tecnicosExternos.create({ nombre: dto.nombre.trim() });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un tecnico externo con ese nombre');
+      }
+      throw e;
+    }
+  }
+
+  async actualizarTecnicoExterno(id: number, dto: ActualizarTecnicoExternoDto) {
+    const tecnico = await this.tecnicosExternos.findByPk(id);
+    if (!tecnico) throw new NotFoundException('El tecnico externo no existe');
+
+    try {
+      await tecnico.update({
+        ...(dto.nombre !== undefined && { nombre: dto.nombre.trim() }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un tecnico externo con ese nombre');
+      }
+      throw e;
+    }
+    return tecnico;
   }
 
   /** Alta de un nuevo tipo de servicio. Nace activo; el resto de banderas por defecto en false. */
