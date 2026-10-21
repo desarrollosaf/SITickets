@@ -58,7 +58,18 @@ export class Nuevo {
   readonly contextoV = signal('');
   texto = '';
   extension = '';
-  edificioAtencion = '';
+  inmuebleId = '';
+  piso = '';
+
+  /**
+   * Nombre del inmueble elegido, tal como se manda al backend (el piso va aparte, en `piso`).
+   * inmuebleId no es signal (va con ngModel), asi que esto NO puede ser un computed():
+   * nunca detectaria el cambio y se quedaria pegado en el valor inicial.
+   */
+  edificioAtencion(): string {
+    const inmueble = this.catalogos()?.inmuebles.find((i) => String(i.id) === this.inmuebleId);
+    return inmueble ? `${inmueble.dependencia} - ${inmueble.ubicacion}`.slice(0, 160) : '';
+  }
 
   readonly dur = duracion;
   readonly nombrePrioridad = NOMBRE_PRIORIDAD;
@@ -237,6 +248,19 @@ export class Nuevo {
 
   /** Equipo de computo: un solo equipo por ticket, sacado de una API distinta. */
   readonly esCmp = computed(() => this.problema()?.servicio_clave === 'CMP');
+
+  /* ---------------- hora de atencion (servicio CNA, Cartas de no adeudo) ---------------- */
+
+  /** Dia y hora en que el tecnico puede ir a revisar los bienes: dos inputs, se combinan al enviar. */
+  readonly esCna = computed(() => this.problema()?.servicio_clave === 'CNA');
+  fechaAtencion = '';
+  horaAtencion = '';
+  /** ISO completo para el backend, o null si falta alguno de los dos campos. */
+  readonly horaAtencionIso = computed(() => {
+    if (!this.fechaAtencion || !this.horaAtencion) return null;
+    const fecha = new Date(`${this.fechaAtencion}T${this.horaAtencion}`);
+    return Number.isNaN(fecha.getTime()) ? null : fecha.toISOString();
+  });
 
   /* ---------------- color de toner (IMP-01 / IMPA-01, solicitud de toner/cartucho) ---------------- */
 
@@ -483,6 +507,8 @@ export class Nuevo {
     this.modeloElegido.set('');
     this.modeloBusqueda.set('');
     this.coloresElegidos = [];
+    this.fechaAtencion = '';
+    this.horaAtencion = '';
   }
 
   /** Boton "Limpiar": reinicia todo el formulario, no solo el contexto del problema actual. */
@@ -490,7 +516,8 @@ export class Nuevo {
     this.servicioId.set(null);
     this.claveProblema.set('');
     this.extension = this.auth.usuario()?.extension ?? '';
-    this.edificioAtencion = '';
+    this.inmuebleId = '';
+    this.piso = '';
     this.error.set('');
     this.cambiandoServicio.set(false);
     this.limpiar();
@@ -557,12 +584,20 @@ export class Nuevo {
       this.error.set('Describe el problema.');
       return;
     }
+    if (!this.inmuebleId) {
+      this.error.set('Elige el edificio o ubicación donde se atenderá.');
+      return;
+    }
     if (this.esColorToner() && !this.coloresElegidos.length) {
       this.error.set('Indica que color(es) de toner se van a cambiar.');
       return;
     }
     if (this.esTrasladoImpa() && !this.modeloElegido().trim()) {
       this.error.set('Elige el modelo de impresora que se va a trasladar.');
+      return;
+    }
+    if (this.esCna() && !this.horaAtencionIso()) {
+      this.error.set('Indica el día y la hora en que el técnico puede ir a revisar los bienes.');
       return;
     }
 
@@ -576,7 +611,10 @@ export class Nuevo {
           : this.contextoFinal() || undefined,
         texto: p.requiere_texto ? this.texto.trim() : undefined,
         extension: this.extension.trim() || undefined,
-        edificio_atencion: this.edificioAtencion.trim() || undefined,
+        edificio_atencion: this.edificioAtencion() || undefined,
+        inmueble_id: this.inmuebleId ? Number(this.inmuebleId) : undefined,
+        piso: this.piso.trim() || undefined,
+        hora_atencion: this.esCna() ? (this.horaAtencionIso() ?? undefined) : undefined,
         correo_libre: this.esCorreo() ? this.correoLibre() : undefined,
         color_toner: this.esColorToner() ? this.coloresElegidos.join(', ') : undefined,
         modelo_traslado: this.esTrasladoImpa() ? this.modeloElegido().trim() : undefined,

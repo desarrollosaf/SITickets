@@ -72,6 +72,42 @@ export class Sede extends Model {
   declare activo: boolean;
 }
 
+/**
+ * Inmuebles propios y arrendados del Congreso: para elegir el edificio al
+ * registrar un ticket en vez de escribirlo a mano. El piso/referencia
+ * sigue siendo texto libre aparte (no vive aqui).
+ */
+@Table({ tableName: 'inmueble', timestamps: false })
+export class Inmueble extends Model {
+  @PrimaryKey
+  @AutoIncrement
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare id: number;
+
+  /** Nombre corto con el que el personal reconoce el edificio (ej. "OSFEM, Quintana Roo"). */
+  @Unique
+  @AllowNull(false)
+  @Column(DataType.STRING(150))
+  declare dependencia: string;
+
+  /** Direccion completa, solo informativa. */
+  @AllowNull(false)
+  @Column(DataType.STRING(300))
+  declare ubicacion: string;
+
+  @AllowNull(false)
+  @Column(DataType.ENUM('propio', 'renta'))
+  declare propiedad: 'propio' | 'renta';
+
+  @AllowNull(false)
+  @Column(DataType.STRING(60))
+  declare tipo: string;
+
+  @Default(true)
+  @Column(DataType.BOOLEAN)
+  declare activo: boolean;
+}
+
 @Table({ tableName: 'area', timestamps: false })
 export class Area extends Model {
   @PrimaryKey

@@ -6,6 +6,7 @@ import {
   DependenciaValidador,
   Estatus,
   FolioSerie,
+  Inmueble,
   MotivoReasignacion,
   Prioridad,
   Sede,
@@ -37,6 +38,7 @@ export * from './eservice.model';
 export const MODELOS = [
   Dependencia,
   Sede,
+  Inmueble,
   Area,
   Usuario,
   CatalogoRol,

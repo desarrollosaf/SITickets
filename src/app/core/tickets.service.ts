@@ -114,6 +114,12 @@ export class TicketsService {
     extension?: string;
     /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
     edificio_atencion?: string;
+    /** Inmueble del catalogo elegido al registrar (ver `Catalogos.inmuebles`). */
+    inmueble_id?: number;
+    /** Piso u oficina dentro del inmueble elegido. */
+    piso?: string;
+    /** Solo servicio CNA: dia y hora (ISO) en que el tecnico puede ir a revisar los bienes. */
+    hora_atencion?: string;
     /** Solo si el campo adicional es «Cuenta de correo»: no exige el dominio institucional. */
     correo_libre?: boolean;
     /** Solo si el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */

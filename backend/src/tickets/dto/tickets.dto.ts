@@ -70,6 +70,23 @@ export class CrearTicketDto {
   @MaxLength(160)
   edificio_atencion?: string;
 
+  /** Inmueble del catalogo elegido al registrar (ver tabla `inmueble`). */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  inmueble_id?: number;
+
+  /** Piso u oficina dentro del inmueble elegido. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  piso?: string;
+
+  /** Solo aplica al servicio CNA (Cartas de no adeudo): dia y hora en que el tecnico puede ir. */
+  @IsOptional()
+  @IsDateString({}, { message: 'La hora de atención debe venir como fecha y hora validas' })
+  hora_atencion?: string;
+
   /** Solo lo usan admin/gestor: registra el ticket a nombre de este usuario de saf. */
   @IsOptional()
   @IsInt()
