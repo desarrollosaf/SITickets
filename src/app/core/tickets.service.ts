@@ -8,6 +8,7 @@ import type {
   CandidatoSaf,
   Catalogos,
   Geo,
+  InmuebleAdmin,
   LineaTraza,
   Monitor,
   NivelToner,
@@ -20,6 +21,7 @@ import type {
   Servicio,
   Tablero,
   Tecnico,
+  TecnicoExterno,
   Ticket,
   TicketAtendidoCmp,
   TicketDetalle,
@@ -114,6 +116,12 @@ export class TicketsService {
     extension?: string;
     /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
     edificio_atencion?: string;
+    /** Inmueble del catalogo elegido al registrar (ver `Catalogos.inmuebles`). */
+    inmueble_id?: number;
+    /** Piso u oficina dentro del inmueble elegido. */
+    piso?: string;
+    /** Solo servicio CNA: dia y hora (ISO) en que el tecnico puede ir a revisar los bienes. */
+    hora_atencion?: string;
     /** Solo si el campo adicional es «Cuenta de correo»: no exige el dominio institucional. */
     correo_libre?: boolean;
     /** Solo si el problema es IMP-01 / IMPA-01 (solicitud de toner/cartucho). */
@@ -203,6 +211,8 @@ export class TicketsService {
       /** Solo servicio CNA (Cartas de no adeudo), en vez de diagnostico/solucion. */
       revision?: 'completa' | 'incompleta';
       observaciones?: string;
+      /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio. */
+      tecnico_externo_id?: number;
     },
   ) {
     return this.accion(id, 'resolver', d);
@@ -380,6 +390,44 @@ export class TicketsService {
   actualizarRol(id: number, datos: Partial<{ nombre: string; activo: boolean }>) {
     return this.http.patch<RolCatalogo>(`${API}/catalogos/roles/${id}`, datos);
   }
+
+  /* ---------------- catalogo de inmuebles ---------------- */
+
+  inmueblesAdmin() {
+    return this.http.get<InmuebleAdmin[]>(`${API}/catalogos/inmuebles/admin`);
+  }
+  crearInmueble(datos: { dependencia: string; ubicacion: string; propiedad: 'propio' | 'renta'; tipo: string }) {
+    return this.http.post<InmuebleAdmin>(`${API}/catalogos/inmuebles`, datos);
+  }
+  actualizarInmueble(
+    id: number,
+    datos: Partial<{
+      dependencia: string;
+      ubicacion: string;
+      propiedad: 'propio' | 'renta';
+      tipo: string;
+      activo: boolean;
+    }>,
+  ) {
+    return this.http.patch<InmuebleAdmin>(`${API}/catalogos/inmuebles/${id}`, datos);
+  }
+  /** Captura/corrige las coordenadas (sede) del inmueble, para el geofencing del reloj (§16). */
+  capturarSedeInmueble(id: number, datos: { latitud: number; longitud: number; radio_m?: number }) {
+    return this.http.patch<InmuebleAdmin>(`${API}/catalogos/inmuebles/${id}/sede`, datos);
+  }
+
+  /* ---------------- catalogo de tecnicos externos (IMPA) ---------------- */
+
+  tecnicosExternosAdmin() {
+    return this.http.get<TecnicoExterno[]>(`${API}/catalogos/tecnicos-externos/admin`);
+  }
+  crearTecnicoExterno(datos: { nombre: string }) {
+    return this.http.post<TecnicoExterno>(`${API}/catalogos/tecnicos-externos`, datos);
+  }
+  actualizarTecnicoExterno(id: number, datos: Partial<{ nombre: string; activo: boolean }>) {
+    return this.http.patch<TecnicoExterno>(`${API}/catalogos/tecnicos-externos/${id}`, datos);
+  }
+
   monitor() {
     return this.http.get<Monitor>(`${API}/monitor`);
   }

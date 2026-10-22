@@ -45,7 +45,7 @@ const NOMBRE_ESTATUS: Record<string, string> = {
   EN_ATENCION: 'En atención',
   EN_ESPERA: 'En espera',
   RESUELTO: 'Resuelto',
-  CERRADO: 'Validado / cerrado',
+  CERRADO: 'Cerrado por el usuario',
   CANCELADO: 'Cancelado',
 };
 
@@ -104,19 +104,20 @@ export function banderas(t: {
 }
 
 /** Lectura corta de la verificacion de ubicacion de una sesion del reloj. */
+/**
+ * Solo dice si quedo en sitio o no: sin distancia, sin nombre de sede, sin
+ * motivo. Cuando no hay con que comparar (sin sede, sin coordenada) no hay
+ * nada que mostrar — null, para que el llamador lo oculte.
+ */
 export function resumenUbicacion(s: {
   en_sitio: boolean | null;
   distancia_m: number | null;
   sede_esperada: string | null;
   motivo_sin_ubicacion: string | null;
-}): { texto: string; clase: string } {
-  if (s.en_sitio === true)
-    return { texto: `en sitio · ${s.distancia_m} m de ${s.sede_esperada}`, clase: 'geo-ok' };
-  if (s.en_sitio === false)
-    return { texto: `fuera de sitio · ${s.distancia_m} m de ${s.sede_esperada}`, clase: 'geo-no' };
-  if (s.motivo_sin_ubicacion)
-    return { texto: `sin ubicación · ${s.motivo_sin_ubicacion}`, clase: 'geo-sd' };
-  return { texto: 'sin sede asignada para comparar', clase: 'geo-sd' };
+}): { texto: string; clase: string } | null {
+  if (s.en_sitio === true) return { texto: 'En sitio', clase: 'geo-ok' };
+  if (s.en_sitio === false) return { texto: 'Fuera de sitio', clase: 'geo-no' };
+  return null;
 }
 
 /* =====================================================================
@@ -225,6 +226,8 @@ export function ubicacionActual(): Promise<{
   lng?: number;
   exactitud?: number;
   motivo_sin_ubicacion?: string;
+  /** true solo cuando el usuario negó el permiso (código 1 del navegador), no por mala señal o timeout. */
+  permiso_denegado?: boolean;
 }> {
   return new Promise((resolver) => {
     if (!navigator.geolocation) {
@@ -246,6 +249,7 @@ export function ubicacionActual(): Promise<{
               : err.code === 2
                 ? 'sin señal de ubicación'
                 : 'tiempo de espera agotado',
+          permiso_denegado: err.code === 1,
         }),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
     );

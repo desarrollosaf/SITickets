@@ -20,6 +20,8 @@ import {
   CrearServicioDto,
 } from './dto/servicio.dto';
 import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
+import { ActualizarInmuebleDto, CapturarSedeInmuebleDto, CrearInmuebleDto } from './dto/inmueble.dto';
+import { ActualizarTecnicoExternoDto, CrearTecnicoExternoDto } from './dto/tecnico-externo.dto';
 
 @Controller('catalogos')
 export class CatalogosController {
@@ -128,6 +130,56 @@ export class CatalogosController {
   @Patch('roles/:id')
   actualizarRol(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarRolDto) {
     return this.catalogos.actualizarRol(id, dto);
+  }
+
+  /* ---------------- catalogo de inmuebles ---------------- */
+
+  @Roles('admin')
+  @Get('inmuebles/admin')
+  inmueblesAdmin() {
+    return this.catalogos.inmueblesAdmin();
+  }
+
+  @Roles('admin')
+  @Post('inmuebles')
+  crearInmueble(@Body() dto: CrearInmuebleDto) {
+    return this.catalogos.crearInmueble(dto);
+  }
+
+  @Roles('admin')
+  @Patch('inmuebles/:id')
+  actualizarInmueble(@Param('id', ParseIntPipe) id: number, @Body() dto: ActualizarInmuebleDto) {
+    return this.catalogos.actualizarInmueble(id, dto);
+  }
+
+  /** Captura/corrige las coordenadas (sede) de un inmueble, para el geofencing del reloj (§16). */
+  @Roles('admin')
+  @Patch('inmuebles/:id/sede')
+  capturarSedeInmueble(@Param('id', ParseIntPipe) id: number, @Body() dto: CapturarSedeInmuebleDto) {
+    return this.catalogos.capturarSedeInmueble(id, dto);
+  }
+
+  /* ---------------- catalogo de tecnicos externos (IMPA) ---------------- */
+
+  @Roles('admin')
+  @Get('tecnicos-externos/admin')
+  tecnicosExternosAdmin() {
+    return this.catalogos.tecnicosExternosAdmin();
+  }
+
+  @Roles('admin')
+  @Post('tecnicos-externos')
+  crearTecnicoExterno(@Body() dto: CrearTecnicoExternoDto) {
+    return this.catalogos.crearTecnicoExterno(dto);
+  }
+
+  @Roles('admin')
+  @Patch('tecnicos-externos/:id')
+  actualizarTecnicoExterno(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ActualizarTecnicoExternoDto,
+  ) {
+    return this.catalogos.actualizarTecnicoExterno(id, dto);
   }
 
   /** Padron de tecnicos: lo consulta el admin/operador para reasignar, y gestor/validador para filtrar su bandeja de "Tickets generados". */

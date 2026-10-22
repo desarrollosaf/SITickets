@@ -27,10 +27,18 @@ export class Reportes {
   /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». */
   filtros: FiltrosTicket = { servicio: '', estatus: '', prioridad: '', tecnico: '' };
 
-  /** Nombre del catalogo de estatus/prioridad, para no mostrar la clave pelona en las graficas. */
+  /**
+   * Nombre del catalogo de estatus/prioridad, para no mostrar la clave pelona
+   * en las graficas. CERRADO_USUARIO/CERRADO_OMISION son claves sinteticas
+   * que arma el backend (reporteDatos): no viven en el catalogo de estatus.
+   */
   private readonly nombreEstatus = computed(() => {
     const cat = this.catalogos()?.estatus ?? [];
-    return (clave: string) => cat.find((e) => e.clave === clave)?.nombre ?? clave;
+    return (clave: string) => {
+      if (clave === 'CERRADO_USUARIO') return 'Cerrado (usuario)';
+      if (clave === 'CERRADO_OMISION') return 'Cerrado (omisión)';
+      return cat.find((e) => e.clave === clave)?.nombre ?? clave;
+    };
   });
   private readonly nombrePrioridad = computed(() => {
     const cat = this.catalogos()?.prioridades ?? [];

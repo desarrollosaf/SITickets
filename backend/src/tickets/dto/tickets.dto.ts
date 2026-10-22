@@ -70,6 +70,22 @@ export class CrearTicketDto {
   @MaxLength(160)
   edificio_atencion?: string;
 
+  /** Inmueble del catalogo elegido al registrar (ver tabla `inmueble`). Obligatorio. */
+  @IsInt({ message: 'Elige el edificio o ubicación donde se atenderá' })
+  @Type(() => Number)
+  inmueble_id!: number;
+
+  /** Piso u oficina dentro del inmueble elegido. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  piso?: string;
+
+  /** Solo aplica al servicio CNA (Cartas de no adeudo): dia y hora en que el tecnico puede ir. */
+  @IsOptional()
+  @IsDateString({}, { message: 'La hora de atención debe venir como fecha y hora validas' })
+  hora_atencion?: string;
+
   /** Solo lo usan admin/gestor: registra el ticket a nombre de este usuario de saf. */
   @IsOptional()
   @IsInt()
@@ -183,6 +199,12 @@ export class ResolverDto {
   @IsString()
   @MaxLength(400)
   observaciones?: string;
+
+  /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio. */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  tecnico_externo_id?: number;
 }
 
 export class ReasignarDto {

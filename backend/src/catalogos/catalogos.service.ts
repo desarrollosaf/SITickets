@@ -8,6 +8,7 @@ import {
   CatalogoProblema,
   CatalogoRol,
   Estatus,
+  Inmueble,
   MotivoReasignacion,
   Prioridad,
   Sede,
@@ -15,6 +16,7 @@ import {
   ServicioUsuarioPermitido,
   SDependencia,
   SUsuario,
+  TecnicoExterno,
   TecnicoServicio,
   Usuario,
 } from '../database/models';
@@ -22,6 +24,8 @@ import { ActualizarProblemaDto, CrearProblemaDto } from './dto/catalogo-problema
 import { ActualizarPrioridadDto } from './dto/prioridad.dto';
 import { AgregarUsuarioPermitidoDto, ActualizarServicioDto, CrearServicioDto } from './dto/servicio.dto';
 import { ActualizarRolDto, CrearRolDto } from './dto/rol.dto';
+import { ActualizarInmuebleDto, CapturarSedeInmuebleDto, CrearInmuebleDto } from './dto/inmueble.dto';
+import { ActualizarTecnicoExternoDto, CrearTecnicoExternoDto } from './dto/tecnico-externo.dto';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 
 /**
@@ -84,6 +88,8 @@ export class CatalogosService {
     @InjectModel(MotivoReasignacion) private readonly motivos: typeof MotivoReasignacion,
     @InjectModel(Area) private readonly areas: typeof Area,
     @InjectModel(Sede) private readonly sedes: typeof Sede,
+    @InjectModel(Inmueble) private readonly inmuebles: typeof Inmueble,
+    @InjectModel(TecnicoExterno) private readonly tecnicosExternos: typeof TecnicoExterno,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidos: typeof ServicioUsuarioPermitido,
@@ -115,20 +121,23 @@ export class CatalogosService {
   }
 
   async todo(usuario: UsuarioToken) {
-    const [servicios, problemas, prioridades, estatus, motivos, sedes] = await Promise.all([
-      this.servicios.findAll({
-        where: { activo: true },
-        order: [
-          ['origen', 'ASC'],
-          ['nombre', 'ASC'],
-        ],
-      }),
-      this.problemas(),
-      this.prioridades.findAll({ order: [['orden', 'ASC']] }),
-      this.estatus.findAll({ order: [['orden', 'ASC']] }),
-      this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
-      this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
-    ]);
+    const [servicios, problemas, prioridades, estatus, motivos, sedes, inmuebles, tecnicosExternos] =
+      await Promise.all([
+        this.servicios.findAll({
+          where: { activo: true },
+          order: [
+            ['origen', 'ASC'],
+            ['nombre', 'ASC'],
+          ],
+        }),
+        this.problemas(),
+        this.prioridades.findAll({ order: [['orden', 'ASC']] }),
+        this.estatus.findAll({ order: [['orden', 'ASC']] }),
+        this.motivos.findAll({ where: { activo: true }, order: [['id', 'ASC']] }),
+        this.sedes.findAll({ where: { activo: true }, attributes: ['id', 'nombre', 'radio_m'] }),
+        this.inmuebles.findAll({ where: { activo: true }, order: [['dependencia', 'ASC']] }),
+        this.tecnicosExternos.findAll({ where: { activo: true }, order: [['nombre', 'ASC']] }),
+      ]);
     /*
      * El dominio viaja con los catalogos para que el formulario valide la
      * cuenta de correo contra el mismo valor que exige el backend. Si el area
@@ -171,6 +180,8 @@ export class CatalogosService {
       estatus,
       motivos,
       sedes,
+      inmuebles,
+      tecnicos_externos: tecnicosExternos,
       correo_dominio,
     };
   }
@@ -280,6 +291,135 @@ export class CatalogosService {
       ...(dto.activo !== undefined && { activo: dto.activo }),
     });
     return rol;
+  }
+
+  /* ------------------------------------------------------------------
+     Catalogo de inmuebles: edificios propios/arrendados para elegir al
+     registrar un ticket. La sede (coordenadas) se administra aparte, ver
+     capturarSedeInmueble — un inmueble puede no tener sede capturada aun.
+     ------------------------------------------------------------------ */
+
+  /** Activos e inactivos, con su sede si ya la tiene: pantalla de administracion. */
+  async inmueblesAdmin() {
+    return this.inmuebles.findAll({
+      include: [{ model: Sede, attributes: ['id', 'nombre', 'latitud', 'longitud', 'radio_m'] }],
+      order: [['dependencia', 'ASC']],
+    });
+  }
+
+  async crearInmueble(dto: CrearInmuebleDto) {
+    try {
+      return await this.inmuebles.create({
+        dependencia: dto.dependencia.trim(),
+        ubicacion: dto.ubicacion.trim(),
+        propiedad: dto.propiedad,
+        tipo: dto.tipo.trim(),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un inmueble con ese nombre');
+      }
+      throw e;
+    }
+  }
+
+  async actualizarInmueble(id: number, dto: ActualizarInmuebleDto) {
+    const inmueble = await this.inmuebles.findByPk(id);
+    if (!inmueble) throw new NotFoundException('El inmueble no existe');
+
+    try {
+      await inmueble.update({
+        ...(dto.dependencia !== undefined && { dependencia: dto.dependencia.trim() }),
+        ...(dto.ubicacion !== undefined && { ubicacion: dto.ubicacion.trim() }),
+        ...(dto.propiedad !== undefined && { propiedad: dto.propiedad }),
+        ...(dto.tipo !== undefined && { tipo: dto.tipo.trim() }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un inmueble con ese nombre');
+      }
+      throw e;
+    }
+    return inmueble;
+  }
+
+  /**
+   * Captura o corrige las coordenadas (Sede) de un inmueble. Si ya tenia una
+   * sede ligada se actualiza esa misma fila (nombre/direccion incluidos, por
+   * si el inmueble cambio de nombre o direccion desde que se capturo); si no,
+   * se crea una nueva y se liga.
+   */
+  async capturarSedeInmueble(id: number, dto: CapturarSedeInmuebleDto) {
+    const inmueble = await this.inmuebles.findByPk(id);
+    if (!inmueble) throw new NotFoundException('El inmueble no existe');
+
+    const datosSede = {
+      nombre: inmueble.dependencia,
+      direccion: inmueble.ubicacion,
+      latitud: dto.latitud,
+      longitud: dto.longitud,
+      radio_m: dto.radio_m ?? 120,
+    };
+
+    if (inmueble.sede_id) {
+      const sede = await this.sedes.findByPk(inmueble.sede_id);
+      if (sede) {
+        await sede.update(datosSede);
+        return this.inmuebles.findByPk(id, { include: [Sede] });
+      }
+    }
+
+    let sede;
+    try {
+      sede = await this.sedes.create(datosSede);
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe una sede con ese nombre');
+      }
+      throw e;
+    }
+    await inmueble.update({ sede_id: sede.id });
+    return this.inmuebles.findByPk(id, { include: [Sede] });
+  }
+
+  /* ------------------------------------------------------------------
+     Catalogo de tecnicos externos (ej. IMPA): sin cuenta ni acceso, solo
+     para dejar registrado quien atendio el ticket.
+     ------------------------------------------------------------------ */
+
+  /** Activos e inactivos: pantalla de administracion del catalogo. */
+  async tecnicosExternosAdmin() {
+    return this.tecnicosExternos.findAll({ order: [['nombre', 'ASC']] });
+  }
+
+  async crearTecnicoExterno(dto: CrearTecnicoExternoDto) {
+    try {
+      return await this.tecnicosExternos.create({ nombre: dto.nombre.trim() });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un tecnico externo con ese nombre');
+      }
+      throw e;
+    }
+  }
+
+  async actualizarTecnicoExterno(id: number, dto: ActualizarTecnicoExternoDto) {
+    const tecnico = await this.tecnicosExternos.findByPk(id);
+    if (!tecnico) throw new NotFoundException('El tecnico externo no existe');
+
+    try {
+      await tecnico.update({
+        ...(dto.nombre !== undefined && { nombre: dto.nombre.trim() }),
+        ...(dto.activo !== undefined && { activo: dto.activo }),
+      });
+    } catch (e) {
+      if (e instanceof UniqueConstraintError) {
+        throw new ConflictException('Ya existe un tecnico externo con ese nombre');
+      }
+      throw e;
+    }
+    return tecnico;
   }
 
   /** Alta de un nuevo tipo de servicio. Nace activo; el resto de banderas por defecto en false. */

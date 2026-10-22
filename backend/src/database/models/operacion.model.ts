@@ -13,7 +13,7 @@ import {
   HasMany,
   Index,
 } from 'sequelize-typescript';
-import { Area, CatalogoProblema, Prioridad, Sede, Servicio, Usuario } from './catalogos.model';
+import { Area, CatalogoProblema, Inmueble, Prioridad, Sede, Servicio, TecnicoExterno, Usuario } from './catalogos.model';
 
 /* =====================================================================
    Operacion. Equivale a la seccion 2 de 01_esquema_mysql.sql.
@@ -140,6 +140,30 @@ export class Ticket extends Model {
   /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
   @Column(DataType.STRING(160))
   declare edificio_atencion: string | null;
+
+  /** Inmueble del catalogo elegido al registrar, para no repetir el texto completo. */
+  @ForeignKey(() => Inmueble)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare inmueble_id: number | null;
+
+  @BelongsTo(() => Inmueble)
+  declare inmueble?: Inmueble;
+
+  /** Piso u oficina dentro del inmueble elegido; aparte del inmueble para no repetir texto largo. */
+  @Column(DataType.STRING(60))
+  declare piso: string | null;
+
+  /** Solo servicio CNA (Cartas de no adeudo): dia y hora en que el tecnico puede ir a revisar los bienes. */
+  @Column(DataType.DATE)
+  declare hora_atencion: Date | null;
+
+  /** Solo servicio IMPA (impresoras arrendadas): tecnico externo que atendio, capturado al resolver. */
+  @ForeignKey(() => TecnicoExterno)
+  @Column(DataType.INTEGER.UNSIGNED)
+  declare tecnico_externo_id: number | null;
+
+  @BelongsTo(() => TecnicoExterno)
+  declare tecnico_externo?: TecnicoExterno;
 
   /** §16 sede esperada del servicio, para verificar la ubicacion del reloj. */
   @ForeignKey(() => Sede)

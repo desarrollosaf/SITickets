@@ -6,12 +6,14 @@ import {
   DependenciaValidador,
   Estatus,
   FolioSerie,
+  Inmueble,
   MotivoReasignacion,
   Prioridad,
   Sede,
   Servicio,
   ServicioUsuarioPermitido,
   ServicioValidador,
+  TecnicoExterno,
   TecnicoServicio,
   Usuario,
 } from './catalogos.model';
@@ -37,6 +39,8 @@ export * from './eservice.model';
 export const MODELOS = [
   Dependencia,
   Sede,
+  Inmueble,
+  TecnicoExterno,
   Area,
   Usuario,
   CatalogoRol,

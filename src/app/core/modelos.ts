@@ -101,6 +101,15 @@ export interface Ticket {
   extension: string | null;
   /** Libre y opcional, aplica a cualquier ticket sin importar el problema. */
   edificio_atencion: string | null;
+  /** Inmueble del catalogo elegido al registrar (ver `Catalogos.inmuebles`). */
+  inmueble_id: number | null;
+  /** Piso u oficina dentro del inmueble elegido. */
+  piso: string | null;
+  /** Solo servicio CNA: dia y hora en que el tecnico puede ir a revisar los bienes. */
+  hora_atencion: string | null;
+  /** Solo servicio IMPA: tecnico externo (proveedor) que atendio, capturado al resolver. */
+  tecnico_externo_id: number | null;
+  tecnico_externo: string | null;
   sede: string | null;
   tecnico_id: number | null;
   tecnico: string | null;
@@ -271,8 +280,34 @@ export interface Catalogos {
   estatus: EstatusCatalogo[];
   motivos: { id: number; nombre: string }[];
   sedes: { id: number; nombre: string; radio_m: number }[];
+  inmuebles: Inmueble[];
+  tecnicos_externos: TecnicoExterno[];
   /** Dominio institucional que exige el campo «Cuenta de correo». Lo fija el backend. */
   correo_dominio: string;
+}
+
+/** Tecnico de un proveedor externo (ej. IMPA) sin cuenta en el sistema: solo se elige para registrar quien atendio. */
+export interface TecnicoExterno {
+  id: number;
+  nombre: string;
+  activo: boolean;
+}
+
+/** Inmuebles propios y arrendados: para elegir el edificio al registrar un ticket. */
+export interface Inmueble {
+  id: number;
+  dependencia: string;
+  ubicacion: string;
+  propiedad: 'propio' | 'renta';
+  tipo: string;
+  activo: boolean;
+  /** Sede (coordenadas) para el geofencing del reloj checador; null si no se ha capturado. */
+  sede_id: number | null;
+}
+
+/** Inmueble con su sede ligada (si ya la tiene), para la pantalla de administracion. */
+export interface InmuebleAdmin extends Inmueble {
+  sede: { id: number; nombre: string; latitud: number; longitud: number; radio_m: number } | null;
 }
 
 /** Un valor agregado del reporte (clave del catalogo + cuantos tickets caen ahi). */

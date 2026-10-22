@@ -127,7 +127,7 @@
 
           <!-- Solicitante (o quien cierra en su lugar: ver USUARIOS_CIERRE_SERVICIO, o el gestor que registro a nombre de otro) -->
           @if (esCierreEspecial() || esGestorQueRegistro() || (rol() === 'solicitante' && esMiSolicitud() && !tieneCierreEspecial())) {
-            @if (t.estatus === 'RESUELTO') {
+            @if (t.estatus === 'RESUELTO' && !(rol() === 'solicitante' && t.dependencia_id === 3)) {
               <button class="btn btn-sm btn-success" [disabled]="ocupado()" (click)="validar()">
                 Sí quedó resuelto
               </button>
@@ -351,6 +351,16 @@
                 <label class="form-label small fw-semibold" for="fm-ref">Refacciones o insumos</label>
                 <input id="fm-ref" class="form-control form-control-sm mb-2" [(ngModel)]="refacciones"
                        name="refacciones" placeholder="Ninguna, o descripción y cantidad" />
+                @if (esImpa()) {
+                  <label class="form-label small fw-semibold" for="fm-tec-ext">Técnico que atendió</label>
+                  <select id="fm-tec-ext" class="form-select form-select-sm mb-2" [(ngModel)]="tecnicoExternoId"
+                          name="tecnicoExternoId">
+                    <option value="">Selecciona…</option>
+                    @for (tx of catalogos()?.tecnicos_externos; track tx.id) {
+                      <option [value]="tx.id">{{ tx.nombre }}</option>
+                    }
+                  </select>
+                }
               }
               <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
@@ -733,6 +743,16 @@
               <dd class="col-7">{{ t.edificio_atencion }}</dd>
             }
 
+            @if (t.piso) {
+              <dt class="col-5 sub fw-normal">Piso / oficina</dt>
+              <dd class="col-7">{{ t.piso }}</dd>
+            }
+
+            @if (t.hora_atencion) {
+              <dt class="col-5 sub fw-normal">Hora de atención</dt>
+              <dd class="col-7">{{ fmt(t.hora_atencion) }}</dd>
+            }
+
             @if (!t.interno) {
               <dt class="col-5 sub fw-normal">Dependencia</dt>
               <dd class="col-7">{{ t.dependencia_saf || '—' }}</dd>
@@ -893,6 +913,10 @@
                 <dt class="col-5 sub fw-normal">Refacciones</dt>
                 <dd class="col-7">{{ t.refacciones || 'Ninguna' }}</dd>
               }
+              @if (t.tecnico_externo) {
+                <dt class="col-5 sub fw-normal">Técnico que atendió</dt>
+                <dd class="col-7">{{ t.tecnico_externo }}</dd>
+              }
               <dt class="col-5 sub fw-normal">Resuelto</dt>
               <dd class="col-7">{{ fmt(t.f_resolucion) }}</dd>
               @if (t.f_validacion) {
@@ -920,9 +944,11 @@
                   @if (s.motivo) {
                     <span class="sub">· {{ s.motivo }}</span>
                   }
-                  <div class="mt-1">
-                    <span class="geo" [class]="geo(s).clase">{{ geo(s).texto }}</span>
-                  </div>
+                  @if (geo(s); as g) {
+                    <div class="mt-1">
+                      <span class="geo" [class]="g.clase">{{ g.texto }}</span>
+                    </div>
+                  }
                 </div>
                 <b class="mono">{{ s.fin ? crono(s.segundos) : 'en curso' }}</b>
               </div>

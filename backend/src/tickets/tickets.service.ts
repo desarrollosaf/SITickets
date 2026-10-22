@@ -18,6 +18,7 @@ import {
   ESTATUS,
   ESTATUS_FINALES,
   EstatusClave,
+  Inmueble,
   SDependencia,
   SDepartamento,
   SDireccion,
@@ -28,6 +29,7 @@ import {
   SUbicacion,
   SUbicacionDepartamento,
   SUsuario,
+  TecnicoExterno,
   Ticket,
   TicketBitacora,
   TicketSesion,
@@ -112,7 +114,7 @@ function estatusLegible(t: Ticket): string {
       EN_ATENCION: 'En atención',
       EN_ESPERA: 'En espera',
       RESUELTO: 'Resuelto',
-      CERRADO: 'Validado / cerrado',
+      CERRADO: 'Cerrado por el usuario',
       CANCELADO: 'Cancelado',
     }[t.estatus] ?? t.estatus
   );
@@ -126,6 +128,7 @@ const INCLUDES = [
   { model: Usuario, as: 'tecnico', attributes: ['id', 'nombre'] },
   { model: Area },
   { model: Sede },
+  { model: TecnicoExterno },
 ];
 
 @Injectable()
@@ -140,6 +143,7 @@ export class TicketsService {
     @InjectModel(Servicio) private readonly serviciosM: typeof Servicio,
     @InjectModel(Usuario) private readonly usuarios: typeof Usuario,
     @InjectModel(Area) private readonly areas: typeof Area,
+    @InjectModel(Inmueble) private readonly inmuebles: typeof Inmueble,
     @InjectModel(ServicioUsuarioPermitido)
     private readonly permitidosServicio: typeof ServicioUsuarioPermitido,
     @InjectModel(DependenciaValidador)
@@ -538,7 +542,8 @@ export class TicketsService {
       { header: 'Total', key: 'total', width: 9 },
       { header: 'Abiertos', key: 'abiertos', width: 10 },
       { header: 'Resueltos (por confirmar)', key: 'resueltos', width: 14 },
-      { header: 'Cerrados', key: 'cerrados', width: 10 },
+      { header: 'Cerrados (usuario)', key: 'cerrados_usuario', width: 15 },
+      { header: 'Cerrados (omisión)', key: 'cerrados_omision', width: 15 },
       { header: 'Cancelados', key: 'cancelados', width: 11 },
       { header: 'Abiertos vencidos', key: 'vencidos', width: 11 },
       { header: '% resueltos en tiempo', key: 'pct', width: 13 },
@@ -556,7 +561,8 @@ export class TicketsService {
         total: lista.length,
         abiertos: lista.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
         resueltos: lista.filter((t) => t.estatus === 'RESUELTO').length,
-        cerrados: lista.filter((t) => t.estatus === 'CERRADO').length,
+        cerrados_usuario: lista.filter((t) => t.estatus === 'CERRADO' && !t.cierre_por_omision).length,
+        cerrados_omision: lista.filter((t) => t.estatus === 'CERRADO' && t.cierre_por_omision).length,
         cancelados: lista.filter((t) => t.estatus === 'CANCELADO').length,
         vencidos: lista.filter(vencidoAbierto).length,
         pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
@@ -721,7 +727,10 @@ export class TicketsService {
     let finalizadosHoy = 0;
 
     for (const t of filas) {
-      porEstatus.set(t.estatus, (porEstatus.get(t.estatus) ?? 0) + 1);
+      /* Mismo criterio que la pestaña de /tickets: CERRADO se separa segun quien lo cerro. */
+      const claveEstatus =
+        t.estatus === 'CERRADO' ? (t.cierre_por_omision ? 'CERRADO_OMISION' : 'CERRADO_USUARIO') : t.estatus;
+      porEstatus.set(claveEstatus, (porEstatus.get(claveEstatus) ?? 0) + 1);
       porPrioridad.set(t.prioridad, (porPrioridad.get(t.prioridad) ?? 0) + 1);
       const servicio = t.servicio?.nombre ?? 'Sin clasificar';
       porServicio.set(servicio, (porServicio.get(servicio) ?? 0) + 1);
@@ -743,6 +752,23 @@ export class TicketsService {
     const aOrdenado = (m: Map<string, number>) =>
       [...m.entries()].sort((a, b) => b[1] - a[1]).map(([clave, total]) => ({ clave, total }));
 
+    /* Para estatus no tiene caso ordenar por cantidad: la grafica debe leerse
+       en el orden del ciclo de vida del ticket, no saltando segun quien tiene
+       mas. */
+    const ORDEN_ESTATUS = [
+      'REGISTRADO',
+      'ASIGNADO',
+      'EN_ATENCION',
+      'EN_ESPERA',
+      'RESUELTO',
+      'CERRADO_USUARIO',
+      'CERRADO_OMISION',
+      'CANCELADO',
+    ];
+    const porEstatusOrdenado = [...porEstatus.entries()]
+      .sort((a, b) => ORDEN_ESTATUS.indexOf(a[0]) - ORDEN_ESTATUS.indexOf(b[0]))
+      .map(([clave, total]) => ({ clave, total }));
+
     return {
       total: filas.length,
       vencidos,
@@ -755,7 +781,7 @@ export class TicketsService {
       cerrados_hoy: cerradosHoy,
       fuera_de_tiempo: vencidos,
       finalizados_hoy: finalizadosHoy,
-      por_estatus: aOrdenado(porEstatus),
+      por_estatus: porEstatusOrdenado,
       por_prioridad: aOrdenado(porPrioridad),
       por_servicio: aOrdenado(porServicio),
       tendencia_mensual: [...porMes.entries()]
@@ -921,6 +947,13 @@ export class TicketsService {
       area_id: t.area_id,
       extension: t.extension,
       edificio_atencion: t.edificio_atencion,
+      inmueble_id: t.inmueble_id,
+      piso: t.piso,
+      /** Solo servicio CNA: dia y hora en que el tecnico puede ir a revisar los bienes. */
+      hora_atencion: t.hora_atencion,
+      /** Solo servicio IMPA: tecnico externo (proveedor) que atendio, capturado al resolver. */
+      tecnico_externo_id: t.tecnico_externo_id,
+      tecnico_externo: t.tecnico_externo?.nombre ?? null,
       sede: t.sede?.nombre ?? null,
       tecnico_id: t.tecnico_id,
       tecnico: t.tecnico?.nombre ?? null,
@@ -1154,6 +1187,9 @@ export class TicketsService {
     if (problema.clave === 'IMPA-09' && !dto.modelo_traslado?.trim()) {
       throw new BadRequestException('Indica que modelo de impresora se va a trasladar');
     }
+    if (problema.servicio.clave === 'CNA' && !dto.hora_atencion) {
+      throw new BadRequestException('Indica el dia y la hora en que el tecnico puede ir a revisar los bienes');
+    }
 
     /* El campo adicional del catalogo. Si pide cuenta de correo se valida aqui
        con la misma regla que la correccion de datos generales. */
@@ -1241,6 +1277,16 @@ export class TicketsService {
       !!quien.dependencia_id &&
       (await this.dependenciaValidador.count({ where: { dependencia_id: quien.dependencia_id } })) > 0;
 
+    /*
+     * §16 el inmueble que el usuario eligio al registrar es mas preciso que
+     * el area del solicitante para saber donde va a estar el tecnico: si
+     * tiene sede capturada, manda sobre la que resolvio resolverQuien().
+     */
+    const sedeId = dto.inmueble_id
+      ? ((await this.inmuebles.findByPk(dto.inmueble_id, { attributes: ['sede_id'] }))?.sede_id ??
+        quien.sede_id)
+      : quien.sede_id;
+
     const ticket = await this.db.transaction(async (tx) => {
       /*
        * El folio por servicio (TK/CMP/N, TK/TEL/N…) se asigna hasta que el
@@ -1266,9 +1312,12 @@ export class TicketsService {
           registrado_por_nombre: registradoPorNombre,
           dependencia_id: quien.dependencia_id,
           area_id: quien.area_id,
-          sede_id: quien.sede_id,
+          sede_id: sedeId,
           extension: dto.extension?.trim() || quien.extension,
           edificio_atencion: dto.edificio_atencion?.trim() || null,
+          inmueble_id: dto.inmueble_id ?? null,
+          piso: dto.piso?.trim() || null,
+          hora_atencion: problema.servicio.clave === 'CNA' ? new Date(dto.hora_atencion!) : null,
           contexto,
           color_toner: CLAVES_TONER.includes(problema.clave) ? dto.color_toner!.trim() : null,
           modelo_traslado: problema.clave === 'IMPA-09' ? dto.modelo_traslado!.trim() : null,
@@ -2330,6 +2379,11 @@ export class TicketsService {
       if (!dto.diagnostico?.trim()) throw new BadRequestException('El diagnostico es obligatorio');
       if (!dto.solucion?.trim()) throw new BadRequestException('La solucion es obligatoria');
     }
+    /* IMPA (impresoras arrendadas): ademas de diagnostico/solucion, deja registrado que tecnico del proveedor atendio. */
+    const esImpa = t.servicio?.clave === 'IMPA';
+    if (esImpa && !dto.tecnico_externo_id) {
+      throw new BadRequestException('Indica que tecnico atendio el ticket');
+    }
 
     /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
     const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
@@ -2357,6 +2411,7 @@ export class TicketsService {
           refacciones: esRevisionBienes ? null : dto.refacciones?.trim() || 'Ninguna',
           revision_bienes: esRevisionBienes ? dto.revision! : null,
           observaciones_revision: esRevisionBienes ? dto.observaciones?.trim() || null : null,
+          tecnico_externo_id: esImpa ? dto.tecnico_externo_id! : null,
         },
         { transaction: tx },
       );
