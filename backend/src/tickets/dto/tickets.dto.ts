@@ -157,6 +157,19 @@ export class MotivoDto {
 }
 
 /**
+ * Para poner un ticket en espera. El numero de inventario es opcional aqui
+ * a proposito: solo se exige en el service cuando el motivo es "Retirar el
+ * equipo..." y el ticket aun no tiene uno capturado (ver
+ * TicketsService.ponerEnEspera).
+ */
+export class PonerEnEsperaDto extends MotivoDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  inventario?: string;
+}
+
+/**
  * Para rechazar un ticket resuelto. A diferencia de MotivoDto, el motivo es
  * opcional aqui: en servicio CNA (Cartas de no adeudo) quien cierra en lugar
  * del solicitante (ver USUARIOS_CIERRE_SERVICIO) puede rechazar con un clic,

@@ -97,6 +97,11 @@ export class TicketsService {
     return this.http.get<BienesUsuario>(`${API}/tickets/${id}/bienes-para-corregir`);
   }
 
+  /** Bienes del solicitante para que el tecnico elija el inventario al retirar un equipo sin numero capturado. */
+  bienesParaRetiro(id: number) {
+    return this.http.get<BienesUsuario>(`${API}/tickets/${id}/bienes-para-retiro`);
+  }
+
   /** Nivel de tóner de las impresoras arrendadas del ticket (solo servicio IMPA, no para el solicitante). */
   nivelToner(id: number) {
     return this.http.get<NivelToner>(`${API}/tickets/${id}/nivel-toner`);
@@ -196,8 +201,9 @@ export class TicketsService {
   marcarCopiado(id: number) {
     return this.accion<void>(id, 'marcar-copiado');
   }
-  espera(id: number, motivo: string) {
-    return this.accion(id, 'espera', { motivo });
+  /** `inventario` solo aplica al retirar un equipo (CMP) que no tenia numero capturado desde el registro. */
+  espera(id: number, motivo: string, inventario?: string) {
+    return this.accion(id, 'espera', { motivo, inventario });
   }
   reanudar(id: number) {
     return this.accion(id, 'reanudar');

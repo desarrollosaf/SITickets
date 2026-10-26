@@ -24,6 +24,7 @@ import {
   CambiarSolicitanteDto,
   DatosGeneralesDto,
   MotivoDto,
+  PonerEnEsperaDto,
   PrioridadDto,
   ReasignarDto,
   RechazarDto,
@@ -142,6 +143,12 @@ export class TicketsController {
     return this.tickets.bienesParaCorregir(id, usuario);
   }
 
+  /** Lista para que el tecnico elija el inventario al retirar un equipo sin numero capturado. */
+  @Get(':id/bienes-para-retiro')
+  bienesParaRetiro(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.bienesParaRetiro(id, usuario);
+  }
+
   /** Nivel de tóner de las impresoras arrendadas de la direccion del solicitante (solo IMPA). */
   @Roles('admin', 'operador', 'tecnico', 'jefe', 'proveedor', 'gestor', 'validador')
   @Get(':id/nivel-toner')
@@ -225,10 +232,10 @@ export class TicketsController {
   @Post(':id/espera')
   espera(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: MotivoDto,
+    @Body() dto: PonerEnEsperaDto,
     @UsuarioActual() usuario: UsuarioToken,
   ) {
-    return this.tickets.ponerEnEspera(id, dto.motivo, usuario);
+    return this.tickets.ponerEnEspera(id, dto.motivo, usuario, dto.inventario);
   }
 
   @HttpCode(200)

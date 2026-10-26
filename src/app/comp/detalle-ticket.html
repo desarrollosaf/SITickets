@@ -278,12 +278,53 @@
                 cuenta contra tu desempeño.
               </div>
               <label class="form-label small fw-semibold" for="fm-espera">Motivo</label>
-              <select id="fm-espera" class="form-select form-select-sm mb-2" [(ngModel)]="motivo" name="motivo">
+              <select id="fm-espera" class="form-select form-select-sm mb-2" [(ngModel)]="motivo" name="motivo"
+                      (ngModelChange)="onMotivoCambia()">
                 <option value="">Selecciona…</option>
                 @for (m of motivosEspera; track m) {
                   <option [value]="m">{{ m }}</option>
                 }
               </select>
+              @if (necesitaInventarioRetiro()) {
+                <div class="alert alert-warning py-2 small">
+                  Este equipo se registró sin número de inventario (el problema elegido no lo pedía).
+                  Captúralo para poder generar la cédula de resguardo.
+                </div>
+                <label class="form-label small fw-semibold">Número de inventario</label>
+                @if (dCargandoBienes()) {
+                  <div class="form-text mb-2">
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    Consultando los bienes resguardados…
+                  </div>
+                } @else if (dBienes().length) {
+                  <div class="border rounded p-2 mb-2" style="max-height: 220px; overflow-y: auto">
+                    @for (b of dBienes(); track b.inventario) {
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="eBienCmp"
+                               [id]="'e-bien-' + b.inventario" [disabled]="b.en_mantenimiento"
+                               [checked]="dSeleccion()[0] === b.inventario"
+                               (change)="dElegirBienUnico(b.inventario)" />
+                        <label class="form-check-label small" [class.text-muted]="b.en_mantenimiento"
+                               [for]="'e-bien-' + b.inventario">
+                          <b>{{ b.inventario }}</b>
+                          @if (b.descripcion) {
+                            <span class="sub"> · {{ b.descripcion }}</span>
+                          }
+                          @if (b.en_mantenimiento) {
+                            <span class="chip chip-bandera ms-1">En atención</span>
+                          }
+                        </label>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <input id="fm-inventario" class="form-control form-control-sm mb-2" [(ngModel)]="inventarioRetiro"
+                         name="inventarioRetiro" maxlength="160" placeholder="Número de inventario del equipo" />
+                  <div class="form-text mb-2">
+                    {{ dMotivoBienes() || 'Captura el número de inventario a mano.' }}
+                  </div>
+                }
+              }
               <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
                 <button class="btn btn-sm btn-primary" [disabled]="ocupado()" (click)="enviarEspera()">
