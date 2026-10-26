@@ -42,12 +42,14 @@ type Formulario =
   | 'prioridad'
   | 'reloj-fin';
 
+const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
+
 const MOTIVOS_ESPERA = [
   'Refacción no disponible en almacén',
   'En espera de visita del proveedor',
   'Usuario ausente o sin acceso al área',
   'En espera de autorización',
-  'Retirar el equipo del lugar para su revisión',
+  MOTIVO_RETIRO_EQUIPO,
 ];
 
 @Component({
@@ -115,6 +117,8 @@ export class DetalleTicket {
 
   /* --- campos de los formularios --- */
   motivo = '';
+  /** Solo si se retira un equipo (CMP) registrado sin numero de inventario (p. ej. problema "Otro"). */
+  inventarioRetiro = '';
   diagnostico = '';
   solucion = '';
   refacciones = '';
@@ -171,6 +175,17 @@ export class DetalleTicket {
   readonly esCierreInmediato = computed(() => this.ticket()?.servicio_clave === 'SIS');
   /** Servicio IMPA (impresoras arrendadas): al resolver, ademas se elige que tecnico del proveedor atendio. */
   readonly esImpa = computed(() => this.ticket()?.servicio_clave === 'IMPA');
+
+  /**
+   * Al retirar un equipo (CMP) para revision: si el ticket se registro con
+   * un problema que no pedia inventario (p. ej. "Otro"), no hay con que
+   * armar la cedula de resguardo — se le pide al tecnico en este momento.
+   * motivo no es signal (va con ngModel), asi que es metodo, no computed.
+   */
+  necesitaInventarioRetiro(): boolean {
+    const t = this.ticket();
+    return this.motivo === MOTIVO_RETIRO_EQUIPO && t?.servicio_clave === 'CMP' && !t.contexto;
+  }
   /**
    * Caso especial, solo para el servicio indicado (ver USUARIOS_CIERRE_SERVICIO
    * en el backend): esta persona reemplaza al solicitante real para
@@ -432,6 +447,10 @@ export class DetalleTicket {
 
   abrirFormulario(f: Formulario) {
     this.motivo = '';
+    this.inventarioRetiro = '';
+    this.dBienes.set([]);
+    this.dMotivoBienes.set('');
+    this.dSeleccion.set([]);
     this.diagnostico = '';
     this.solucion = '';
     this.refacciones = '';
@@ -465,21 +484,27 @@ export class DetalleTicket {
     this.dMotivoBienes.set('');
 
     /* Igual que al registrar: si el campo pide inventario, se elige de una lista. */
-    if (this.esInventarioTicket()) {
-      this.dCargandoBienes.set(true);
-      this.api.bienesParaCorregir(t.id).subscribe({
-        next: (r) => {
-          this.dCargandoBienes.set(false);
-          this.dBienes.set(r.bienes);
-          this.dMotivoBienes.set(r.bienes.length ? '' : (r.motivo ?? 'No tiene bienes resguardados.'));
-        },
-        error: (e) => {
-          this.dCargandoBienes.set(false);
-          this.dBienes.set([]);
-          this.dMotivoBienes.set(mensajeError(e));
-        },
-      });
-    }
+    if (this.esInventarioTicket()) this.cargarBienes(t.id);
+  }
+
+  /** Compartido con onMotivoCambia(): lista de bienes resguardados del solicitante. */
+  private cargarBienes(ticketId: number, origen: 'corregir' | 'retiro' = 'corregir') {
+    this.dCargandoBienes.set(true);
+    const peticion = origen === 'retiro'
+      ? this.api.bienesParaRetiro(ticketId)
+      : this.api.bienesParaCorregir(ticketId);
+    peticion.subscribe({
+      next: (r) => {
+        this.dCargandoBienes.set(false);
+        this.dBienes.set(r.bienes);
+        this.dMotivoBienes.set(r.bienes.length ? '' : (r.motivo ?? 'No tiene bienes resguardados.'));
+      },
+      error: (e) => {
+        this.dCargandoBienes.set(false);
+        this.dBienes.set([]);
+        this.dMotivoBienes.set(mensajeError(e));
+      },
+    });
   }
 
   /** Equipo de computo: un solo equipo por ticket. */
@@ -571,9 +596,29 @@ export class DetalleTicket {
 
   /* ---------------- formularios ---------------- */
 
+  /** Al elegir "Retirar el equipo…" sin inventario capturado: ofrece la lista de bienes del solicitante. */
+  onMotivoCambia() {
+    this.dBienes.set([]);
+    this.dMotivoBienes.set('');
+    this.dSeleccion.set([]);
+    this.inventarioRetiro = '';
+    if (this.necesitaInventarioRetiro()) this.cargarBienes(this.id(), 'retiro');
+  }
+
+  /** Con lista de bienes disponible se manda lo elegido; si no, lo que el tecnico tecleo a mano. */
+  private inventarioAEnviar(): string | undefined {
+    if (!this.necesitaInventarioRetiro()) return undefined;
+    return (this.dBienes().length ? this.dSeleccion()[0] : this.inventarioRetiro.trim()) || undefined;
+  }
+
   enviarEspera() {
+    if (this.necesitaInventarioRetiro() && !this.inventarioAEnviar()) {
+      this.error.set('Este equipo no tiene número de inventario capturado: indícalo para retirarlo.');
+      return;
+    }
+    this.error.set('');
     this.ocupado.set(true);
-    this.api.espera(this.id(), this.motivo).subscribe({
+    this.api.espera(this.id(), this.motivo, this.inventarioAEnviar()).subscribe({
       next: (t) => this.aplicar(t),
       error: (e) => this.falla(e),
     });

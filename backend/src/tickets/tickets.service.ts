@@ -2070,6 +2070,26 @@ export class TicketsService {
       : this.bienesSrv.porRfc(rfc);
   }
 
+  /**
+   * Bienes resguardados del solicitante, para que el tecnico elija de una
+   * lista el inventario del equipo que va a retirar (ver ponerEnEspera):
+   * a diferencia de bienesParaCorregir(), la pide el tecnico (no el
+   * solicitante) ANTES de poner el ticket en espera, y justo porque el
+   * problema no trae campo de inventario no hay ese gate aqui.
+   */
+  async bienesParaRetiro(id: number, usuario: UsuarioToken) {
+    const t = await this.cargar(id, usuario);
+    this.exigeTecnico(t, usuario);
+    if (t.servicio?.clave !== 'CMP') {
+      throw new BadRequestException('Este ticket no es de equipo de computo');
+    }
+
+    const rfc = await this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre);
+    if (!rfc) return { bienes: [], motivo: 'No se pudo identificar el RFC del solicitante.' };
+
+    return this.bienesSrv.porRfcCmp(rfc);
+  }
+
   private esTecnicoDe(t: Ticket, usuario: UsuarioToken): boolean {
     return t.tecnico_id === usuario.id;
   }
@@ -2083,10 +2103,16 @@ export class TicketsService {
    * no es un numero de inventario y buscarlo en SIASAF solo produce avisos
    * confusos o, peor, una cedula con datos inventados.
    */
+  /**
+   * Equipo de computo con un bien identificado: o el problema elegido pedia
+   * inventario desde el registro, o ya se capturo despues (ver
+   * ponerEnEspera, cuando el tecnico lo agrega al retirar un equipo
+   * registrado con un problema tipo "Otro" que no lo pedia).
+   */
   private esTicketDeInventarioCmp(t: Ticket): boolean {
     return (
       t.servicio?.clave === 'CMP' &&
-      !!t.problema?.campo_adicional?.toLowerCase().includes('inventario')
+      (!!t.problema?.campo_adicional?.toLowerCase().includes('inventario') || !!t.contexto)
     );
   }
 
@@ -2180,21 +2206,46 @@ export class TicketsService {
     }
   }
 
-  async ponerEnEspera(id: number, motivo: string, usuario: UsuarioToken) {
+  async ponerEnEspera(id: number, motivo: string, usuario: UsuarioToken, inventario?: string) {
     const t = await this.cargar(id, usuario);
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.ASIGNADO]);
+
+    /*
+     * Retirar equipo sin inventario capturado al registrar (p. ej. el
+     * problema elegido fue "Otro", que no lo pide): sin numero de
+     * inventario no hay bien que documentar en la cedula de custodia, asi
+     * que se le exige al tecnico en este momento en vez de dejarlo pasar
+     * sin cedula.
+     */
+    const retiraEquipo = motivo === MOTIVO_RETIRO_EQUIPO && t.servicio?.clave === 'CMP';
+    if (retiraEquipo && !t.contexto && !inventario?.trim()) {
+      throw new BadRequestException(
+        'Este equipo no tiene número de inventario capturado: indícalo para retirarlo',
+      );
+    }
+
+    const nuevoInventario = retiraEquipo && !t.contexto ? inventario?.trim() || undefined : undefined;
 
     await t.update({
       estatus: ESTATUS.EN_ESPERA,
       f_espera_desde: new Date(),
       motivo_espera: motivo,
+      ...(nuevoInventario && { contexto: nuevoInventario }),
     });
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
 
     if (motivo === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t)) {
       await this.generarCedulaSalida(t, usuario);
+      /*
+       * El inventario se acaba de saber en este momento (antes el problema
+       * no lo pedia): marcarCmpEnMantenimiento() normalmente corre al
+       * iniciar la atencion, pero en ese momento t.contexto todavia estaba
+       * vacio, asi que el equipo nunca quedo resguardado en SIASAF. Se
+       * marca hasta ahora, que ya se sabe cual es.
+       */
+      if (nuevoInventario) await this.marcarCmpEnMantenimiento(t, usuario);
     }
 
     return this.detalle(id, usuario);
