@@ -184,7 +184,16 @@ export class TicketsService {
    * Corrige los datos generales del reporte. El ticket en si —problema,
    * prioridad, tecnico— no se toca por aqui.
    */
-  datos(id: number, d: { contexto?: string; extension?: string; edificio_atencion?: string }) {
+  datos(
+    id: number,
+    d: {
+      contexto?: string;
+      extension?: string;
+      edificio_atencion?: string;
+      inmueble_id?: number;
+      piso?: string;
+    },
+  ) {
     return this.http.post<TicketDetalle>(`${API}/tickets/${id}/datos`, d);
   }
 
