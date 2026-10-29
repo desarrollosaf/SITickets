@@ -104,6 +104,13 @@ const SERVICIOS_ACEPTAN_BAJAS = ['CNA'];
 /** Lo que sigue en manos del area (el reporte los separa de resueltos y cerrados). */
 const ESTATUS_ABIERTOS_REPORTE = ['REGISTRADO', 'ASIGNADO', 'EN_ATENCION', 'EN_ESPERA'];
 
+/** Estatus en los que se admite corregir los datos generales (actualizarDatos/bienesParaCorregir). */
+const ESTATUS_CORREGIBLES: EstatusClave[] = [
+  ESTATUS.REGISTRADO,
+  ESTATUS.ASIGNADO,
+  ESTATUS.EN_ESPERA,
+];
+
 /** Estatus como lo lee una persona en el Excel, con los mismos matices que el chip de la app. */
 function estatusLegible(t: Ticket): string {
   if (t.en_cola) return 'En cola (sin técnico)';
@@ -1693,19 +1700,24 @@ export class TicketsService {
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
 
+    /* Caso especial, solo para el servicio indicado: reemplaza al solicitante, no se suma — ver USUARIOS_CIERRE_SERVICIO. */
+    const encargado = USUARIOS_CIERRE_SERVICIO[ticket.servicio?.clave ?? ''];
     const suyo = ticket.solicitante_id === usuario.id;
-    if (!suyo && usuario.rol !== 'admin') {
+    if (!suyo && usuario.rol !== 'admin' && usuario.id !== encargado) {
       throw new ForbiddenException('Solo quien levanto el reporte o el administrador lo corrigen');
     }
     if (ESTATUS_FINALES.includes(ticket.estatus)) {
       throw new BadRequestException('El ticket ya esta cerrado o cancelado: sus datos no se tocan');
     }
     /*
-     * Solo se corrige mientras el tecnico tiene el ticket en espera: evita
-     * pisar un cambio de bien mientras se esta atendiendo activamente.
+     * Se corrige mientras nadie lo esta atendiendo activamente todavia
+     * (REGISTRADO/ASIGNADO) o mientras el tecnico lo tiene en espera —
+     * evita pisar un cambio de bien mientras se atiende de verdad
+     * (EN_ATENCION), que es cuando ya puede haber equipo tomado/mantenimiento
+     * en curso.
      */
-    if (ticket.estatus !== ESTATUS.EN_ESPERA) {
-      throw new BadRequestException('El ticket debe estar en espera para corregir sus datos');
+    if (!ESTATUS_CORREGIBLES.includes(ticket.estatus)) {
+      throw new BadRequestException('El ticket debe estar registrado, asignado o en espera para corregir sus datos');
     }
 
     /* Cada cambio se anota por separado: la bitacora guarda antes y despues. */
@@ -1739,11 +1751,28 @@ export class TicketsService {
       }
     }
 
-    if (dto.edificio_atencion !== undefined) {
+    if (dto.inmueble_id !== undefined) {
+      const inmueble = await this.inmuebles.findByPk(dto.inmueble_id);
+      if (!inmueble) throw new BadRequestException('El inmueble elegido no existe');
+      const edificioAtencion = `${inmueble.dependencia} - ${inmueble.ubicacion}`.slice(0, 160);
+      if (edificioAtencion !== ticket.edificio_atencion) {
+        anota('Edificio o ubicacion', ticket.edificio_atencion, edificioAtencion);
+        nuevos.edificio_atencion = edificioAtencion;
+      }
+      if (dto.inmueble_id !== ticket.inmueble_id) nuevos.inmueble_id = dto.inmueble_id;
+    } else if (dto.edificio_atencion !== undefined) {
       const edificioAtencion = dto.edificio_atencion.trim() || null;
       if (edificioAtencion !== ticket.edificio_atencion) {
         anota('Edificio o ubicacion', ticket.edificio_atencion, edificioAtencion);
         nuevos.edificio_atencion = edificioAtencion;
+      }
+    }
+
+    if (dto.piso !== undefined) {
+      const piso = dto.piso.trim() || null;
+      if (piso !== ticket.piso) {
+        anota('Piso', ticket.piso, piso);
+        nuevos.piso = piso;
       }
     }
 
@@ -2078,12 +2107,15 @@ export class TicketsService {
     });
     if (!ticket) throw new NotFoundException('El ticket no existe o no esta a tu alcance');
 
+    const encargado = USUARIOS_CIERRE_SERVICIO[ticket.servicio?.clave ?? ''];
     const suyo = ticket.solicitante_id === usuario.id;
-    if (!suyo && usuario.rol !== 'admin') {
+    if (!suyo && usuario.rol !== 'admin' && usuario.id !== encargado) {
       throw new ForbiddenException('Solo quien levanto el reporte o el administrador lo corrigen');
     }
-    if (ticket.estatus !== ESTATUS.EN_ESPERA) {
-      throw new BadRequestException('El ticket debe estar en espera para corregir el número de inventario');
+    if (!ESTATUS_CORREGIBLES.includes(ticket.estatus)) {
+      throw new BadRequestException(
+        'El ticket debe estar registrado, asignado o en espera para corregir el número de inventario',
+      );
     }
 
     const campo = (ticket.problema?.campo_adicional ?? '').toLowerCase();

@@ -31,8 +31,8 @@
         <div class="d-flex flex-wrap gap-2 mt-3 no-imprimir">
           <!-- Corrección de datos generales: no cambia el ticket, solo sus datos -->
           @if (puedeCorregir()) {
-            <button class="btn btn-sm btn-outline-secondary" [disabled]="!enEspera()"
-                    [title]="enEspera() ? '' : 'El ticket debe estar en espera para poder corregir sus datos'"
+            <button class="btn btn-sm btn-outline-secondary" [disabled]="!puedeCorregirEstatus()"
+                    [title]="puedeCorregirEstatus() ? '' : 'El ticket debe estar registrado, asignado o en espera para poder corregir sus datos'"
                     (click)="abrirDatos()">
               <i class="bi bi-pencil"></i> Corregir datos
             </button>
@@ -261,8 +261,21 @@
               <label class="form-label small fw-semibold" for="fm-edificio">
                 Edificio o ubicación donde se atenderá el reporte
               </label>
-              <input id="fm-edificio" class="form-control form-control-sm mb-2" [(ngModel)]="dEdificioAtencion"
-                     name="dEdificioAtencion" maxlength="160" />
+              <select id="fm-edificio" class="form-select form-select-sm mb-2" [(ngModel)]="dInmuebleId"
+                      name="dInmuebleId">
+                <option value="">Elige un inmueble…</option>
+                @for (i of catalogos()?.inmuebles; track i.id) {
+                  <option [value]="i.id">{{ i.dependencia }}</option>
+                }
+              </select>
+              @if (!dInmuebleId() && dEdificioAtencion()) {
+                <div class="form-text mb-2">
+                  Texto libre actual: {{ dEdificioAtencion() }} — elige un inmueble de la lista para reemplazarlo.
+                </div>
+              }
+              <label class="form-label small fw-semibold" for="fm-piso">Piso / oficina</label>
+              <input id="fm-piso" class="form-control form-control-sm mb-2" [(ngModel)]="dPiso"
+                     name="dPiso" maxlength="60" />
 
               <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-sm btn-outline-secondary" (click)="formulario.set(null)">Cancelar</button>
