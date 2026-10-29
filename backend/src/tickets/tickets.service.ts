@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -1267,15 +1268,22 @@ export class TicketsService {
     }
 
     /*
-     * §16 validacion previa (rol validador, ver DependenciaValidador): si
-     * quien registra es gestor y la dependencia del solicitante tiene al
-     * menos un validador asignado, el ticket queda congelado —sin tecnico,
-     * sin SLA corriendo— hasta que un validador lo revise.
+     * §16 validacion previa (rol validador, ver DependenciaValidador): solo
+     * pasan por aqui los tickets que registra un gestor CUYA PROPIA
+     * dependencia de saf (s_usuario.id_Dependencia, no la del solicitante)
+     * es la 3 — es la unica dependencia con validador asignado. El ticket
+     * queda congelado —sin tecnico, sin SLA corriendo— hasta que un
+     * validador lo revise.
+     *
+     * CNA (Cartas de no adeudo) queda fuera aparte: SASA920502 lo registra a
+     * nombre de solicitantes de cualquier dependencia (ver
+     * USUARIOS_CIERRE_SERVICIO) — es un flujo cerrado donde ella misma
+     * confirma el cierre al final, la validacion previa no aplica.
      */
     const requiereValidacion =
+      problema.servicio.clave !== 'CNA' &&
       usuario.rol === 'gestor' &&
-      !!quien.dependencia_id &&
-      (await this.dependenciaValidador.count({ where: { dependencia_id: quien.dependencia_id } })) > 0;
+      (await this.dependenciaSafDeGestor(usuario.id)) === 3;
 
     /*
      * §16 el inmueble que el usuario eligio al registrar es mas preciso que
@@ -1286,6 +1294,29 @@ export class TicketsService {
       ? ((await this.inmuebles.findByPk(dto.inmueble_id, { attributes: ['sede_id'] }))?.sede_id ??
         quien.sede_id)
       : quien.sede_id;
+
+    /*
+     * Doble clic, recarga de pagina o reintento del navegador con mala
+     * señal: sin esto, cada click de mas crea un ticket identico (ya paso
+     * dos veces, una vez 60 seguidos). Si el mismo solicitante ya registro
+     * EXACTAMENTE el mismo problema+contexto hace menos de 2 minutos, se
+     * corta aqui en vez de dejar pasar el duplicado.
+     */
+    const duplicado = await this.tickets.findOne({
+      where: {
+        solicitante_id: solicitanteId,
+        problema_id: problema.id,
+        contexto,
+        f_captura: { [Op.gte]: new Date(Date.now() - 2 * 60_000) },
+      },
+      order: [['f_captura', 'DESC']],
+    });
+    if (duplicado) {
+      throw new ConflictException(
+        `Ya registraste este mismo reporte hace un momento (folio ${duplicado.folio_general}). ` +
+          'Si de verdad necesitas otro, espera un par de minutos e inténtalo de nuevo.',
+      );
+    }
 
     const ticket = await this.db.transaction(async (tx) => {
       /*
