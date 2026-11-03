@@ -86,28 +86,39 @@ export class RelojService {
         );
       }
 
-      /* Un tecnico solo puede tener un reloj corriendo: la sesion anterior se
-         detiene sola y su ticket queda EN ESPERA, no abandonado. */
-      const abierta = await this.sesiones.findOne({
-        where: { usuario_id: usuario.id, fin: null, ticket_id: { [Op.ne]: t.id } },
-        transaction: tx,
-      });
-      if (abierta) {
-        await this.detenerSesion(abierta, 'Cambio de servicio', null, tx);
-        const otro = await this.tickets.findByPk(abierta.ticket_id, { transaction: tx });
-        if (otro && otro.estatus === ESTATUS.EN_ATENCION) {
-          await otro.update(
-            {
-              estatus: ESTATUS.EN_ESPERA,
-              f_espera_desde: new Date(),
-              motivo_espera: 'El tecnico salio a atender otro ticket',
-            },
-            { transaction: tx },
-          );
-          this.traza.registra(
-            '§16',
-            `Un tecnico solo puede tener un reloj activo. ${otro.folio} se detuvo y quedo EN ESPERA.`,
-          );
+      /*
+       * Un tecnico solo puede tener un reloj corriendo: la sesion anterior se
+       * detiene sola y su ticket queda EN ESPERA, no abandonado.
+       *
+       * Excepcion: tickets internos (interno=true, §11) si pueden correr en
+       * paralelo entre si — el area se los asigna a su propio ritmo, no hay
+       * un "sitio" fisico unico que obligue a estar nada mas en uno a la vez
+       * (ej. varias revisiones preventivas de la misma jornada). Si el
+       * ticket que se arranca NO es interno, se sigue aplicando el candado
+       * normal, aunque lo que estuviera corriendo fuera interno.
+       */
+      if (!t.interno) {
+        const abierta = await this.sesiones.findOne({
+          where: { usuario_id: usuario.id, fin: null, ticket_id: { [Op.ne]: t.id } },
+          transaction: tx,
+        });
+        if (abierta) {
+          await this.detenerSesion(abierta, 'Cambio de servicio', null, tx);
+          const otro = await this.tickets.findByPk(abierta.ticket_id, { transaction: tx });
+          if (otro && otro.estatus === ESTATUS.EN_ATENCION) {
+            await otro.update(
+              {
+                estatus: ESTATUS.EN_ESPERA,
+                f_espera_desde: new Date(),
+                motivo_espera: 'El tecnico salio a atender otro ticket',
+              },
+              { transaction: tx },
+            );
+            this.traza.registra(
+              '§16',
+              `Un tecnico solo puede tener un reloj activo. ${otro.folio} se detuvo y quedo EN ESPERA.`,
+            );
+          }
         }
       }
 
