@@ -63,7 +63,13 @@ import {
   ResolverDto,
 } from './dto/tickets.dto';
 import { AtenderCmpDto } from './dto/atender-cmp.dto';
-import { fechaExcel, fechaLocal, inicioSemana, minutosHabiles } from '../common/fecha';
+import {
+  cercaDelCierre,
+  fechaExcel,
+  fechaLocal,
+  inicioSemana,
+  minutosHabiles,
+} from '../common/fecha';
 
 /**
  * Carpeta donde se guardan los dictamenes de baja (pdf). Vive dentro de
@@ -472,6 +478,80 @@ export class TicketsService {
       .filter(({ avance }) => avance >= UMBRAL && avance < 1)
       .sort((a, b) => b.avance - a.avance)
       .map(({ t }) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0, mapaDependencias));
+  }
+
+  /**
+   * Tickets de prioridad P1 o P2 que siguen abiertos a partir de las 17:30
+   * (media hora antes del cierre real de jornada, 18:30 — da un poco mas de
+   * margen que esperar al cierre exacto) — se queda vacio mientras no se
+   * llegue a esa hora, no hay nada que avisar todavia. Mismo alcance que
+   * proximosAVencer: admin/operador ven todo, un tecnico solo lo suyo.
+   * No se excluye IMPA aqui: a diferencia de proximosAVencer (que mide
+   * desempeno del tecnico), esto es urgencia de negocio — un P1/P2 sin
+   * resolver importa sin importar quien lo atiende.
+   */
+  async prioridadAltaSinResolver(usuario: UsuarioToken) {
+    if (!cercaDelCierre()) return [];
+
+    const where: Record<string, unknown> = {
+      estatus: { [Op.in]: ESTATUS_ABIERTOS_REPORTE },
+      prioridad: { [Op.in]: ['P1', 'P2'] },
+    };
+    if (ROLES_TECNICOS.includes(usuario.rol)) where.tecnico_id = usuario.id;
+
+    const filas = await this.tickets.findAll({
+      where,
+      include: INCLUDES,
+      order: [['prioridad', 'ASC'], ['f_registro', 'ASC']],
+    });
+
+    const objetivos = await this.reglas.objetivos();
+    const conteos = await this.conteoSesiones(filas.map((t) => t.id));
+    const mapaDependencias = await this.mapaDependenciasSaf();
+    return filas.map((t) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0, mapaDependencias));
+  }
+
+  /**
+   * Deja constancia en bitacora de cada P1/P2 que sigue abierto desde las
+   * 17:30 — llamado cada hora desde MantenimientoService.cadaHora(), igual
+   * que cierreDeJornada()/reinicioDeJornada(). Solo una vez por ticket por
+   * dia (si ya se aviso hoy, no se repite aunque el cron siga corriendo cada
+   * hora toda la noche o el fin de semana).
+   */
+  async avisaPrioridadAltaAlCierre(): Promise<number> {
+    if (!cercaDelCierre()) return 0;
+
+    const ACCION = 'Alerta prioridad alta';
+    const filas = await this.tickets.findAll({
+      where: {
+        estatus: { [Op.in]: ESTATUS_ABIERTOS_REPORTE },
+        prioridad: { [Op.in]: ['P1', 'P2'] },
+      },
+      attributes: ['id', 'folio', 'prioridad'],
+    });
+    if (!filas.length) return 0;
+
+    const hoy = fechaLocal();
+    let avisados = 0;
+    for (const t of filas) {
+      const yaHoy = await this.bitacora.findOne({
+        where: { ticket_id: t.id, accion: ACCION, fecha: { [Op.gte]: new Date(`${hoy}T00:00:00`) } },
+      });
+      if (yaHoy) continue;
+
+      await this.reglas.anota(
+        t.id,
+        null,
+        ACCION,
+        `${t.prioridad}: sigue abierto desde las 17:30 o despues`,
+      );
+      this.traza.registra(
+        '§16',
+        `${t.folio} (${t.prioridad}) sigue abierto desde las 17:30: avisado al tecnico y al administrador.`,
+      );
+      avisados++;
+    }
+    return avisados;
   }
 
   /**

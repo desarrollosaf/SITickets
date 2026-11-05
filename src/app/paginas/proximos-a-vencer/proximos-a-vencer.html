@@ -24,6 +24,19 @@
   <div class="alert alert-danger py-2 small">{{ error() }}</div>
 }
 
+@if (prioridadAlta().length) {
+  <div class="tarjeta p-3 mb-3" style="border-left: 4px solid var(--p1)">
+    <h2 class="h6 mb-1 d-flex align-items-center gap-2" style="color: var(--p1)">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      {{ prioridadAlta().length }} de prioridad alta (P1/P2) sin resolver
+    </h2>
+    <p class="sub small mb-3">
+      Siguen abiertos desde las 17:30 — ya se avisó también al técnico asignado:
+    </p>
+    <app-tabla-tickets [tickets]="prioridadAlta()" (abrir)="abierto.set($event)" [boletos]="true" />
+  </div>
+}
+
 @if (cargando()) {
   <div class="tarjeta p-5 text-center">
     <span class="spinner-border spinner-border-sm me-2"></span>Cargando…

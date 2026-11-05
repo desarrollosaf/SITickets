@@ -66,10 +66,10 @@
             @if (o.ruta === '/tickets-por-validar' && pendientesValidar() > 0) {
               <span class="punto-parpadeante ms-auto" [title]="pendientesValidar() + ' por validar'"></span>
             }
-            @if (o.ruta === '/proximos-a-vencer' && proximosAVencerCount() > 0) {
+            @if (o.ruta === '/proximos-a-vencer' && avisosUrgentes() > 0) {
               <span class="badge rounded-pill ms-auto badge-parpadeante" style="background: var(--p2)"
-                    [title]="proximosAVencerCount() + ' próximos a vencer'">
-                {{ proximosAVencerCount() }}
+                    [title]="avisosUrgentes() + ' próximos a vencer o de prioridad alta'">
+                {{ avisosUrgentes() }}
               </span>
             }
           </a>
@@ -182,10 +182,10 @@
                   @if (o.ruta === '/tickets-por-validar' && pendientesValidar() > 0) {
                     <span class="punto-parpadeante ms-auto" [title]="pendientesValidar() + ' por validar'"></span>
                   }
-                  @if (o.ruta === '/proximos-a-vencer' && proximosAVencerCount() > 0) {
+                  @if (o.ruta === '/proximos-a-vencer' && avisosUrgentes() > 0) {
                     <span class="badge rounded-pill ms-auto badge-parpadeante" style="background: var(--p2)"
-                          [title]="proximosAVencerCount() + ' próximos a vencer'">
-                      {{ proximosAVencerCount() }}
+                          [title]="avisosUrgentes() + ' próximos a vencer o de prioridad alta'">
+                      {{ avisosUrgentes() }}
                     </span>
                   }
                 </a>

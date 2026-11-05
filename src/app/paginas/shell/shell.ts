@@ -140,6 +140,9 @@ export class Shell {
   readonly pendientesValidar = signal(0);
   /** Cuantos tickets estan al 70% o mas de su objetivo sin vencer aun (ver "Próximos a vencer"). */
   readonly proximosAVencerCount = signal(0);
+  /** Cuantos P1/P2 siguen abiertos fuera de jornada. Se suma al mismo badge de "Próximos a vencer". */
+  readonly prioridadAltaCount = signal(0);
+  readonly avisosUrgentes = computed(() => this.proximosAVencerCount() + this.prioridadAltaCount());
 
   constructor() {
     if (this.auth.rol() === 'validador') {
@@ -156,10 +159,15 @@ export class Shell {
     /* Mismos roles que tienen "/proximos-a-vencer" en su menu (ver MENUS). */
     if (['admin', 'jefe', 'operador'].includes(this.auth.rol() ?? '')) {
       this.cargarProximosAVencer();
+      this.cargarPrioridadAlta();
       this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
         this.cargarProximosAVencer();
+        this.cargarPrioridadAlta();
       });
-      setInterval(() => this.cargarProximosAVencer(), 60_000);
+      setInterval(() => {
+        this.cargarProximosAVencer();
+        this.cargarPrioridadAlta();
+      }, 60_000);
     }
   }
 
@@ -175,6 +183,15 @@ export class Shell {
   private cargarProximosAVencer() {
     this.api.proximosAVencer().subscribe({
       next: (t) => this.proximosAVencerCount.set(t.length),
+      error: () => {
+        /* Si falla, simplemente no se muestra el indicador: no es critico. */
+      },
+    });
+  }
+
+  private cargarPrioridadAlta() {
+    this.api.prioridadAltaSinResolver().subscribe({
+      next: (t) => this.prioridadAltaCount.set(t.length),
       error: () => {
         /* Si falla, simplemente no se muestra el indicador: no es critico. */
       },
