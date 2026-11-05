@@ -124,6 +124,16 @@ export class TicketsController {
   }
 
   /**
+   * P1/P2 abiertos fuera de la jornada laboral. Mismo alcance de roles y
+   * misma razon de ir antes de ':id' que proximos-a-vencer.
+   */
+  @Roles('admin', 'jefe', 'operador', 'tecnico', 'proveedor', 'sistemas')
+  @Get('prioridad-alta-sin-resolver')
+  prioridadAltaSinResolver(@UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.prioridadAltaSinResolver(usuario);
+  }
+
+  /**
    * Excel de «Equipos dados de baja». Solo administrador. Va antes de ':id'
    * para que no se confunda "bajas-excel" con un identificador de ticket.
    */

@@ -12,6 +12,7 @@ import {
 import { ReglasService } from '../tickets/reglas.service';
 import { TrazaService } from '../tickets/traza.service';
 import { RelojService } from '../tickets/reloj.service';
+import { TicketsService } from '../tickets/tickets.service';
 import { fechaLocal } from '../common/fecha';
 
 /**
@@ -32,6 +33,7 @@ export class MantenimientoService {
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
     private readonly reloj: RelojService,
+    private readonly ticketsSrv: TicketsService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -40,6 +42,7 @@ export class MantenimientoService {
     await this.generaPreventivos();
     await this.reloj.cierreDeJornada();
     await this.reloj.reinicioDeJornada();
+    await this.ticketsSrv.avisaPrioridadAltaAlCierre();
   }
 
   /** §11 · genera los tickets del programa preventivo que ya tocan. */

@@ -37,10 +37,14 @@ export class Bandeja implements OnDestroy {
 
   /** Abiertos propios que van al 70% o mas de su objetivo sin vencer aun (IMPA aparte). */
   readonly proximosAVencer = signal<Ticket[]>([]);
+  /** P1/P2 propios que siguen abiertos fuera de jornada. Vacio mientras la jornada sigue corriendo. */
+  readonly prioridadAlta = signal<Ticket[]>([]);
   readonly cortinaCerrada = signal(false);
   readonly mostrarCortina = computed(
     () =>
-      (this.proximosAVencer().length > 0 || this.ticketsVencidos().length > 0) &&
+      (this.proximosAVencer().length > 0 ||
+        this.ticketsVencidos().length > 0 ||
+        this.prioridadAlta().length > 0) &&
       !this.cortinaCerrada(),
   );
 
@@ -152,6 +156,7 @@ export class Bandeja implements OnDestroy {
     void this.revisaPermisoGeo();
     this.cargar();
     this.api.proximosAVencer().subscribe({ next: (t) => this.proximosAVencer.set(t) });
+    this.api.prioridadAltaSinResolver().subscribe({ next: (t) => this.prioridadAlta.set(t) });
   }
 
   ngOnDestroy() {
