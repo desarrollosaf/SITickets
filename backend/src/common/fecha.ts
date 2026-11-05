@@ -26,6 +26,13 @@ export function fechaLocal(d: Date = new Date()): string {
 const JORNADA_INICIO_MIN = 9 * 60;
 const JORNADA_FIN_MIN = 18 * 60 + 30;
 
+/** Fuera de la jornada laboral (fin de semana o antes/despues de horario). */
+export function fueraDeJornada(d: Date = new Date()): boolean {
+  if (d.getDay() === 0 || d.getDay() === 6) return true;
+  const minutosDia = d.getHours() * 60 + d.getMinutes();
+  return minutosDia < JORNADA_INICIO_MIN || minutosDia >= JORNADA_FIN_MIN;
+}
+
 /** 9:00 am del siguiente dia habil (salta sabado y domingo). */
 function inicioSiguienteDiaHabil(d: Date): Date {
   const n = new Date(d);

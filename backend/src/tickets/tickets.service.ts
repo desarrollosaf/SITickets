@@ -2296,6 +2296,15 @@ export class TicketsService {
       motivo_espera: motivo,
       ...(nuevoInventario && { contexto: nuevoInventario }),
     });
+
+    /* Al quedar en espera tambien se detiene el reloj de sitio: si no, sigue
+       corriendo aunque el tecnico ya no este atendiendo (se detecto una sesion
+       de mas de una semana abierta por este hueco). */
+    await this.sesiones.update(
+      { fin: new Date(), motivo },
+      { where: { ticket_id: t.id, fin: null } },
+    );
+
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
 

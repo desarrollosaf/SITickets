@@ -273,6 +273,11 @@ export class DetalleTicket {
     () => !['CERRADO', 'CANCELADO'].includes(this.ticket()?.estatus ?? ''),
   );
   readonly relojCorriendo = computed(() => this.ticket()?.sesiones.some((s) => !s.fin) ?? false);
+  /** §16 · alerta si el reloj lleva mas de 4 horas corriendo sin detenerse. */
+  readonly relojAlerta = computed(() => {
+    const abierta = this.ticket()?.sesiones.find((s) => !s.fin);
+    return (abierta?.segundos ?? 0) > 4 * 3600;
+  });
 
   /**
    * §16 · QR "de llegada": al escanearlo, si hace falta pide iniciar sesion y

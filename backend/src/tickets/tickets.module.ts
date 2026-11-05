@@ -74,6 +74,6 @@ import { ImpresorasModule } from '../impresoras/impresoras.module';
     DictamenService,
     CedulaCustodiaService,
   ],
-  exports: [TicketsService, ReglasService, TrazaService, SequelizeModule],
+  exports: [TicketsService, ReglasService, TrazaService, RelojService, SequelizeModule],
 })
 export class TicketsModule {}
