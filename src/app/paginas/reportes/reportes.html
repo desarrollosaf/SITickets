@@ -150,4 +150,10 @@
   </div>
 
   <app-tendencia-chart [etiquetas]="etiquetasTendencia()" [valores]="valoresTendencia()" />
+
+  <div class="mt-3">
+    <app-tendencia-semanal-chart
+      [semanas]="semanasTendencia()"
+      [servicios]="serviciosTendenciaSemanal()" />
+  </div>
 }
