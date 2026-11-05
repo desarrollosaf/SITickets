@@ -100,6 +100,9 @@ export class DetalleTicket {
   readonly dContexto = signal('');
   readonly dExtension = signal('');
   readonly dEdificioAtencion = signal('');
+  /** Inmueble del catalogo elegido al corregir; '' = ninguno (se mantiene el texto libre que ya tenia). */
+  readonly dInmuebleId = signal('');
+  readonly dPiso = signal('');
 
   /* --- correccion del numero de inventario: mismo mecanismo que al registrar --- */
   readonly esInventarioTicket = computed(() => esCampoInventario(this.ticket()?.campo_adicional));
@@ -307,7 +310,9 @@ export class DetalleTicket {
    * bien mientras se atiende activamente. El backend vuelve a revisar todo
    * esto; aqui solo se decide que se ofrece.
    */
-  readonly puedeCorregir = computed(() => this.esMiSolicitud() || this.esAdmin());
+  readonly puedeCorregir = computed(
+    () => this.esMiSolicitud() || this.esAdmin() || this.esCierreEspecial(),
+  );
 
   /**
    * Cambiar a nombre de quien quedo el ticket: admin/operador, o quien lo
@@ -396,6 +401,10 @@ export class DetalleTicket {
       .subscribe({ next: (t) => this.aplicar(t), error: (e) => this.falla(e) });
   }
   readonly enEspera = computed(() => this.ticket()?.estatus === 'EN_ESPERA');
+  /** "Corregir datos" se habilita antes de que alguien lo atienda de verdad, o ya en espera — ver ESTATUS_CORREGIBLES en el backend. */
+  readonly puedeCorregirEstatus = computed(() =>
+    ['REGISTRADO', 'ASIGNADO', 'EN_ESPERA'].includes(this.ticket()?.estatus ?? ''),
+  );
 
   /** Opciones de reclasificacion: servicios de usuario distintos al actual. */
   readonly problemasReclasificacion = computed(() => {
@@ -478,6 +487,8 @@ export class DetalleTicket {
     this.dSeleccion.set(t.contexto ? t.contexto.split(',').map((s) => s.trim()).filter(Boolean) : []);
     this.dExtension.set(t.extension ?? '');
     this.dEdificioAtencion.set(t.edificio_atencion ?? '');
+    this.dInmuebleId.set(t.inmueble_id ? String(t.inmueble_id) : '');
+    this.dPiso.set(t.piso ?? '');
     this.error.set('');
     this.formulario.set('datos');
     this.dBienes.set([]);
@@ -528,7 +539,10 @@ export class DetalleTicket {
       .datos(t.id, {
         contexto: this.dContextoFinal(),
         extension: this.dExtension().trim(),
-        edificio_atencion: this.dEdificioAtencion().trim(),
+        /* Con inmueble elegido del catalogo manda ese; si no, se deja el texto libre que ya traia. */
+        inmueble_id: this.dInmuebleId() ? Number(this.dInmuebleId()) : undefined,
+        edificio_atencion: this.dInmuebleId() ? undefined : this.dEdificioAtencion().trim(),
+        piso: this.dPiso().trim(),
       })
       .subscribe({ next: (r) => this.aplicar(r), error: (e) => this.falla(e) });
   }

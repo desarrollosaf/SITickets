@@ -114,6 +114,17 @@ export class DatosGeneralesDto {
   @IsString()
   @MaxLength(160)
   edificio_atencion?: string;
+
+  /** Inmueble del catalogo elegido al corregir (ver tabla `inmueble`); si viene, manda sobre edificio_atencion. */
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  inmueble_id?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  piso?: string;
 }
 
 /** Corregir a nombre de quien quedo el ticket. Sin a_nombre_de = a nombre propio. */
