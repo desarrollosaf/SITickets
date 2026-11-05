@@ -21,6 +21,8 @@ export class ProximosAVencer {
   private readonly api = inject(TicketsService);
 
   readonly tickets = signal<Ticket[]>([]);
+  /** P1/P2 abiertos fuera de jornada (ver prioridadAltaSinResolver() del backend). */
+  readonly prioridadAlta = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);
   readonly abierto = signal<number | null>(null);
   readonly error = signal('');
@@ -56,6 +58,7 @@ export class ProximosAVencer {
   constructor() {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
     this.cargar();
+    this.api.prioridadAltaSinResolver().subscribe({ next: (t) => this.prioridadAlta.set(t) });
   }
 
   irAPagina(n: number) {
@@ -80,5 +83,6 @@ export class ProximosAVencer {
         this.cargando.set(false);
       },
     });
+    this.api.prioridadAltaSinResolver().subscribe({ next: (t) => this.prioridadAlta.set(t) });
   }
 }

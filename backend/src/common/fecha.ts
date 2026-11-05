@@ -43,6 +43,20 @@ export function fueraDeJornada(d: Date = new Date()): boolean {
   return minutosDia < JORNADA_INICIO_MIN || minutosDia >= JORNADA_FIN_MIN;
 }
 
+/**
+ * Umbral propio para la alerta de prioridad alta (P1/P2) sin resolver: media
+ * hora antes del cierre real de jornada (18:30), para avisar con un poco mas
+ * de margen en vez de esperar al cierre exacto. Fin de semana sigue contando
+ * como dentro del aviso, igual que fueraDeJornada().
+ */
+const ALERTA_PRIORIDAD_ALTA_MIN = 17 * 60 + 30;
+
+export function cercaDelCierre(d: Date = new Date()): boolean {
+  if (d.getDay() === 0 || d.getDay() === 6) return true;
+  const minutosDia = d.getHours() * 60 + d.getMinutes();
+  return minutosDia < JORNADA_INICIO_MIN || minutosDia >= ALERTA_PRIORIDAD_ALTA_MIN;
+}
+
 /** 9:00 am del siguiente dia habil (salta sabado y domingo). */
 function inicioSiguienteDiaHabil(d: Date): Date {
   const n = new Date(d);

@@ -176,6 +176,10 @@ export class TicketsService {
   proximosAVencer() {
     return this.http.get<Ticket[]>(`${API}/tickets/proximos-a-vencer`);
   }
+  /** P1/P2 abiertos fuera de la jornada laboral. Vacio mientras la jornada sigue corriendo. */
+  prioridadAltaSinResolver() {
+    return this.http.get<Ticket[]>(`${API}/tickets/prioridad-alta-sin-resolver`);
+  }
 
   crearInterno(datos: {
     problema: string;

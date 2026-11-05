@@ -64,6 +64,32 @@
       </div>
     }
 
+    @if (prioridadAlta().length) {
+      <p class="fw-semibold small mb-1 d-flex align-items-center gap-2" style="color: var(--p1)">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        {{ prioridadAlta().length }} de prioridad alta sin resolver
+      </p>
+      <p class="sub small mb-2">
+        Siguen abiertos desde las 17:30 — ya se avisó también al administrador:
+      </p>
+      <div class="d-flex flex-column gap-2 mb-3">
+        @for (t of prioridadAlta(); track t.id) {
+          <button type="button" class="fila-urgencia roja d-flex justify-content-between
+                                        align-items-center text-start"
+                  (click)="abrirDesdeCortina(t.id)">
+            <span class="d-flex align-items-center gap-2">
+              <span class="chip" [class]="'chip-' + t.prioridad">{{ t.prioridad }}</span>
+              <span>
+                <span class="folio">{{ t.folio }}</span>
+                <span class="sub d-block" style="font-size: 0.75rem">{{ t.problema }}</span>
+              </span>
+            </span>
+            <i class="bi bi-chevron-right sub"></i>
+          </button>
+        }
+      </div>
+    }
+
     <div class="d-flex justify-content-end">
       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cerrarCortina()">
         Revisar después
