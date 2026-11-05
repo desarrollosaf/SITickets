@@ -7,6 +7,71 @@
   <div class="alert alert-danger py-2 small">{{ error() }}</div>
 }
 
+@if (mostrarCortina()) {
+  <div class="cajon-fondo" (click)="cerrarCortina()"></div>
+  <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+       style="z-index: 1050; width: min(460px, 92vw); max-height: 86vh; overflow-y: auto">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+      <h2 class="h6 mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-alarm" style="color: var(--p2)"></i>
+        Tiempo de tus tickets
+      </h2>
+      <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarCortina()"></button>
+    </div>
+
+    @if (proximosAVencer().length) {
+      <p class="fw-semibold small mb-1" style="color: var(--p2)">
+        {{ proximosAVencer().length }} próximo(s) a exceder tiempo
+      </p>
+      <p class="sub small mb-2">
+        Ya van al 70% o más de su objetivo sin haberlo vencido todavía. Atiéndelos antes de que se
+        salgan de tiempo:
+      </p>
+      <div class="d-flex flex-column gap-2 mb-3">
+        @for (t of proximosAVencer(); track t.id) {
+          <button type="button" class="fila-urgencia naranja d-flex justify-content-between
+                                        align-items-center text-start"
+                  (click)="abrirDesdeCortina(t.id)">
+            <span>
+              <span class="folio">{{ t.folio }}</span>
+              <span class="sub d-block" style="font-size: 0.75rem">{{ t.problema }}</span>
+            </span>
+            <i class="bi bi-chevron-right sub"></i>
+          </button>
+        }
+      </div>
+    }
+
+    @if (ticketsVencidos().length) {
+      <p class="fw-semibold small mb-1" style="color: var(--p1)">
+        {{ ticketsVencidos().length }} ya excedieron el tiempo
+      </p>
+      <p class="sub small mb-2">
+        Ya pasaron su objetivo de resolución:
+      </p>
+      <div class="d-flex flex-column gap-2 mb-3">
+        @for (t of ticketsVencidos(); track t.id) {
+          <button type="button" class="fila-urgencia roja d-flex justify-content-between
+                                        align-items-center text-start"
+                  (click)="abrirDesdeCortina(t.id)">
+            <span>
+              <span class="folio">{{ t.folio }}</span>
+              <span class="sub d-block" style="font-size: 0.75rem">{{ t.problema }}</span>
+            </span>
+            <i class="bi bi-chevron-right sub"></i>
+          </button>
+        }
+      </div>
+    }
+
+    <div class="d-flex justify-content-end">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cerrarCortina()">
+        Revisar después
+      </button>
+    </div>
+  </div>
+}
+
 <!-- §16 · reloj checador -->
 <div class="crono p-3 mb-3 d-flex flex-wrap justify-content-between align-items-center gap-3"
      [class.activo]="enCurso()">

@@ -27,6 +27,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/tickets', etiqueta: 'Todos los tickets', icono: 'bi-inboxes' },
     { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
+    { ruta: '/carga-trabajo', etiqueta: 'Carga de trabajo', icono: 'bi-bar-chart-steps' },
+    { ruta: '/proximos-a-vencer', etiqueta: 'Próximos a vencer', icono: 'bi-alarm' },
     { ruta: '/disponibilidad', etiqueta: 'Disponibilidad', icono: 'bi-calendar3' },
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
     { ruta: '/catalogo-servicios', etiqueta: 'Catálogo de servicios',
@@ -62,6 +64,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/internos', etiqueta: 'Tickets internos', icono: 'bi-tools' },
     { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
+    { ruta: '/carga-trabajo', etiqueta: 'Carga de trabajo', icono: 'bi-bar-chart-steps' },
+    { ruta: '/proximos-a-vencer', etiqueta: 'Próximos a vencer', icono: 'bi-alarm' },
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
     { ruta: '/mis-tickets', etiqueta: 'Mis tickets', icono: 'bi-card-list' },
   ],
@@ -75,6 +79,8 @@ const MENUS: Record<Rol, Opcion[]> = {
     { ruta: '/tickets', etiqueta: 'Todos los tickets', icono: 'bi-inboxes' },
     { ruta: '/monitor', etiqueta: 'Monitor de turnos', icono: 'bi-display' },
     { ruta: '/tablero', etiqueta: 'Tablero', icono: 'bi-graph-up' },
+    { ruta: '/carga-trabajo', etiqueta: 'Carga de trabajo', icono: 'bi-bar-chart-steps' },
+    { ruta: '/proximos-a-vencer', etiqueta: 'Próximos a vencer', icono: 'bi-alarm' },
   ],
   gestor: [
     { ruta: '/nuevo', etiqueta: 'Registrar ticket', icono: 'bi-plus-circle' },
@@ -132,6 +138,8 @@ export class Shell {
 
   /** Cuantos tickets tiene el validador esperando en "Tickets por validar". */
   readonly pendientesValidar = signal(0);
+  /** Cuantos tickets estan al 70% o mas de su objetivo sin vencer aun (ver "Próximos a vencer"). */
+  readonly proximosAVencerCount = signal(0);
 
   constructor() {
     if (this.auth.rol() === 'validador') {
@@ -144,11 +152,29 @@ export class Shell {
       });
       setInterval(() => this.cargarPendientesValidar(), 60_000);
     }
+
+    /* Mismos roles que tienen "/proximos-a-vencer" en su menu (ver MENUS). */
+    if (['admin', 'jefe', 'operador'].includes(this.auth.rol() ?? '')) {
+      this.cargarProximosAVencer();
+      this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
+        this.cargarProximosAVencer();
+      });
+      setInterval(() => this.cargarProximosAVencer(), 60_000);
+    }
   }
 
   private cargarPendientesValidar() {
     this.api.porValidar().subscribe({
       next: (t) => this.pendientesValidar.set(t.length),
+      error: () => {
+        /* Si falla, simplemente no se muestra el indicador: no es critico. */
+      },
+    });
+  }
+
+  private cargarProximosAVencer() {
+    this.api.proximosAVencer().subscribe({
+      next: (t) => this.proximosAVencerCount.set(t.length),
       error: () => {
         /* Si falla, simplemente no se muestra el indicador: no es critico. */
       },
