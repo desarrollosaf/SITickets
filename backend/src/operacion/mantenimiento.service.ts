@@ -11,6 +11,7 @@ import {
 } from '../database/models';
 import { ReglasService } from '../tickets/reglas.service';
 import { TrazaService } from '../tickets/traza.service';
+import { RelojService } from '../tickets/reloj.service';
 import { fechaLocal } from '../common/fecha';
 
 /**
@@ -30,12 +31,15 @@ export class MantenimientoService {
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
     private readonly reglas: ReglasService,
     private readonly traza: TrazaService,
+    private readonly reloj: RelojService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
   async cadaHora() {
     await this.reglas.cierrePorOmision();
     await this.generaPreventivos();
+    await this.reloj.cierreDeJornada();
+    await this.reloj.reinicioDeJornada();
   }
 
   /** §11 · genera los tickets del programa preventivo que ya tocan. */

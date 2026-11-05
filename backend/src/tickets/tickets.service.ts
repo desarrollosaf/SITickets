@@ -63,7 +63,7 @@ import {
   ResolverDto,
 } from './dto/tickets.dto';
 import { AtenderCmpDto } from './dto/atender-cmp.dto';
-import { fechaExcel, fechaLocal, minutosHabiles } from '../common/fecha';
+import { fechaExcel, fechaLocal, inicioSemana, minutosHabiles } from '../common/fecha';
 
 /**
  * Carpeta donde se guardan los dictamenes de baja (pdf). Vive dentro de
@@ -497,6 +497,15 @@ export class TicketsService {
           (b.t.f_registro?.getTime() ?? 0) - (a.t.f_registro?.getTime() ?? 0),
       );
 
+    /* Indice por orden de registro (el mas antiguo es 1): la hoja "Tickets"
+       se ve agrupada por servicio, asi que sin esto no hay forma de volver
+       al orden de llegada con el ordenar de Excel. Los pendientes de
+       validacion (f_registro aun null) quedan al final. */
+    const porFechaRegistro = [...filas].sort(
+      (a, b) => (a.f_registro?.getTime() ?? Infinity) - (b.f_registro?.getTime() ?? Infinity),
+    );
+    const indiceDe = new Map(porFechaRegistro.map((t, i) => [t.id, i + 1]));
+
     const libro = new ExcelJS.Workbook();
 
     /* ---------------------------------------------------- Por tecnico */
@@ -582,6 +591,7 @@ export class TicketsService {
     /* -------------------------------------------------------- Tickets */
     const hoja = libro.addWorksheet('Tickets');
     hoja.columns = [
+      { header: 'Índice', key: 'indice', width: 9 },
       { header: 'Servicio', key: 'servicio', width: 26 },
       { header: 'Folio', key: 'folio', width: 18 },
       { header: 'Folio general', key: 'folio_general', width: 18 },
@@ -599,11 +609,13 @@ export class TicketsService {
       { header: 'Fecha de resolución', key: 'f_resolucion', width: 17 },
       { header: 'Fecha de cierre', key: 'f_validacion', width: 17 },
       { header: 'Tiempo activo (h)', key: 'horas_activo', width: 12 },
+      { header: 'Objetivo de la prioridad (h)', key: 'objetivo_prioridad', width: 14 },
       { header: 'Vencido', key: 'vencido', width: 9 },
       { header: 'Reaperturas', key: 'reaperturas', width: 11 },
     ];
     for (const { t, org } of ordenados) {
       hoja.addRow({
+        indice: indiceDe.get(t.id),
         servicio: servicioDe(t),
         folio: t.folio,
         folio_general: t.folio_general,
@@ -621,6 +633,7 @@ export class TicketsService {
         f_resolucion: fechaExcel(t.f_resolucion),
         f_validacion: fechaExcel(t.f_validacion),
         horas_activo: horas(ReglasService.minutosActivos(t)),
+        objetivo_prioridad: horas(objetivos.get(t.prioridad) ?? 1440),
         vencido: ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440) ? 'Sí' : 'No',
         reaperturas: t.reaperturas,
       });
@@ -723,6 +736,8 @@ export class TicketsService {
     const porPrioridad = new Map<string, number>();
     const porServicio = new Map<string, number>();
     const porMes = new Map<string, number>();
+    /** semana (lunes, YYYY-MM-DD) -> servicio -> total. */
+    const porSemanaServicio = new Map<string, Map<string, number>>();
     const hoy = new Date().toDateString();
     const esHoy = (f: Date | null) => !!f && new Date(f).toDateString() === hoy;
 
@@ -747,6 +762,11 @@ export class TicketsService {
       if (t.f_registro) {
         const mes = fechaLocal(new Date(t.f_registro)).slice(0, 7);
         porMes.set(mes, (porMes.get(mes) ?? 0) + 1);
+
+        const semana = fechaLocal(inicioSemana(new Date(t.f_registro)));
+        const fila = porSemanaServicio.get(semana) ?? new Map<string, number>();
+        fila.set(servicio, (fila.get(servicio) ?? 0) + 1);
+        porSemanaServicio.set(semana, fila);
       }
 
       if (esHoy(t.f_registro)) recibidosHoy++;
@@ -795,7 +815,33 @@ export class TicketsService {
       tendencia_mensual: [...porMes.entries()]
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([mes, total]) => ({ mes, total })),
+      tendencia_semanal: this.tendenciaSemanalPorServicio(porSemanaServicio),
     };
+  }
+
+  /**
+   * Ultimas 12 semanas (lunes a lunes), desglosadas por servicio. Se limita
+   * a 12 para que la grafica siga siendo legible: a diferencia de la
+   * tendencia mensual (que se usa para ver todo el historico), esta vista es
+   * para el pulso reciente, semana con semana.
+   */
+  private tendenciaSemanalPorServicio(
+    porSemanaServicio: Map<string, Map<string, number>>,
+  ): { semanas: string[]; servicios: { nombre: string; datos: number[] }[] } {
+    const SEMANAS_A_MOSTRAR = 12;
+    const semanas = [...porSemanaServicio.keys()].sort().slice(-SEMANAS_A_MOSTRAR);
+
+    const todosLosServicios = new Set<string>();
+    for (const semana of semanas) {
+      for (const servicio of porSemanaServicio.get(semana)!.keys()) todosLosServicios.add(servicio);
+    }
+
+    const servicios = [...todosLosServicios].sort().map((nombre) => ({
+      nombre,
+      datos: semanas.map((semana) => porSemanaServicio.get(semana)?.get(nombre) ?? 0),
+    }));
+
+    return { semanas, servicios };
   }
 
   /** Admin/operador dieron clic en "Copiar datos": queda grabado, no solo en su navegador. */
@@ -2296,6 +2342,15 @@ export class TicketsService {
       motivo_espera: motivo,
       ...(nuevoInventario && { contexto: nuevoInventario }),
     });
+
+    /* Al quedar en espera tambien se detiene el reloj de sitio: si no, sigue
+       corriendo aunque el tecnico ya no este atendiendo (se detecto una sesion
+       de mas de una semana abierta por este hueco). */
+    await this.sesiones.update(
+      { fin: new Date(), motivo },
+      { where: { ticket_id: t.id, fin: null } },
+    );
+
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
 

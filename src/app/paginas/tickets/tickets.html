@@ -23,7 +23,8 @@
 @if (porConfirmar().length) {
   <div class="alert alert-primary py-2 small">
     Tienes <b>{{ porConfirmar().length }}</b> ticket(s) marcados como resueltos esperando tu
-    confirmación. Si no respondes en 3 días, el sistema los cierra por omisión.
+    confirmación. Si no respondes en 3 días, el sistema los cierra por omisión y
+    <b>el silencio se tomará como inconformidad</b>.
   </div>
 }
 

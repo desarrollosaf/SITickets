@@ -334,6 +334,8 @@ export interface ReporteDatos {
   /** Aqui «clave» es el nombre del servicio, no una clave corta. */
   por_servicio: ConteoReporte[];
   tendencia_mensual: { mes: string; total: number }[];
+  /** Ultimas 12 semanas (lunes de cada semana), desglosadas por servicio. */
+  tendencia_semanal: { semanas: string[]; servicios: { nombre: string; datos: number[] }[] };
 }
 
 /** Bien bajo resguardo del usuario, tal como lo entrega el sistema de bienes. */

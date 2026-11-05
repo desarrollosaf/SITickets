@@ -3,14 +3,15 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
 import { DonaChart } from '../../comp/dona-chart';
 import { TendenciaChart } from '../../comp/tendencia-chart';
+import { TendenciaSemanalChart } from '../../comp/tendencia-semanal-chart';
 import { TicketsService, type FiltrosTicket } from '../../core/tickets.service';
-import { mensajeError } from '../../core/formato';
+import { duracion, mensajeError } from '../../core/formato';
 import type { Catalogos, ReporteDatos, Tecnico } from '../../core/modelos';
 
 /** Reporte para el administrador: graficas en pantalla y descarga en excel, ambas con los mismos filtros. */
 @Component({
   selector: 'app-reportes',
-  imports: [FormsModule, DonaChart, TendenciaChart],
+  imports: [FormsModule, DonaChart, TendenciaChart, TendenciaSemanalChart],
   templateUrl: './reportes.html',
 })
 export class Reportes {
@@ -23,6 +24,7 @@ export class Reportes {
 
   readonly datos = signal<ReporteDatos | null>(null);
   readonly cargandoDatos = signal(false);
+  readonly dur = duracion;
 
   /* Cadenas vacias, no undefined: así los select muestran la opción «Todos». */
   filtros: FiltrosTicket = { servicio: '', estatus: '', prioridad: '', tecnico: '' };
@@ -45,13 +47,27 @@ export class Reportes {
     return (clave: string) => cat.find((p) => p.clave === clave)?.nombre ?? clave;
   });
 
+  /** minutos_resolucion de cada prioridad, lo que de verdad decide "a tiempo" vs "fuera de tiempo". */
+  private readonly objetivoPrioridad = computed(() => {
+    const cat = this.catalogos()?.prioridades ?? [];
+    return (clave: string) => cat.find((p) => p.clave === clave)?.minutos_resolucion;
+  });
+
   readonly etiquetasEstatus = computed(() =>
     (this.datos()?.por_estatus ?? []).map((c) => this.nombreEstatus()(c.clave)),
   );
   readonly valoresEstatus = computed(() => (this.datos()?.por_estatus ?? []).map((c) => c.total));
 
+  /**
+   * El objetivo va directo en la etiqueta de la leyenda: asi el cumplimiento
+   * (vencidos/a tiempo) es verificable sin salir de la grafica.
+   */
   readonly etiquetasPrioridad = computed(() =>
-    (this.datos()?.por_prioridad ?? []).map((c) => `${c.clave} · ${this.nombrePrioridad()(c.clave)}`),
+    (this.datos()?.por_prioridad ?? []).map((c) => {
+      const objetivo = this.objetivoPrioridad()(c.clave);
+      const sufijo = objetivo ? ` (objetivo ${this.dur(objetivo)})` : '';
+      return `${c.clave} · ${this.nombrePrioridad()(c.clave)}${sufijo}`;
+    }),
   );
   readonly valoresPrioridad = computed(() => (this.datos()?.por_prioridad ?? []).map((c) => c.total));
 
@@ -64,6 +80,11 @@ export class Reportes {
   );
   readonly valoresTendencia = computed(() =>
     (this.datos()?.tendencia_mensual ?? []).map((m) => m.total),
+  );
+
+  readonly semanasTendencia = computed(() => this.datos()?.tendencia_semanal.semanas ?? []);
+  readonly serviciosTendenciaSemanal = computed(
+    () => this.datos()?.tendencia_semanal.servicios ?? [],
   );
 
   constructor() {

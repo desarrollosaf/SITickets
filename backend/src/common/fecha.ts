@@ -22,9 +22,26 @@ export function fechaLocal(d: Date = new Date()): string {
   return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
+/** Lunes de la semana de d (hora local), a medianoche — para agrupar por semana. */
+export function inicioSemana(d: Date): Date {
+  const n = new Date(d);
+  n.setHours(0, 0, 0, 0);
+  const dia = n.getDay(); // 0 = domingo
+  const diasDesdeLunes = dia === 0 ? 6 : dia - 1;
+  n.setDate(n.getDate() - diasDesdeLunes);
+  return n;
+}
+
 /** Jornada laboral (hora local del proceso, ver TZ arriba): lunes a viernes, 9:00 a 18:30. */
 const JORNADA_INICIO_MIN = 9 * 60;
 const JORNADA_FIN_MIN = 18 * 60 + 30;
+
+/** Fuera de la jornada laboral (fin de semana o antes/despues de horario). */
+export function fueraDeJornada(d: Date = new Date()): boolean {
+  if (d.getDay() === 0 || d.getDay() === 6) return true;
+  const minutosDia = d.getHours() * 60 + d.getMinutes();
+  return minutosDia < JORNADA_INICIO_MIN || minutosDia >= JORNADA_FIN_MIN;
+}
 
 /** 9:00 am del siguiente dia habil (salta sabado y domingo). */
 function inicioSiguienteDiaHabil(d: Date): Date {
