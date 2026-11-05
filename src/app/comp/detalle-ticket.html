@@ -43,6 +43,13 @@
             </button>
           }
 
+          @if (relojAlerta()) {
+            <div class="w-100 small text-warning-emphasis">
+              <i class="bi bi-exclamation-triangle"></i>
+              El reloj lleva más de 4 horas corriendo sin detenerse: verifica que el técnico sigue en sitio.
+            </div>
+          }
+
           <!-- Técnico asignado -->
           @if ((atiende() && esMio()) || esAdmin()) {
             @if (relojCorriendo()) {

@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/sequelize';
 import { Op, Sequelize, Transaction } from 'sequelize';
 import { ESTATUS, Sede, Servicio, Ticket, TicketSesion, Usuario } from '../database/models';
@@ -7,6 +13,10 @@ import { TrazaService } from './traza.service';
 import { TicketsService } from './tickets.service';
 import type { UsuarioToken } from '../common/usuario-actual.decorator';
 import { RelojFinDto, RelojInicioDto } from './dto/tickets.dto';
+import { fueraDeJornada } from '../common/fecha';
+
+/** Motivo fijo que deja cierreDeJornada(): reinicioDeJornada() busca por el mismo texto. */
+const MOTIVO_CIERRE_JORNADA = 'Fin de la jornada laboral';
 
 interface Geo {
   lat: number | null;
@@ -36,6 +46,8 @@ function geoDe(dto: { lat?: number; lng?: number; exactitud?: number; motivo_sin
  */
 @Injectable()
 export class RelojService {
+  private readonly log = new Logger('Reloj');
+
   constructor(
     @InjectConnection() private readonly db: Sequelize,
     @InjectModel(Ticket) private readonly tickets: typeof Ticket,
@@ -215,6 +227,96 @@ export class RelojService {
     });
 
     return this.ticketsSrv.detalle(id, usuario);
+  }
+
+  /**
+   * Cierre automatico al fin de la jornada laboral (lunes a viernes 9:00-18:30).
+   * Se invoca cada hora desde MantenimientoService.cadaHora(): si corre fuera
+   * de jornada, cierra cualquier reloj que haya quedado abierto (el tecnico se
+   * fue sin detenerlo) y, si el ticket seguia EN_ATENCION, lo regresa a
+   * EN_ESPERA para que no aparente seguir atendido toda la noche.
+   */
+  async cierreDeJornada(): Promise<number> {
+    if (!fueraDeJornada()) return 0;
+
+    const abiertas = await this.sesiones.findAll({ where: { fin: null } });
+    if (!abiertas.length) return 0;
+
+    for (const sesion of abiertas) {
+      await this.db.transaction(async (tx) => {
+        await this.detenerSesion(sesion, 'Cierre de jornada', null, tx);
+        const t = await this.tickets.findByPk(sesion.ticket_id, { transaction: tx });
+        if (t && t.estatus === ESTATUS.EN_ATENCION) {
+          await t.update(
+            {
+              estatus: ESTATUS.EN_ESPERA,
+              f_espera_desde: new Date(),
+              motivo_espera: MOTIVO_CIERRE_JORNADA,
+            },
+            { transaction: tx },
+          );
+        }
+        await this.reglas.anota(
+          sesion.ticket_id,
+          null,
+          'Reloj detenido',
+          'Cierre automatico de jornada: el reloj quedo abierto fuera de horario',
+          tx,
+        );
+      });
+      this.traza.registra('§16', `Reloj cerrado por fin de jornada en el ticket ${sesion.ticket_id}.`);
+    }
+    this.log.log(`Cierre de jornada: ${abiertas.length} reloj(es) cerrado(s).`);
+    return abiertas.length;
+  }
+
+  /**
+   * Reinicio automatico al abrir la jornada siguiente. Solo afecta tickets
+   * que quedaron EN_ESPERA por cierreDeJornada() (motivo exacto
+   * MOTIVO_CIERRE_JORNADA): la pausa ahi fue del sistema, no del tecnico, asi
+   * que al entrar la jornada se reanuda la atencion y se vuelve a abrir el
+   * reloj solo — sin esto el tecnico amanecia con el ticket EN ESPERA y
+   * tenia que acordarse de reanudarlo e iniciar el reloj a mano. Un ticket
+   * que quedo en espera por otro motivo (esperando refaccion, etc.) no se
+   * toca aqui.
+   */
+  async reinicioDeJornada(): Promise<number> {
+    if (fueraDeJornada()) return 0;
+
+    const pendientes = await this.tickets.findAll({
+      where: { estatus: ESTATUS.EN_ESPERA, motivo_espera: MOTIVO_CIERRE_JORNADA },
+    });
+    if (!pendientes.length) return 0;
+
+    for (const t of pendientes) {
+      if (!t.tecnico_id) continue;
+      await this.db.transaction(async (tx) => {
+        await t.update(
+          { estatus: ESTATUS.EN_ATENCION, f_espera_desde: null, motivo_espera: null },
+          { transaction: tx },
+        );
+        await this.sesiones.create(
+          {
+            ticket_id: t.id,
+            usuario_id: t.tecnico_id!,
+            inicio: new Date(),
+            sede_esperada_id: t.sede_id,
+            motivo_sin_ubicacion: 'reinicio automatico al abrir la jornada',
+          },
+          { transaction: tx },
+        );
+        await this.reglas.anota(
+          t.id,
+          null,
+          'Reloj iniciado',
+          'Reinicio automatico: se abrio la jornada laboral y el ticket seguia EN ATENCION',
+          tx,
+        );
+      });
+      this.traza.registra('§16', `Reloj reiniciado automaticamente al abrir la jornada en ${t.folio}.`);
+    }
+    this.log.log(`Reinicio de jornada: ${pendientes.length} ticket(s).`);
+    return pendientes.length;
   }
 
   private async detenerSesion(

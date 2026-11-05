@@ -53,6 +53,9 @@ export class Bandeja implements OnDestroy {
     () => this.abiertos().filter((t) => t.estatus === 'EN_ESPERA').length,
   );
 
+  /** §16 · alerta si el reloj del ticket en curso lleva mas de 4 horas corriendo. */
+  readonly relojAlerta = computed(() => this.enCurso() !== null && this.segundos() > 4 * 3600);
+
   /** Candidato para arrancar el reloj cuando no hay ninguno activo. */
   readonly siguiente = computed(
     () => this.abiertos().find((t) => ['ASIGNADO', 'EN_ATENCION'].includes(t.estatus)) ?? null,

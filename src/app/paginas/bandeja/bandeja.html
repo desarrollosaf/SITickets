@@ -20,6 +20,11 @@
         <b>{{ t.folio }}</b> · {{ t.problema }}<br />
         {{ t.dependencia }}@if (t.contexto) { · {{ t.contexto }} }
       </div>
+      @if (relojAlerta()) {
+        <div class="small mt-1 text-warning">
+          <i class="bi bi-exclamation-triangle"></i> Más de 4 horas con el reloj corriendo
+        </div>
+      }
     } @else {
       <div class="small mb-1" style="color: #9db4d0">Reloj de atención</div>
       <div class="tiempo">00:00:00</div>
