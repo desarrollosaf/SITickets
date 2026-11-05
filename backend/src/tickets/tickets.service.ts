@@ -440,6 +440,41 @@ export class TicketsService {
   }
 
   /**
+   * Tickets abiertos que todavia no vencen pero ya van muy avanzados contra
+   * su objetivo de prioridad (70% o mas, igual umbral "naranja" que usa la
+   * barra de avance en el detalle del ticket) — para poder actuar antes de
+   * que se vuelvan "fuera de tiempo", no despues. IMPA queda fuera: su
+   * tiempo depende del proveedor externo, no de quien lo tiene asignado
+   * aqui (ver "Por proveedor (IMPA)" en /reportes).
+   *
+   * admin/operador ven todo (es su panel de monitoreo); un tecnico (o
+   * jefe/proveedor/sistemas) solo ve lo suyo, es la cortina que le avisa al
+   * entrar — no tiene por que ver la carga de los demas.
+   */
+  async proximosAVencer(usuario: UsuarioToken) {
+    const UMBRAL = 0.7;
+    const where: Record<string, unknown> = { estatus: { [Op.in]: ESTATUS_ABIERTOS_REPORTE } };
+    if (ROLES_TECNICOS.includes(usuario.rol)) where.tecnico_id = usuario.id;
+
+    const filas = await this.tickets.findAll({ where, include: INCLUDES });
+
+    const objetivos = await this.reglas.objetivos();
+    const conteos = await this.conteoSesiones(filas.map((t) => t.id));
+    const mapaDependencias = await this.mapaDependenciasSaf();
+
+    return filas
+      .filter((t) => t.servicio?.clave !== 'IMPA')
+      .map((t) => {
+        const objetivo = objetivos.get(t.prioridad) ?? 1440;
+        const avance = objetivo ? ReglasService.minutosActivos(t) / objetivo : 0;
+        return { t, avance };
+      })
+      .filter(({ avance }) => avance >= UMBRAL && avance < 1)
+      .sort((a, b) => b.avance - a.avance)
+      .map(({ t }) => this.resumen(t, objetivos, conteos.get(t.id) ?? 0, mapaDependencias));
+  }
+
+  /**
    * Reporte en excel para el administrador: mismos filtros que listar() (§
    * construyeFiltro), pero sin el tope de 500 — el reporte debe traer todo lo
    * que cumpla el filtro, no solo lo mas reciente.
@@ -478,6 +513,17 @@ export class TicketsService {
       : [[], []];
 
     const servicioDe = (t: Ticket) => t.servicio?.nombre ?? 'Sin clasificar';
+    const servicioClaveDe = (t: Ticket) => t.servicio?.clave ?? '';
+    /* "Otro (no aparece en la lista)" y cualquier problema con requiere_texto
+       no dicen nada por si solos: se les pega lo que el solicitante escribio
+       a mano, o la columna queda igual de vacia que en pantalla. */
+    const problemaConTexto = (t: Ticket) => {
+      const base = t.problema?.descripcion ?? 'Sin clasificar';
+      if (t.problema?.requiere_texto && t.texto_libre?.trim()) {
+        return `${base}: ${t.texto_libre.trim()}`;
+      }
+      return base;
+    };
     const horas = (min: number) => Math.round((min / 60) * 10) / 10;
     const promedio = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
     const enTiempo = (t: Ticket) =>
@@ -524,8 +570,17 @@ export class TicketsService {
       { header: 'Tiempo total en sitio (h)', key: 'sitio', width: 14 },
       { header: 'Reaperturas + rechazos', key: 'reab', width: 14 },
     ];
+    /*
+     * IMPA (impresoras arrendadas) se queda fuera de "Por tecnico": a quien
+     * de verdad va y resuelve es el proveedor externo (tecnico_externo), no
+     * el tecnico interno que el sistema le asigna como responsable del
+     * seguimiento. Mezclarlo aqui le cargaria al interno un tiempo de
+     * resolucion que depende del SLA del proveedor, no de su desempeño. Ver
+     * la hoja "Por proveedor (IMPA)" mas abajo.
+     */
     const porTecnico = new Map<string, Ticket[]>();
     for (const { t } of ordenados) {
+      if (servicioClaveDe(t) === 'IMPA') continue;
       const nombre = t.tecnico?.nombre ?? 'Sin asignar';
       porTecnico.set(nombre, [...(porTecnico.get(nombre) ?? []), t]);
     }
@@ -551,6 +606,51 @@ export class TicketsService {
       });
     }
     hTec.getColumn('pct').numFmt = '0%';
+
+    /*
+     * Por proveedor (IMPA): separado de "Por tecnico" porque el que de
+     * verdad resuelve ahi es el proveedor externo, no el personal de la
+     * dependencia (ver tecnico_externo_id en resolver(), tickets.dto.ts).
+     * Mientras el ticket sigue abierto todavia no se sabe que proveedor lo
+     * va a atender (el campo solo se captura al resolver), asi que esos
+     * quedan en "Sin asignar" hasta que se resuelvan.
+     */
+    const hProv = libro.addWorksheet('Por proveedor (IMPA)');
+    hProv.columns = [
+      { header: 'Proveedor', key: 'proveedor', width: 32 },
+      { header: 'Tickets asignados', key: 'asignados', width: 12 },
+      { header: 'Abiertos', key: 'abiertos', width: 10 },
+      { header: 'En espera', key: 'espera', width: 10 },
+      { header: 'Resueltos', key: 'resueltos', width: 10 },
+      { header: 'Resueltos en tiempo', key: 'en_tiempo', width: 12 },
+      { header: '% en tiempo', key: 'pct', width: 11 },
+      { header: 'Abiertos vencidos', key: 'vencidos', width: 11 },
+      { header: 'Tiempo prom. de resolución (h)', key: 'prom', width: 16 },
+      { header: 'Reaperturas + rechazos', key: 'reab', width: 14 },
+    ];
+    const porProveedor = new Map<string, Ticket[]>();
+    for (const { t } of ordenados) {
+      if (servicioClaveDe(t) !== 'IMPA') continue;
+      const nombre = t.tecnico_externo?.nombre ?? 'Sin asignar';
+      porProveedor.set(nombre, [...(porProveedor.get(nombre) ?? []), t]);
+    }
+    for (const [nombre, suyos] of [...porProveedor].sort((a, b) => a[0].localeCompare(b[0], 'es'))) {
+      const resueltos = suyos.filter((t) => t.f_resolucion);
+      const prom = promedio(resueltos.map((t) => ReglasService.minutosActivos(t)));
+      hProv.addRow({
+        proveedor: nombre,
+        asignados: suyos.length,
+        abiertos: suyos.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
+        espera: suyos.filter((t) => t.estatus === 'EN_ESPERA').length,
+        resueltos: resueltos.length,
+        en_tiempo: resueltos.filter(enTiempo).length,
+        pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
+        vencidos: suyos.filter(vencidoAbierto).length,
+        prom: prom === null ? null : horas(prom),
+        reab: suyos.reduce((a, t) => a + t.reaperturas + t.rechazos, 0),
+      });
+    }
+    hProv.getColumn('pct').numFmt = '0%';
 
     /* --------------------------------------------------- Por servicio */
     const hSrv = libro.addWorksheet('Por servicio');
@@ -619,7 +719,7 @@ export class TicketsService {
         servicio: servicioDe(t),
         folio: t.folio,
         folio_general: t.folio_general,
-        problema: t.problema?.descripcion ?? 'Sin clasificar',
+        problema: problemaConTexto(t),
         color_toner: t.color_toner ?? '—',
         prioridad: t.prioridad,
         estatus: estatusLegible(t),
@@ -797,6 +897,47 @@ export class TicketsService {
       .sort((a, b) => ORDEN_ESTATUS.indexOf(a[0]) - ORDEN_ESTATUS.indexOf(b[0]))
       .map(([clave, total]) => ({ clave, total }));
 
+    /*
+     * IMPA (impresoras arrendadas) por proveedor: igual que en reporteExcel,
+     * el que de verdad atiende es el proveedor externo (tecnico_externo), no
+     * el personal de la dependencia, asi que su indicador va aparte en vez
+     * de mezclarse con el resto. Mientras el ticket sigue abierto todavia no
+     * se sabe que proveedor lo va a atender (se captura hasta resolver), asi
+     * que esos quedan en "Sin asignar".
+     */
+    const horas = (min: number) => Math.round((min / 60) * 10) / 10;
+    const promedio = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+    const enTiempo = (t: Ticket) =>
+      ReglasService.minutosActivos(t) <= (objetivos.get(t.prioridad) ?? 1440);
+    const vencidoAbierto = (t: Ticket) =>
+      ESTATUS_ABIERTOS_REPORTE.includes(t.estatus) &&
+      ReglasService.vencido(t, objetivos.get(t.prioridad) ?? 1440);
+
+    const porProveedorImpa = new Map<string, Ticket[]>();
+    for (const t of filas) {
+      if (t.servicio?.clave !== 'IMPA') continue;
+      const nombre = t.tecnico_externo?.nombre ?? 'Sin asignar';
+      porProveedorImpa.set(nombre, [...(porProveedorImpa.get(nombre) ?? []), t]);
+    }
+    const porProveedor = [...porProveedorImpa]
+      .sort((a, b) => a[0].localeCompare(b[0], 'es'))
+      .map(([proveedor, suyos]) => {
+        const resueltos = suyos.filter((t) => t.f_resolucion);
+        const prom = promedio(resueltos.map((t) => ReglasService.minutosActivos(t)));
+        return {
+          proveedor,
+          asignados: suyos.length,
+          abiertos: suyos.filter((t) => ESTATUS_ABIERTOS_REPORTE.includes(t.estatus)).length,
+          espera: suyos.filter((t) => t.estatus === 'EN_ESPERA').length,
+          resueltos: resueltos.length,
+          en_tiempo: resueltos.filter(enTiempo).length,
+          pct: resueltos.length ? resueltos.filter(enTiempo).length / resueltos.length : null,
+          vencidos: suyos.filter(vencidoAbierto).length,
+          prom_horas: prom === null ? null : horas(prom),
+          reaperturas: suyos.reduce((a, t) => a + t.reaperturas + t.rechazos, 0),
+        };
+      });
+
     return {
       total: filas.length,
       vencidos,
@@ -816,6 +957,7 @@ export class TicketsService {
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([mes, total]) => ({ mes, total })),
       tendencia_semanal: this.tendenciaSemanalPorServicio(porSemanaServicio),
+      por_proveedor_impa: porProveedor,
     };
   }
 

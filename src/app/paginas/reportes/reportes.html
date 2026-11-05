@@ -156,4 +156,51 @@
       [semanas]="semanasTendencia()"
       [servicios]="serviciosTendenciaSemanal()" />
   </div>
+
+  @if (proveedoresImpa().length) {
+    <div class="tarjeta p-3 mt-3">
+      <h3 class="h6 mb-1">Impresoras arrendadas (IMPA) · por proveedor</h3>
+      <p class="sub small mb-3">
+        Quien de verdad atiende estos tickets es el proveedor externo, no el personal de la
+        dependencia: por eso su indicador va aparte y no se mezcla con "Prioridad" ni con ningún
+        desempeño interno.
+      </p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Proveedor</th>
+              <th class="text-end">Asignados</th>
+              <th class="text-end">Abiertos</th>
+              <th class="text-end">En espera</th>
+              <th class="text-end">Resueltos</th>
+              <th class="text-end">% en tiempo</th>
+              <th class="text-end">Vencidos</th>
+              <th class="text-end">Tiempo prom.</th>
+              <th class="text-end">Reaperturas</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of proveedoresImpa(); track p.proveedor) {
+              <tr>
+                <td>{{ p.proveedor }}</td>
+                <td class="text-end">{{ p.asignados }}</td>
+                <td class="text-end">{{ p.abiertos }}</td>
+                <td class="text-end">{{ p.espera }}</td>
+                <td class="text-end">{{ p.resueltos }}</td>
+                <td class="text-end">{{ p.pct === null ? '—' : (p.pct | percent) }}</td>
+                <td class="text-end">
+                  <span [class.text-danger]="p.vencidos > 0" [class.fw-semibold]="p.vencidos > 0">
+                    {{ p.vencidos }}
+                  </span>
+                </td>
+                <td class="text-end">{{ p.prom_horas === null ? '—' : dur(p.prom_horas * 60) }}</td>
+                <td class="text-end">{{ p.reaperturas }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
 }

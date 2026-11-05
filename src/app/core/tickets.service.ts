@@ -6,6 +6,7 @@ import type {
   BienesUsuario,
   BienTicket,
   CandidatoSaf,
+  CargaTrabajo,
   Catalogos,
   Geo,
   InmuebleAdmin,
@@ -169,6 +170,11 @@ export class TicketsService {
   /** Lo que el gestor registro y sigue (o quedo) en validacion. */
   misPorValidar() {
     return this.http.get<TicketPorValidar[]>(`${API}/tickets/mis-por-validar`);
+  }
+
+  /** Abiertos al 70% o mas de su objetivo, sin vencer aun. IMPA queda fuera. */
+  proximosAVencer() {
+    return this.http.get<Ticket[]>(`${API}/tickets/proximos-a-vencer`);
   }
 
   crearInterno(datos: {
@@ -448,6 +454,9 @@ export class TicketsService {
   }
   tablero() {
     return this.http.get<Tablero>(`${API}/tablero`);
+  }
+  cargaTrabajo() {
+    return this.http.get<CargaTrabajo>(`${API}/carga-trabajo`);
   }
   agenda() {
     return this.http.get<Agenda>(`${API}/calendario`);

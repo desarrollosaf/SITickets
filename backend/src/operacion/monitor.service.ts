@@ -299,6 +299,89 @@ export class MonitorService {
     );
   }
 
+  /**
+   * Carga diaria por tecnico: cuantos tickets se le asignaron cada dia de los
+   * ultimos `dias`. Se agrupa por f_asignacion (no por f_registro): lo que
+   * interesa para medir carga de trabajo es cuando el ticket le empezo a
+   * pesar al tecnico, no cuando el solicitante lo levanto.
+   */
+  async cargaDiaria(dias = 14) {
+    const hoy = fechaLocal();
+    const desde = new Date();
+    desde.setDate(desde.getDate() - (dias - 1));
+    desde.setHours(0, 0, 0, 0);
+
+    const tecnicos = await this.usuarios.findAll({
+      where: { activo: true, rol: { [Op.in]: ['tecnico', 'proveedor', 'jefe'] } },
+      attributes: ['id', 'nombre'],
+      include: [
+        { model: TecnicoServicio, include: [{ model: Servicio, attributes: ['clave', 'nombre'] }] },
+      ],
+      order: [['nombre', 'ASC']],
+    });
+
+    /* Folio/servicio/problema van aparte del conteo: alimentan el detalle
+       que se ve al pasar el mouse sobre cada celda, no solo el numero. */
+    const asignados = await this.tickets.findAll({
+      where: { tecnico_id: { [Op.ne]: null }, f_asignacion: { [Op.gte]: desde } },
+      attributes: ['id', 'tecnico_id', 'f_asignacion', 'folio', 'estatus'],
+      include: [
+        { model: Servicio, as: 'servicio', attributes: ['nombre'] },
+        { model: CatalogoProblema, attributes: ['descripcion'] },
+      ],
+    });
+
+    /* Lista de dias en orden, la mas vieja primero, para que la tabla se lea
+       de izquierda (hace `dias` dias) a derecha (hoy). */
+    const listaDias: string[] = [];
+    for (let i = dias - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      listaDias.push(fechaLocal(d));
+    }
+
+    const abiertosHoy = await this.tickets.findAll({
+      where: { tecnico_id: { [Op.ne]: null }, estatus: { [Op.in]: ESTATUS_ABIERTOS } },
+      attributes: ['tecnico_id'],
+    });
+
+    const tabla = tecnicos.map((u) => {
+      const suyos = asignados.filter((t) => t.tecnico_id === u.id);
+      const porDiaMapa = new Map<
+        string,
+        { folio: string; servicio: string; problema: string; estatus: string }[]
+      >();
+      for (const t of suyos) {
+        if (!t.f_asignacion) continue;
+        const dia = fechaLocal(new Date(t.f_asignacion));
+        const lista = porDiaMapa.get(dia) ?? [];
+        lista.push({
+          folio: t.folio,
+          servicio: t.servicio?.nombre ?? 'Sin clasificar',
+          problema: t.problema?.descripcion ?? 'Sin clasificar',
+          estatus: t.estatus,
+        });
+        porDiaMapa.set(dia, lista);
+      }
+      /* Clave corta (CMP, NET, TEL...) para que la columna ocupe poco y deje
+         mas espacio a los dias; el nombre completo va en el tooltip. */
+      const especialidad = (u.especialidades ?? [])
+        .map((e) => (e.servicio ? { clave: e.servicio.clave, nombre: e.servicio.nombre } : null))
+        .filter((s): s is { clave: string; nombre: string } => s !== null);
+
+      return {
+        tecnico_id: u.id,
+        tecnico: u.nombre,
+        especialidad,
+        por_dia: listaDias.map((d) => porDiaMapa.get(d) ?? []),
+        total_periodo: suyos.length,
+        abiertos_hoy: abiertosHoy.filter((t) => t.tecnico_id === u.id).length,
+      };
+    });
+
+    return { hoy, dias: listaDias, tecnicos: tabla };
+  }
+
   /* ==================================================================
      §8 · disponibilidad del dia por servicio
      ================================================================== */

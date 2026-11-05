@@ -1,3 +1,4 @@
+import { PercentPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin } from 'rxjs';
@@ -11,7 +12,7 @@ import type { Catalogos, ReporteDatos, Tecnico } from '../../core/modelos';
 /** Reporte para el administrador: graficas en pantalla y descarga en excel, ambas con los mismos filtros. */
 @Component({
   selector: 'app-reportes',
-  imports: [FormsModule, DonaChart, TendenciaChart, TendenciaSemanalChart],
+  imports: [FormsModule, PercentPipe, DonaChart, TendenciaChart, TendenciaSemanalChart],
   templateUrl: './reportes.html',
 })
 export class Reportes {
@@ -86,6 +87,9 @@ export class Reportes {
   readonly serviciosTendenciaSemanal = computed(
     () => this.datos()?.tendencia_semanal.servicios ?? [],
   );
+
+  /** IMPA (impresoras arrendadas): el indicador depende del proveedor, no del personal interno. */
+  readonly proveedoresImpa = computed(() => this.datos()?.por_proveedor_impa ?? []);
 
   constructor() {
     forkJoin({ catalogos: this.api.catalogos(), tecnicos: this.api.tecnicos() }).subscribe({

@@ -39,6 +39,13 @@ export class OperacionController {
     return { rezago, desempeno, disponibilidad, compras };
   }
 
+  /** Carga de trabajo por dia: cuantos tickets se le asignaron a cada tecnico. */
+  @Roles('admin', 'jefe', 'operador')
+  @Get('carga-trabajo')
+  cargaTrabajo() {
+    return this.monitorSrv.cargaDiaria();
+  }
+
   @Roles('admin', 'jefe')
   @Get('calendario')
   agenda() {
