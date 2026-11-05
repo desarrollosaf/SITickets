@@ -74,6 +74,18 @@ export const routes: Routes = [
         loadComponent: () => import('./paginas/tablero/tablero').then((m) => m.Tablero),
       },
       {
+        path: 'carga-trabajo',
+        canActivate: [guardRol('admin', 'jefe', 'operador')],
+        loadComponent: () =>
+          import('./paginas/carga-trabajo/carga-trabajo').then((m) => m.CargaTrabajo),
+      },
+      {
+        path: 'proximos-a-vencer',
+        canActivate: [guardRol('admin', 'jefe', 'operador')],
+        loadComponent: () =>
+          import('./paginas/proximos-a-vencer/proximos-a-vencer').then((m) => m.ProximosAVencer),
+      },
+      {
         path: 'disponibilidad',
         canActivate: [guardRol('admin')],
         loadComponent: () =>

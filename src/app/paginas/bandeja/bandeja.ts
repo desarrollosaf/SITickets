@@ -35,6 +35,15 @@ export class Bandeja implements OnDestroy {
 
   readonly permisoGeo = signal<PermissionState | 'desconocido'>('desconocido');
 
+  /** Abiertos propios que van al 70% o mas de su objetivo sin vencer aun (IMPA aparte). */
+  readonly proximosAVencer = signal<Ticket[]>([]);
+  readonly cortinaCerrada = signal(false);
+  readonly mostrarCortina = computed(
+    () =>
+      (this.proximosAVencer().length > 0 || this.ticketsVencidos().length > 0) &&
+      !this.cortinaCerrada(),
+  );
+
   private readonly latido = setInterval(() => {
     if (this.enCurso()) this.segundos.update((s) => s + 1);
   }, 1000);
@@ -49,6 +58,15 @@ export class Bandeja implements OnDestroy {
     this.tickets().filter((t) => ['CERRADO', 'CANCELADO'].includes(t.estatus)),
   );
   readonly vencidos = computed(() => this.abiertos().filter((t) => t.vencido).length);
+  /**
+   * Lista completa (no solo el conteo) para la cortina: ya vencieron de
+   * verdad, distinto de "proximosAVencer" que todavia no llega al 100%. IMPA
+   * fuera por la misma razon que proximosAVencer: ese tiempo depende del
+   * proveedor externo, no del tecnico.
+   */
+  readonly ticketsVencidos = computed(() =>
+    this.abiertos().filter((t) => t.vencido && t.servicio_clave !== 'IMPA'),
+  );
   readonly enEspera = computed(
     () => this.abiertos().filter((t) => t.estatus === 'EN_ESPERA').length,
   );
@@ -133,6 +151,7 @@ export class Bandeja implements OnDestroy {
     this.api.catalogos().subscribe({ next: (c) => this.catalogos.set(c) });
     void this.revisaPermisoGeo();
     this.cargar();
+    this.api.proximosAVencer().subscribe({ next: (t) => this.proximosAVencer.set(t) });
   }
 
   ngOnDestroy() {
@@ -188,6 +207,15 @@ export class Bandeja implements OnDestroy {
   async pedirPermisoGeo() {
     const g = await ubicacionActual();
     this.permisoGeo.set(g.motivo_sin_ubicacion ? 'denied' : 'granted');
+  }
+
+  cerrarCortina() {
+    this.cortinaCerrada.set(true);
+  }
+
+  abrirDesdeCortina(id: number) {
+    this.cortinaCerrada.set(true);
+    this.abierto.set(id);
   }
 
   async iniciarReloj(id: number) {

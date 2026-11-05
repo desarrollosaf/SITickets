@@ -112,6 +112,18 @@ export class TicketsController {
   }
 
   /**
+   * Abiertos que van al 70% o mas de su objetivo sin haberlo vencido aun
+   * (IMPA aparte, depende del proveedor). Va antes de ':id' por la misma
+   * razon que reporte-excel/reporte-datos. admin/operador ven todo; un
+   * tecnico (o jefe/proveedor/sistemas) solo ve lo suyo.
+   */
+  @Roles('admin', 'jefe', 'operador', 'tecnico', 'proveedor', 'sistemas')
+  @Get('proximos-a-vencer')
+  proximosAVencer(@UsuarioActual() usuario: UsuarioToken) {
+    return this.tickets.proximosAVencer(usuario);
+  }
+
+  /**
    * Excel de «Equipos dados de baja». Solo administrador. Va antes de ':id'
    * para que no se confunda "bajas-excel" con un identificador de ticket.
    */

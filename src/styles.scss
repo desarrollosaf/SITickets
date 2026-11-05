@@ -261,6 +261,10 @@ table.tickets tbody tr.por-confirmar:hover { background: #ece0f9; }
   animation: parpadeo-aviso 1.2s ease-in-out infinite;
 }
 
+.badge-parpadeante {
+  animation: parpadeo-aviso 1.2s ease-in-out infinite;
+}
+
 .vencido { color: var(--p1); font-weight: 600; }
 
 /* Barra de avance contra el objetivo de resolucion */
@@ -389,6 +393,77 @@ table.tickets tbody tr.por-confirmar:hover { background: #ece0f9; }
   .rail, .cajon-fondo, .no-imprimir { display: none !important; }
   .cajon { position: static; width: 100%; box-shadow: none; }
   body { background: #fff; }
+}
+
+/* --------------------------------------------------------------------
+   Cortina de tiempo (bandeja del tecnico): filas de folio por urgencia.
+   Fondo claro siempre legible; en hover solo se ilumina el borde, no se
+   rellena de color solido (eso tapaba el texto con btn-outline-* de
+   Bootstrap).
+   -------------------------------------------------------------------- */
+.fila-urgencia {
+  width: 100%;
+  background: var(--fondo);
+  border: 1px solid var(--linea);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: var(--tinta);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.fila-urgencia.naranja:hover { border-color: var(--p2); box-shadow: 0 0 0 1px var(--p2); }
+.fila-urgencia.roja:hover { border-color: var(--p1); box-shadow: 0 0 0 1px var(--p1); }
+
+/* --------------------------------------------------------------------
+   Carga de trabajo: celdas del heatmap + tooltip propio (no el title nativo)
+   -------------------------------------------------------------------- */
+.celda-carga {
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.celda-carga.con-datos {
+  cursor: pointer;
+}
+.celda-carga.con-datos:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 10px rgba(18, 26, 38, 0.22);
+  z-index: 2;
+}
+
+.carga-tooltip {
+  position: fixed;
+  z-index: 1060;
+  transform: translate(-50%, -100%);
+  background: var(--tinta);
+  color: #fff;
+  border-radius: 0.6rem;
+  padding: 0.5rem;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 10px 28px rgba(18, 26, 38, 0.32);
+  animation: carga-tooltip-in 0.1s ease-out;
+}
+.carga-tooltip.arriba { transform: translate(-50%, -100%); }
+.carga-tooltip:not(.arriba) { transform: translate(-50%, 0); }
+
+.carga-tooltip-fila {
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.4rem;
+}
+.carga-tooltip-fila:hover { background: rgba(255, 255, 255, 0.06); }
+.carga-tooltip-fila + .carga-tooltip-fila { margin-top: 0.1rem; }
+.carga-tooltip-fila .folio { color: #cfe0f2; font-size: 0.72rem; }
+.carga-tooltip-detalle {
+  font-size: 0.72rem;
+  color: #b8c9dd;
+  margin-top: 0.1rem;
+  line-height: 1.35;
+}
+
+@keyframes carga-tooltip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* --------------------------------------------------------------------

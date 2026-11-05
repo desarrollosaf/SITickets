@@ -1,0 +1,67 @@
+<div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-3">
+  <div>
+    <h1 class="h5 mb-1">Próximos a exceder tiempo</h1>
+    <p class="sub mb-0">
+      Abiertos al 70% o más de su objetivo de prioridad, sin haberlo vencido aún — ordenados del
+      más urgente al menos urgente. No incluye impresoras arrendadas (IMPA): ese tiempo depende
+      del proveedor externo, no de quien lo tiene asignado aquí.
+    </p>
+  </div>
+  <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-end">
+    <div class="buscador">
+      <i class="bi bi-search"></i>
+      <input type="search" class="form-control form-control-sm"
+             placeholder="Buscar por folio, técnico, problema, dependencia…"
+             [value]="busqueda()" (input)="buscar($any($event.target).value)" />
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" (click)="cargar()">
+      <i class="bi bi-arrow-clockwise"></i> Actualizar
+    </button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+@if (cargando()) {
+  <div class="tarjeta p-5 text-center">
+    <span class="spinner-border spinner-border-sm me-2"></span>Cargando…
+  </div>
+} @else {
+  <app-tabla-tickets [tickets]="ticketsPagina()" (abrir)="abierto.set($event)"
+                     [boletos]="true"
+                     [vacio]="tickets().length ? 'Ningún ticket coincide con la búsqueda' : 'Nada cerca de vencer ahora mismo'"
+                     [ayudaVacio]="tickets().length ? 'Prueba con otra palabra.' : 'Buena señal: nada está a punto de salirse del objetivo.'" />
+
+  @if (filtrados().length) {
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+      <span class="sub small">{{ desde() }}–{{ hasta() }} de {{ filtrados().length }} ticket(s)</span>
+      @if (totalPaginas() > 1) {
+        <nav class="paginador" aria-label="Páginas">
+          <button type="button" [disabled]="paginaActual() === 1" (click)="irAPagina(paginaActual() - 1)"
+                  aria-label="Anterior">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          @for (n of paginas(); track $index) {
+            @if (n === null) {
+              <span class="sub px-1">…</span>
+            } @else {
+              <button type="button" [class.activa]="n === paginaActual()" (click)="irAPagina(n)">{{ n }}</button>
+            }
+          }
+          <button type="button" [disabled]="paginaActual() === totalPaginas()"
+                  (click)="irAPagina(paginaActual() + 1)" aria-label="Siguiente">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+        </nav>
+      }
+    </div>
+  }
+}
+
+<app-detalle-ticket
+  [ticketId]="abierto()"
+  [catalogos]="catalogos()"
+  (cerrar)="abierto.set(null)"
+  (cambio)="cargar()" />

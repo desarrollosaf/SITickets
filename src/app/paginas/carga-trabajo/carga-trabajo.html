@@ -1,0 +1,123 @@
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h5 mb-1">Carga de trabajo</h1>
+    <p class="sub mb-0">
+      Tickets asignados a cada técnico, día por día de los últimos {{ datos()?.dias?.length ?? 14 }}
+      días — para detectar quién trae más carga o si algún día cayó todo sobre una sola persona.
+    </p>
+  </div>
+  <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cargar()" [disabled]="cargando()">
+    <i class="bi bi-arrow-clockwise"></i> Actualizar
+  </button>
+</div>
+
+@if (error()) {
+  <div class="alert alert-danger py-2 small">{{ error() }}</div>
+}
+
+@if (cargando() && !datos()) {
+  <div class="text-center py-5 sub">Cargando…</div>
+} @else if (datos() && !conCarga().length) {
+  <div class="tarjeta p-4 text-center sub">
+    Ningún técnico tiene tickets asignados en este periodo.
+  </div>
+} @else if (datos()) {
+  <div class="tarjeta p-3">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0" style="font-variant-numeric: tabular-nums">
+        <thead>
+          <tr>
+            <th style="min-width: 160px">Técnico</th>
+            <th style="min-width: 90px">Servicios</th>
+            @for (d of datos()!.dias; track d) {
+              <th class="text-center" [style.opacity]="etiquetaDia(d).esFinde ? 0.55 : 1"
+                  style="min-width: 54px">
+                <div class="small text-uppercase sub" style="font-size: 0.65rem">
+                  {{ etiquetaDia(d).dia }}
+                </div>
+                <div style="font-size: 0.72rem">{{ etiquetaDia(d).corto }}</div>
+              </th>
+            }
+            <th class="text-center" style="min-width: 60px">Total</th>
+            <th class="text-center" style="min-width: 70px">Abiertos hoy</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of conCarga(); track t.tecnico_id) {
+            <tr>
+              <td class="fw-semibold" style="font-size: 0.85rem">{{ t.tecnico }}</td>
+              <td>
+                <div class="d-flex flex-wrap gap-1">
+                  @for (s of t.especialidad; track s.clave) {
+                    <span class="chip" style="background: #eef1f4; color: var(--tinta-2)"
+                          [attr.title]="s.nombre">
+                      {{ s.clave }}
+                    </span>
+                  } @empty {
+                    <span class="sub" style="font-size: 0.78rem">—</span>
+                  }
+                </div>
+              </td>
+              @for (v of t.por_dia; track $index) {
+                <td class="text-center rounded-2 celda-carga" [class.con-datos]="v.length"
+                    [style.background]="colorCelda(v.length)"
+                    [style.color]="colorTexto(v.length)"
+                    (mouseenter)="mostrarTooltip($event, v)"
+                    (mouseleave)="ocultarTooltip()">
+                  {{ v.length || '' }}
+                </td>
+              }
+              <td class="text-center fw-semibold">{{ t.total_periodo }}</td>
+              <td class="text-center">
+                <span class="chip" [style.background]="t.abiertos_hoy ? '#e8f0fa' : '#eef1f4'"
+                      [style.color]="t.abiertos_hoy ? 'var(--p3)' : 'var(--tinta-2)'">
+                  {{ t.abiertos_hoy }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr class="border-top">
+            <td class="sub small">Total del día</td>
+            <td></td>
+            @for (v of totalesPorDia(); track $index) {
+              <td class="text-center sub small">{{ v || '—' }}</td>
+            }
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  @if (leyendaServicios().length) {
+    <div class="mt-3 d-flex flex-wrap align-items-center gap-2">
+      <span class="sub small">Claves de servicio:</span>
+      @for (s of leyendaServicios(); track s.clave) {
+        <span class="chip" style="background: #eef1f4; color: var(--tinta-2)">
+          <b>{{ s.clave }}</b> · {{ s.nombre }}
+        </span>
+      }
+    </div>
+  }
+}
+
+@if (tooltip(); as tt) {
+  <div class="carga-tooltip" [class.arriba]="tt.arriba"
+       [style.left.px]="tt.x" [style.top.px]="tt.y"
+       (mouseenter)="cancelarCierre()" (mouseleave)="ocultarTooltip()">
+    @for (t of tt.tickets; track t.folio) {
+      <div class="carga-tooltip-fila">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <span class="folio">{{ t.folio }}</span>
+          <span class="estatus" [class]="t.estatusClase" style="font-size: 0.62rem">
+            {{ t.estatusTexto }}
+          </span>
+        </div>
+        <div class="carga-tooltip-detalle">{{ t.servicio }} · {{ t.problema }}</div>
+      </div>
+    }
+  </div>
+}

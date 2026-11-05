@@ -336,6 +336,19 @@ export interface ReporteDatos {
   tendencia_mensual: { mes: string; total: number }[];
   /** Ultimas 12 semanas (lunes de cada semana), desglosadas por servicio. */
   tendencia_semanal: { semanas: string[]; servicios: { nombre: string; datos: number[] }[] };
+  /** IMPA (impresoras arrendadas) por proveedor: depende del externo, no del personal interno. */
+  por_proveedor_impa: {
+    proveedor: string;
+    asignados: number;
+    abiertos: number;
+    espera: number;
+    resueltos: number;
+    en_tiempo: number;
+    pct: number | null;
+    vencidos: number;
+    prom_horas: number | null;
+    reaperturas: number;
+  }[];
 }
 
 /** Bien bajo resguardo del usuario, tal como lo entrega el sistema de bienes. */
@@ -474,6 +487,23 @@ export interface Tablero {
     problemas: { clave: string; descripcion: string; servicio: string; tickets: number }[];
     dependencias: { dependencia: string; tickets: number }[];
   };
+}
+
+/** Carga de trabajo: cuantos tickets se le asignaron a cada tecnico, dia por dia. */
+export interface CargaTrabajo {
+  hoy: string;
+  /** YYYY-MM-DD, de mas viejo a mas reciente. */
+  dias: string[];
+  tecnicos: {
+    tecnico_id: number;
+    tecnico: string;
+    /** Servicios que atiende, p.ej. [{clave:'CMP',nombre:'Equipo de cómputo'}]. */
+    especialidad: { clave: string; nombre: string }[];
+    /** Mismo orden que `dias`: el detalle de cada ticket asignado ese dia. */
+    por_dia: { folio: string; servicio: string; problema: string; estatus: string }[][];
+    total_periodo: number;
+    abiertos_hoy: number;
+  }[];
 }
 
 export interface Agenda {
