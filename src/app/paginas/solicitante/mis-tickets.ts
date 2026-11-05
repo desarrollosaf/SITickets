@@ -40,6 +40,40 @@ function normalizar(texto: string): string {
       <div class="alert alert-danger py-2 small">{{ error() }}</div>
     }
 
+    @if (mostrarCortina()) {
+      <div class="cajon-fondo" (click)="cerrarCortina()"></div>
+      <div class="position-fixed top-50 start-50 translate-middle tarjeta p-4"
+           style="z-index: 1050; width: min(460px, 92vw)">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <h2 class="h6 mb-0 d-flex align-items-center gap-2">
+            <i class="bi bi-hourglass-split" style="color: #c9971c"></i>
+            Tienes {{ porConfirmar().length }} ticket(s) por confirmar
+          </h2>
+          <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarCortina()"></button>
+        </div>
+        <p class="sub small mb-2">
+          El técnico ya los marcó como resueltos. Confirma si quedaron bien o recházalos:
+        </p>
+        <p class="sub small mb-3" style="color: #a05a00">
+          Si no respondes en 3 días, el sistema los cierra solo y
+          <b>el silencio se tomará como inconformidad</b>.
+        </p>
+        <div class="d-flex flex-wrap gap-2 mb-4">
+          @for (t of porConfirmar(); track t.id) {
+            <span class="chip" style="background: #fdf1e3; color: #a05a00">{{ t.folio }}</span>
+          }
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cerrarCortina()">
+            Revisar después
+          </button>
+          <button type="button" class="btn btn-sm btn-warning" (click)="irAConfirmar()">
+            Ir a confirmar <i class="bi bi-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    }
+
     @if (enValidacion().length) {
       <div class="tarjeta p-3 mb-3">
         <h2 class="h6 mb-2">En validación</h2>
@@ -91,7 +125,7 @@ function normalizar(texto: string): string {
         <i class="bi bi-hourglass-split"></i>
         <span>
           El técnico los marcó como resueltos. Ábrelos para confirmar o rechazar: si no respondes
-          en 3 días, el sistema los cierra solo.
+          en 3 días, el sistema los cierra solo y <b>el silencio se tomará como inconformidad</b>.
         </span>
       </div>
     }
@@ -157,6 +191,19 @@ export class MisTickets {
 
   /** §16 solo el gestor tiene este endpoint; para el resto queda vacio. */
   readonly enValidacion = signal<TicketPorValidar[]>([]);
+
+  /**
+   * Tickets que el tecnico ya marco como resueltos y esperan la confirmacion
+   * del solicitante. A diferencia de filtrados()/coincidencias(), no depende
+   * de la busqueda ni de la pestaña activa: es la cortina que avisa desde
+   * cualquier pestaña, no solo cuando ya estas parado en "Por confirmar".
+   */
+  readonly porConfirmar = computed(() =>
+    this.tickets().filter((t) => pestanaDe(t.estatus) === 'confirmar'),
+  );
+  /** Una vez cerrada (o tras ir a confirmar) no vuelve a interrumpir en esta sesion de pantalla. */
+  readonly cortinaCerrada = signal(false);
+  readonly mostrarCortina = computed(() => this.porConfirmar().length > 0 && !this.cortinaCerrada());
 
   readonly pestanas = [
     { clave: 'abiertos', texto: 'Abiertos', icono: 'bi-ticket-perforated', tono: '#2b6cb0' },
@@ -237,12 +284,22 @@ export class MisTickets {
     if (this.auth.rol() === 'gestor') {
       this.api.misPorValidar().subscribe({ next: (r) => this.enValidacion.set(r) });
     }
-    this.cargar(true);
+    this.cargar();
   }
 
   cambiarPestana(p: Pestana) {
     this.pestana.set(p);
     this.paginaActual.set(1);
+  }
+
+  irAConfirmar() {
+    this.cortinaCerrada.set(true);
+    this.cambiarPestana('confirmar');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  cerrarCortina() {
+    this.cortinaCerrada.set(true);
   }
 
   buscar(texto: string) {
@@ -255,16 +312,10 @@ export class MisTickets {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /**
-   * La primera vez abre "Por confirmar" si hay algo esperando respuesta: es lo
-   * unico que le pide accion al solicitante. Al recargar tras un cambio se
-   * queda en la pestaña donde estaba.
-   */
-  cargar(inicial = false) {
+  cargar() {
     this.api.listar({ propios: 'true' }).subscribe({
       next: (t) => {
         this.tickets.set(t);
-        if (inicial && t.some((x) => x.estatus === 'RESUELTO')) this.pestana.set('confirmar');
         this.paginaActual.set(Math.min(this.paginaActual(), this.totalPaginas()));
       },
       error: (e) => this.error.set(mensajeError(e)),
