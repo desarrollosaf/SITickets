@@ -13,6 +13,7 @@ import {
   TecnicoServicio,
   Ticket,
   TicketBitacora,
+  TicketTecnico,
   Usuario,
 } from '../database/models';
 import { TrazaService } from './traza.service';
@@ -52,6 +53,7 @@ export class ReglasService {
     @InjectModel(CatalogoProblema) private readonly problemas: typeof CatalogoProblema,
     @InjectModel(Prioridad) private readonly prioridades: typeof Prioridad,
     @InjectModel(TicketBitacora) private readonly bitacora: typeof TicketBitacora,
+    @InjectModel(TicketTecnico) private readonly equipos: typeof TicketTecnico,
     private readonly traza: TrazaService,
   ) {}
 
@@ -128,14 +130,64 @@ export class ReglasService {
      §8 · disponibilidad
      ------------------------------------------------------------------ */
 
-  /** Fin de semana o dia bloqueado en el calendario. */
+  /**
+   * Fin de semana, dia bloqueado en el calendario, o reservado para un
+   * ticket interno (ver ocupadoEnInterno).
+   */
   async disponible(usuarioId: number, fecha = new Date()): Promise<boolean> {
     const dia = fecha.getDay();
     if (dia === 0 || dia === 6) return false;
     const bloqueo = await this.calendario.count({
       where: { usuario_id: usuarioId, fecha: ISO(fecha) },
     });
-    return bloqueo === 0;
+    if (bloqueo > 0) return false;
+    return !(await this.ocupadoEnInterno(usuarioId, fecha));
+  }
+
+  /**
+   * §11/§8 · un tecnico (responsable o de apoyo, ver ticket_tecnico) de un
+   * ticket interno abierto queda reservado para ese trabajo y deja de
+   * recibir tickets normales de su servicio mientras: a) el interno ya esta
+   * EN_ATENCION (esta trabajando en eso ahora mismo), o b) ya llego su
+   * fecha programada (fecha_plan), aunque todavia no arranque el reloj —
+   * el area lo aparto para ese dia. Se usa ESTATUS_ABIERTOS (no
+   * ESTATUS_FINALES): en cuanto el tecnico termina y el interno pasa a
+   * RESUELTO ya vuelve a estar disponible — no hace falta esperar a que
+   * alguien lo cierre formalmente, eso puede tardar dias.
+   */
+  private async ocupadoEnInterno(usuarioId: number, fecha: Date): Promise<boolean> {
+    return (await this.ocupadosPorInterno(fecha)).has(usuarioId);
+  }
+
+  /**
+   * Version en lote de ocupadoEnInterno(): todos los ids de tecnicos
+   * (responsables o de apoyo) bloqueados ahora mismo por algun ticket
+   * interno. La usa disponible() para un tecnico suelto y la pantalla de
+   * Disponibilidad (agenda()) para pintar la columna de hoy de todos a la vez,
+   * sin un query por tecnico.
+   */
+  async ocupadosPorInterno(fecha = new Date()): Promise<Set<number>> {
+    const condicionInterno = {
+      interno: true,
+      estatus: { [Op.in]: ESTATUS_ABIERTOS },
+      [Op.or]: [{ estatus: ESTATUS.EN_ATENCION }, { fecha_plan: { [Op.lte]: ISO(fecha) } }],
+    };
+
+    const internos = await this.tickets.findAll({
+      where: condicionInterno,
+      attributes: ['id', 'tecnico_id'],
+    });
+
+    const ocupados = new Set<number>();
+    for (const t of internos) if (t.tecnico_id) ocupados.add(t.tecnico_id);
+    if (!internos.length) return ocupados;
+
+    const apoyos = await this.equipos.findAll({
+      where: { ticket_id: { [Op.in]: internos.map((t) => t.id) }, papel: 'apoyo' },
+      attributes: ['usuario_id'],
+    });
+    for (const a of apoyos) ocupados.add(a.usuario_id);
+    return ocupados;
   }
 
   /* ------------------------------------------------------------------
