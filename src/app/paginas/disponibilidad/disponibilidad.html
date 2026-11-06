@@ -31,6 +31,9 @@
               <td class="p-1">
                 @if (finde(d)) {
                   <div class="cal-dia finde" title="Fin de semana"></div>
+                } @else if (esHoy(d) && ocupadoPorInterno(t.id)) {
+                  <div class="cal-dia ocupado-interno"
+                       title="Ocupado hoy: ticket interno en atención o con fecha programada (responsable o apoyo)"></div>
                 } @else {
                   <button
                     class="cal-dia"
@@ -63,6 +66,10 @@
     <span class="d-flex align-items-center gap-2">
       <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #fbe9e7; border: 1px solid #f0c9c5"></i>
       Vacaciones, descanso, incapacidad o comisión
+    </span>
+    <span class="d-flex align-items-center gap-2">
+      <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #f1ecfb; border: 1px solid #ddd0f2"></i>
+      Ocupado hoy por un ticket interno
     </span>
     <span class="d-flex align-items-center gap-2">
       <i class="d-inline-block rounded" style="width: 14px; height: 14px; background: #edf0f3; border: 1px solid #dfe4ea"></i>

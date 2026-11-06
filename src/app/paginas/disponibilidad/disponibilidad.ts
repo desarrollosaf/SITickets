@@ -15,7 +15,7 @@ import type { Agenda } from '../../core/modelos';
 export class Disponibilidad {
   private readonly api = inject(TicketsService);
 
-  readonly agenda = signal<Agenda>({ tecnicos: [], bloqueos: [] });
+  readonly agenda = signal<Agenda>({ tecnicos: [], bloqueos: [], ocupadosPorInternoHoy: [] });
   readonly error = signal('');
   readonly guardando = signal(false);
 
@@ -44,6 +44,15 @@ export class Disponibilidad {
 
   bloqueado(usuarioId: number, d: Date): boolean {
     return this.bloqueados().has(`${usuarioId}|${iso(d)}`);
+  }
+
+  /** Solo tiene sentido para hoy: es un estado en vivo, no una reserva a futuro (ver backend). */
+  esHoy(d: Date): boolean {
+    return iso(d) === iso(new Date());
+  }
+
+  ocupadoPorInterno(usuarioId: number): boolean {
+    return this.agenda().ocupadosPorInternoHoy.includes(usuarioId);
   }
 
   alternar(usuarioId: number, d: Date) {

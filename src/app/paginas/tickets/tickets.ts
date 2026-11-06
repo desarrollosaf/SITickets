@@ -73,6 +73,28 @@ export class Tickets {
     this.tickets().filter((t) => t.estatus === 'RESUELTO' && this.miConfirmacion(t)),
   );
 
+  /**
+   * Cortina al entrar, solo para gestor (que ahora cae aqui por defecto, ver
+   * inicioDeRol() en auth.service.ts): a diferencia de la del tecnico, aqui
+   * nomas se dice cuantos son, sin listar folios — "Tickets generados" ya es
+   * su propia bandeja de trabajo, no hace falta duplicar la lista en la
+   * cortina.
+   */
+  readonly cortinaCerrada = signal(false);
+  readonly mostrarCortina = computed(
+    () => this.auth.rol() === 'gestor' && this.porConfirmar().length > 0 && !this.cortinaCerrada(),
+  );
+
+  cerrarCortina() {
+    this.cortinaCerrada.set(true);
+  }
+
+  irAConfirmarCortina() {
+    this.cortinaCerrada.set(true);
+    this.cambiarPestana('RESUELTO');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   readonly tickets = signal<Ticket[]>([]);
   readonly catalogos = signal<Catalogos | null>(null);
   readonly tecnicos = signal<Tecnico[]>([]);
