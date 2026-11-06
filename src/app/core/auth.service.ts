@@ -73,6 +73,7 @@ export class AuthService {
     switch (rol) {
       case 'admin':
       case 'operador':
+      case 'gestor':
         return '/tickets';
       case 'tecnico':
       case 'proveedor':

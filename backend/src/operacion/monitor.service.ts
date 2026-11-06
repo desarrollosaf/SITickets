@@ -489,7 +489,7 @@ export class MonitorService {
     const desde = new Date(Date.now() - desdeDias * 86_400_000);
     const hasta = new Date(Date.now() + dias * 86_400_000);
 
-    const [tecnicos, bloqueos] = await Promise.all([
+    const [tecnicos, bloqueos, ocupadosPorInterno] = await Promise.all([
       this.usuarios.findAll({
         where: { activo: true, rol: { [Op.in]: ['tecnico', 'proveedor'] } },
         attributes: ['id', 'nombre', 'rol'],
@@ -501,6 +501,7 @@ export class MonitorService {
           fecha: { [Op.between]: [fechaLocal(desde), fechaLocal(hasta)] },
         },
       }),
+      this.reglas.ocupadosPorInterno(),
     ]);
 
     return {
@@ -516,6 +517,10 @@ export class MonitorService {
         tipo: b.tipo,
         nota: b.nota,
       })),
+      /* Solo aplica a HOY: a diferencia de los bloqueos de calendario (que
+         cubren un rango de dias), ocupado por un interno es un estado en
+         vivo, no una reserva planeada a futuro. */
+      ocupadosPorInternoHoy: [...ocupadosPorInterno],
     };
   }
 }

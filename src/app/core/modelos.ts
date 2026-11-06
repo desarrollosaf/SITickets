@@ -509,6 +509,8 @@ export interface CargaTrabajo {
 export interface Agenda {
   tecnicos: { id: number; nombre: string; especialidad: string }[];
   bloqueos: { usuario_id: number; fecha: string; tipo: string; nota: string | null }[];
+  /** Ids de tecnicos ocupados HOY por un ticket interno (responsable o apoyo). */
+  ocupadosPorInternoHoy: number[];
 }
 
 export interface LineaTraza {
