@@ -391,6 +391,12 @@ table.tickets tbody tr.por-confirmar:hover { background: #ece0f9; }
   flex-direction: column;
   box-shadow: -8px 0 28px rgba(18, 26, 38, 0.16);
 }
+/* Sin min-height: 0 un hijo flex no se encoge por debajo de su contenido:
+   el overflow-auto no hacia scroll de verdad, crecia con todo (formulario +
+   bitacora) y dejaba muy poco visible del resto. */
+.cajon-cuerpo {
+  min-height: 0;
+}
 
 @media print {
   .rail, .cajon-fondo, .no-imprimir { display: none !important; }
