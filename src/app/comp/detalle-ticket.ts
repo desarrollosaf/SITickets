@@ -44,6 +44,9 @@ type Formulario =
 
 const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
 
+/** Mismo catalogo de bienes en SIASAF que equipo de computo (ver backend: SERVICIOS_CON_BIEN_SIASAF). */
+const SERVICIOS_CON_BIEN_SIASAF = ['CMP', 'IMP'];
+
 const MOTIVOS_ESPERA = [
   'Refacción no disponible en almacén',
   'En espera de visita del proveedor',
@@ -122,6 +125,14 @@ export class DetalleTicket {
   motivo = '';
   /** Solo si se retira un equipo (CMP) registrado sin numero de inventario (p. ej. problema "Otro"). */
   inventarioRetiro = '';
+  /** Compartido entre "Retirar equipo" y "Dado de baja": el tecnico puede elegir de la lista o capturar a mano. */
+  readonly capturaManualInventario = signal(false);
+
+  alternarCapturaManualInventario() {
+    this.capturaManualInventario.update((v) => !v);
+    this.dSeleccion.set([]);
+    this.inventarioRetiro = '';
+  }
   diagnostico = '';
   solucion = '';
   refacciones = '';
@@ -180,14 +191,34 @@ export class DetalleTicket {
   readonly esImpa = computed(() => this.ticket()?.servicio_clave === 'IMPA');
 
   /**
-   * Al retirar un equipo (CMP) para revision: si el ticket se registro con
-   * un problema que no pedia inventario (p. ej. "Otro"), no hay con que
-   * armar la cedula de resguardo — se le pide al tecnico en este momento.
-   * motivo no es signal (va con ngModel), asi que es metodo, no computed.
+   * Al retirar un equipo (CMP o IMP) para revision: si el ticket se
+   * registro con un problema que no pedia inventario (p. ej. "Otro"), no
+   * hay con que armar la cedula de resguardo — se le pide al tecnico en
+   * este momento. motivo no es signal (va con ngModel), asi que es metodo,
+   * no computed.
    */
   necesitaInventarioRetiro(): boolean {
     const t = this.ticket();
-    return this.motivo === MOTIVO_RETIRO_EQUIPO && t?.servicio_clave === 'CMP' && !t.contexto;
+    return (
+      this.motivo === MOTIVO_RETIRO_EQUIPO &&
+      SERVICIOS_CON_BIEN_SIASAF.includes(t?.servicio_clave ?? '') &&
+      !t?.contexto
+    );
+  }
+  /**
+   * Al dar de baja un equipo (CMP o IMP) siempre se confirma el bien de la
+   * lista del solicitante, sin importar lo que ya traiga t.contexto: ese
+   * campo puede ser un numero de inventario real, o el modelo/programa/
+   * ubicacion que pedia el problema (p. ej. IMP sin bienes en SIASAF cae a
+   * capturar el modelo a mano) — no hay forma de distinguirlos solo con el
+   * texto, asi que aqui siempre se pide el bien explicito antes de avisar a
+   * SIASAF y generar el dictamen.
+   */
+  necesitaInventarioBaja(): boolean {
+    return (
+      this.resultadoCmp === 'baja' &&
+      SERVICIOS_CON_BIEN_SIASAF.includes(this.ticket()?.servicio_clave ?? '')
+    );
   }
   /**
    * Caso especial, solo para el servicio indicado (ver USUARIOS_CIERRE_SERVICIO
@@ -292,8 +323,10 @@ export class DetalleTicket {
        dominio que nunca existio. */
     return t ? new URL(`checador/${t.id}`, document.baseURI).href : '';
   });
-  /** Equipo de computo: "Atender ticket" reemplaza a "Marcar resuelto". */
-  readonly esCmpTicket = computed(() => this.ticket()?.servicio_clave === 'CMP');
+  /** Equipo de computo o impresoras propias: "Atender ticket" reemplaza a "Marcar resuelto". */
+  readonly esCmpTicket = computed(() =>
+    SERVICIOS_CON_BIEN_SIASAF.includes(this.ticket()?.servicio_clave ?? ''),
+  );
   /** Impresoras arrendadas: nivel de tóner del sistema eService, no para el solicitante. */
   readonly esImpaTicket = computed(() => this.ticket()?.servicio_clave === 'IMPA');
 
@@ -434,7 +467,7 @@ export class DetalleTicket {
         /* Solo si el problema realmente pide numero de inventario: hay CMP
            (CMP-06, CMP-09, CMP-12…) cuyo campo adicional es otra cosa
            (programa, ubicacion, usuario/carpeta), no un bien. */
-        if (t.servicio_clave === 'CMP' && esCampoInventario(t.campo_adicional)) {
+        if (SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio_clave) && esCampoInventario(t.campo_adicional)) {
           this.api.bienDelTicket(id).subscribe({ next: (b) => this.bienTicket.set(b) });
         }
         if (t.servicio_clave === 'IMPA' && !this.esSolicitante()) {
@@ -465,6 +498,7 @@ export class DetalleTicket {
     this.dBienes.set([]);
     this.dMotivoBienes.set('');
     this.dSeleccion.set([]);
+    this.capturaManualInventario.set(false);
     this.diagnostico = '';
     this.solucion = '';
     this.refacciones = '';
@@ -514,6 +548,13 @@ export class DetalleTicket {
         this.dCargandoBienes.set(false);
         this.dBienes.set(r.bienes);
         this.dMotivoBienes.set(r.bienes.length ? '' : (r.motivo ?? 'No tiene bienes resguardados.'));
+        /* Si lo que ya traia el ticket resulta ser un numero de inventario
+           real (no un modelo/programa capturado a mano), se preselecciona
+           para no obligar a repetir el clic cuando ya estaba bien. */
+        const contexto = this.ticket()?.contexto;
+        if (contexto && r.bienes.some((b) => b.inventario === contexto)) {
+          this.dSeleccion.set([contexto]);
+        }
       },
       error: (e) => {
         this.dCargandoBienes.set(false);
@@ -621,13 +662,30 @@ export class DetalleTicket {
     this.dMotivoBienes.set('');
     this.dSeleccion.set([]);
     this.inventarioRetiro = '';
+    this.capturaManualInventario.set(false);
     if (this.necesitaInventarioRetiro()) this.cargarBienes(this.id(), 'retiro');
+  }
+
+  /** Al elegir "Dado de baja" sin inventario capturado: mismo mecanismo que onMotivoCambia(). */
+  onResultadoCmpCambia() {
+    this.dBienes.set([]);
+    this.dMotivoBienes.set('');
+    this.dSeleccion.set([]);
+    this.inventarioRetiro = '';
+    this.capturaManualInventario.set(false);
+    if (this.necesitaInventarioBaja()) this.cargarBienes(this.id(), 'retiro');
+  }
+
+  /** Lo elegido de la lista si hay, si no lo que el tecnico tecleo a mano. */
+  private bienElegido(): string | undefined {
+    if (this.capturaManualInventario()) return this.inventarioRetiro.trim() || undefined;
+    return (this.dBienes().length ? this.dSeleccion()[0] : this.inventarioRetiro.trim()) || undefined;
   }
 
   /** Con lista de bienes disponible se manda lo elegido; si no, lo que el tecnico tecleo a mano. */
   private inventarioAEnviar(): string | undefined {
     if (!this.necesitaInventarioRetiro()) return undefined;
-    return (this.dBienes().length ? this.dSeleccion()[0] : this.inventarioRetiro.trim()) || undefined;
+    return this.bienElegido();
   }
 
   enviarEspera() {
@@ -713,6 +771,10 @@ export class DetalleTicket {
   }
 
   enviarAtenderCmp() {
+    if (this.necesitaInventarioBaja() && !this.bienElegido()) {
+      this.error.set('Indica el número de inventario del equipo que se da de baja.');
+      return;
+    }
     this.ocupado.set(true);
     this.api
       .atenderCmp(this.id(), {
@@ -722,6 +784,7 @@ export class DetalleTicket {
         refacciones: this.resultadoCmp === 'reparado' ? this.refacciones || undefined : undefined,
         observaciones: this.resultadoCmp === 'baja' ? this.observacionesBaja : undefined,
         fotos: this.resultadoCmp === 'baja' ? this.fotosBaja : undefined,
+        inventario: this.necesitaInventarioBaja() ? this.bienElegido() : undefined,
       })
       .subscribe({
         next: (t) => {

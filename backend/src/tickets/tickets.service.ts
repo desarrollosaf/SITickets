@@ -90,6 +90,15 @@ export const CARPETA_CEDULAS = join(process.cwd(), 'storage', 'cedulas');
 const MOTIVO_RETIRO_EQUIPO = 'Retirar el equipo del lugar para su revisión';
 
 /**
+ * Servicios cuyo bien vive en el mismo catalogo de SIASAF que equipo de
+ * computo (tipo 1, ver bienesSrv.porRfcCmp): impresoras propias comparte el
+ * mismo "tipo de bien" ahi, no tiene uno aparte. Toda la mecanica de
+ * inventario — dar de baja, cedulas de resguardo, traspaso de custodia,
+ * "en mantenimiento" — aplica igual a los dos.
+ */
+const SERVICIOS_CON_BIEN_SIASAF = ['CMP', 'IMP'];
+
+/**
  * Roles que atienden tickets y por tanto ven solo lo que traen turnado.
  * "sistemas" es un rol de una sola persona (SISTEMAS/PROGRESS, ver
  * migracion 024_rol_sistemas.sql): atiende como cualquier tecnico, con la
@@ -2081,7 +2090,7 @@ export class TicketsService {
     if (
       typeof nuevos.contexto === 'string' &&
       ticket.tecnico_id &&
-      this.esTicketDeInventarioCmp(ticket)
+      this.esTicketDeInventarioSiasaf(ticket)
     ) {
       await this.traspasaCustodiaCmp(ticket, contextoAnterior, nuevos.contexto);
     }
@@ -2315,14 +2324,15 @@ export class TicketsService {
   }
 
   /**
-   * Equipo de computo asignado al solicitante del ticket, para que el tecnico
-   * sepa exactamente cual reparar. Solo aplica a servicio CMP; para el resto
-   * el numero de inventario ya se ve como texto plano en el detalle.
+   * Bien asignado al solicitante del ticket, para que el tecnico sepa
+   * exactamente cual reparar. Solo aplica a CMP/IMP (mismo catalogo de
+   * bienes en SIASAF, ver SERVICIOS_CON_BIEN_SIASAF); para el resto el
+   * numero de inventario ya se ve como texto plano en el detalle.
    */
   async bienDelTicket(id: number, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
-    if (t.servicio?.clave !== 'CMP') {
-      return { bien: null, motivo: 'Este ticket no es de Equipo de cómputo.' };
+    if (!SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio?.clave ?? '')) {
+      return { bien: null, motivo: 'Este ticket no maneja un número de inventario en SIASAF.' };
     }
     /* Hay problemas de CMP (CMP-06, CMP-09, CMP-12…) cuyo campo adicional no
        es un numero de inventario (programa, ubicacion, usuario/carpeta). */
@@ -2396,7 +2406,7 @@ export class TicketsService {
       return { bienes: [], motivo: 'No se pudo identificar el RFC del solicitante.' };
     }
 
-    return ticket.servicio?.clave === 'CMP'
+    return SERVICIOS_CON_BIEN_SIASAF.includes(ticket.servicio?.clave ?? '')
       ? this.bienesSrv.porRfcCmp(rfc)
       : this.bienesSrv.porRfc(rfc);
   }
@@ -2411,8 +2421,8 @@ export class TicketsService {
   async bienesParaRetiro(id: number, usuario: UsuarioToken) {
     const t = await this.cargar(id, usuario);
     this.exigeTecnico(t, usuario);
-    if (t.servicio?.clave !== 'CMP') {
-      throw new BadRequestException('Este ticket no es de equipo de computo');
+    if (!SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio?.clave ?? '')) {
+      throw new BadRequestException('Este ticket no maneja un número de inventario en SIASAF');
     }
 
     const rfc = await this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre);
@@ -2435,14 +2445,14 @@ export class TicketsService {
    * confusos o, peor, una cedula con datos inventados.
    */
   /**
-   * Equipo de computo con un bien identificado: o el problema elegido pedia
+   * CMP o IMP con un bien identificado: o el problema elegido pedia
    * inventario desde el registro, o ya se capturo despues (ver
    * ponerEnEspera, cuando el tecnico lo agrega al retirar un equipo
    * registrado con un problema tipo "Otro" que no lo pedia).
    */
-  private esTicketDeInventarioCmp(t: Ticket): boolean {
+  private esTicketDeInventarioSiasaf(t: Ticket): boolean {
     return (
-      t.servicio?.clave === 'CMP' &&
+      SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio?.clave ?? '') &&
       (!!t.problema?.campo_adicional?.toLowerCase().includes('inventario') || !!t.contexto)
     );
   }
@@ -2519,7 +2529,7 @@ export class TicketsService {
    * igual avanza. `t.servicio` debe venir cargado (ver cargar()).
    */
   async marcarCmpEnMantenimiento(t: Ticket, usuario: UsuarioToken): Promise<void> {
-    if (!t.contexto || !this.esTicketDeInventarioCmp(t)) return;
+    if (!t.contexto || !this.esTicketDeInventarioSiasaf(t)) return;
 
     const [tecnicoLocal, rfcSolicitante] = await Promise.all([
       this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
@@ -2549,7 +2559,8 @@ export class TicketsService {
      * que se le exige al tecnico en este momento en vez de dejarlo pasar
      * sin cedula.
      */
-    const retiraEquipo = motivo === MOTIVO_RETIRO_EQUIPO && t.servicio?.clave === 'CMP';
+    const retiraEquipo =
+      motivo === MOTIVO_RETIRO_EQUIPO && SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio?.clave ?? '');
     if (retiraEquipo && !t.contexto && !inventario?.trim()) {
       throw new BadRequestException(
         'Este equipo no tiene número de inventario capturado: indícalo para retirarlo',
@@ -2576,7 +2587,7 @@ export class TicketsService {
     await this.reglas.anota(t.id, usuario.id, 'En espera', motivo);
     this.traza.registra('§5', `${t.folio} EN ESPERA (${motivo}). Reloj de resolucion pausado.`);
 
-    if (motivo === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t)) {
+    if (motivo === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioSiasaf(t)) {
       await this.generarCedulaSalida(t, usuario);
       /*
        * El inventario se acaba de saber en este momento (antes el problema
@@ -2663,7 +2674,7 @@ export class TicketsService {
     const pausaMinHabil = t.f_espera_desde ? minutosHabiles(new Date(t.f_espera_desde), new Date()) : 0;
 
     const veniaDeRetiroEquipo =
-      t.motivo_espera === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioCmp(t);
+      t.motivo_espera === MOTIVO_RETIRO_EQUIPO && this.esTicketDeInventarioSiasaf(t);
 
     await t.update({
       espera_acum_seg: t.espera_acum_seg + pausaMinHabil * 60,
@@ -2838,12 +2849,13 @@ export class TicketsService {
   }
 
   /* ------------------------------------------------------------------
-     Atencion de EQUIPO DE COMPUTO (CMP): reemplaza a resolver() para este
-     servicio. El tecnico declara si reparo el equipo (mismos campos de
-     siempre) o si lo dio de baja; en ese caso el sistema mismo genera el
-     dictamen tecnico en pdf a partir de las observaciones y fotos que
-     capture. Al cerrar, se avisa a SIASAF que el bien queda asignado
-     temporalmente al tecnico.
+     Atencion de EQUIPO DE COMPUTO (CMP) e IMPRESORAS PROPIAS (IMP):
+     reemplaza a resolver() para estos servicios (mismo catalogo de bienes
+     en SIASAF, ver SERVICIOS_CON_BIEN_SIASAF). El tecnico declara si
+     reparo el equipo (mismos campos de siempre) o si lo dio de baja; en
+     ese caso el sistema mismo genera el dictamen tecnico en pdf a partir
+     de las observaciones y fotos que capture. Al cerrar, se avisa a
+     SIASAF que el bien queda asignado temporalmente al tecnico.
      ------------------------------------------------------------------ */
 
   async atenderCmp(
@@ -2856,12 +2868,28 @@ export class TicketsService {
     this.exigeTecnico(t, usuario);
     this.exigeEstatus(t, [ESTATUS.EN_ATENCION, ESTATUS.EN_ESPERA, ESTATUS.ASIGNADO]);
 
-    if (t.servicio?.clave !== 'CMP') {
-      throw new BadRequestException('Esta accion solo aplica a tickets de Equipo de cómputo');
+    if (!SERVICIOS_CON_BIEN_SIASAF.includes(t.servicio?.clave ?? '')) {
+      throw new BadRequestException(
+        'Esta acción solo aplica a tickets de Equipo de cómputo o Impresoras propias',
+      );
     }
     if (dto.resultado === 'baja' && !dto.observaciones?.trim()) {
       throw new BadRequestException('Captura las observaciones para generar el dictamen de baja');
     }
+
+    /*
+     * Al dar de baja siempre se exige el inventario explicito del dto, sin
+     * importar lo que ya traiga t.contexto: ese campo puede ser un numero
+     * de inventario real o el modelo/programa/ubicacion que pedia el
+     * problema (p. ej. IMP sin bienes en SIASAF cae a capturar el modelo a
+     * mano) — no hay forma de distinguirlos solo con el texto, asi que el
+     * frontend siempre pide confirmar el bien de la lista antes de avisar a
+     * SIASAF y generar el dictamen (ver necesitaInventarioBaja()).
+     */
+    if (dto.resultado === 'baja' && !dto.inventario?.trim()) {
+      throw new BadRequestException('Indica el número de inventario del equipo que se da de baja');
+    }
+    const nuevoInventario = dto.resultado === 'baja' ? dto.inventario!.trim() : undefined;
 
     /* El reloj tiene que estar corriendo: sin eso no hay tiempo en sitio que registrar. */
     const sesionAbierta = await this.sesiones.findOne({ where: { ticket_id: t.id, fin: null } });
@@ -2881,17 +2909,19 @@ export class TicketsService {
      * regresa en la respuesta para que el tecnico sepa que debe avisar al
      * área.
      */
+    const contextoParaBien = nuevoInventario ?? (this.esTicketDeInventarioSiasaf(t) ? t.contexto : null);
+
     let avisoCustodia: string | null = null;
     let bienId: number | null = null;
     let bienEsBc = false;
-    if (t.contexto && this.esTicketDeInventarioCmp(t)) {
+    if (contextoParaBien) {
       const [tecnicoLocal, rfcSolicitante] = await Promise.all([
         this.usuarios.findByPk(usuario.id, { attributes: ['rfc'] }),
         this.rfcDelSolicitante(t.solicitante_id, t.solicitante_nombre),
       ]);
       if (rfcSolicitante) {
         const { bienes } = await this.bienesSrv.porRfcCmp(rfcSolicitante);
-        const bien = bienes.find((b) => b.inventario === t.contexto);
+        const bien = bienes.find((b) => b.inventario === contextoParaBien);
         bienId = bien?.id ?? null;
         bienEsBc = bien?.esBc ?? false;
         if (bien?.id && tecnicoLocal?.rfc) {
@@ -2922,7 +2952,7 @@ export class TicketsService {
         departamento: org.departamento,
         servicioNombre: t.servicio?.nombre ?? '—',
         bien: detalleBien ?? {
-          numero_inventario: t.contexto ?? '—',
+          numero_inventario: contextoParaBien ?? '—',
           nombre_bien: '—',
           material: null,
           marca: null,
@@ -2954,6 +2984,7 @@ export class TicketsService {
       solucion: reparado ? dto.solucion : null,
       refacciones: reparado ? dto.refacciones?.trim() || 'Ninguna' : null,
       dictamen_url: reparado ? null : dictamenArchivo,
+      ...(nuevoInventario && { contexto: nuevoInventario }),
     });
 
     await this.reglas.anota(
