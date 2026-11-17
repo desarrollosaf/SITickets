@@ -257,6 +257,8 @@ export class TicketsService {
       refacciones?: string;
       observaciones?: string;
       fotos?: File[];
+      /** Solo si el ticket no tenia numero de inventario capturado (ver necesitaInventarioBaja). */
+      inventario?: string;
     },
   ) {
     const form = new FormData();
@@ -265,6 +267,7 @@ export class TicketsService {
     if (d.solucion) form.set('solucion', d.solucion);
     if (d.refacciones) form.set('refacciones', d.refacciones);
     if (d.observaciones) form.set('observaciones', d.observaciones);
+    if (d.inventario) form.set('inventario', d.inventario);
     for (const foto of d.fotos ?? []) form.append('fotos', foto);
     return this.http.post<TicketAtendidoCmp>(`${API}/tickets/${id}/atender-cmp`, form);
   }

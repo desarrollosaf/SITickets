@@ -251,6 +251,13 @@
                               <span class="spinner-border spinner-border-sm me-2"></span>
                               Consultando tus bienes resguardados…
                             </div>
+                          } @else if (bienes().length && capturaManualBien()) {
+                            <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
+                                   [placeholder]="p.campo_adicional" autocomplete="off" />
+                            <button type="button" class="btn btn-link btn-sm p-0 mt-1"
+                                    (click)="alternarCapturaManual()">
+                              Elegir de la lista de bienes
+                            </button>
                           } @else if (bienes().length) {
                             @if (esCmp()) {
                               <!-- Un solo equipo: es el que se va a reparar. -->
@@ -303,6 +310,10 @@
                                 }
                               </div>
                             }
+                            <button type="button" class="btn btn-link btn-sm p-0 mt-1"
+                                    (click)="alternarCapturaManual()">
+                              ¿No aparece en la lista? Captúralo a mano
+                            </button>
                           } @else {
                             <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
                                    [placeholder]="p.campo_adicional" />
@@ -340,9 +351,6 @@
                                    placeholder="Modelo de impresora" />
                             <div class="form-text">No se pudo consultar el catálogo de modelos. Captúralo a mano.</div>
                           }
-                        } @else if (esModeloImpresoraLibre()) {
-                          <input id="n-ctx" class="form-control" [(ngModel)]="contextoV" name="contexto"
-                                 placeholder="Modelo de impresora" autocomplete="off" />
                         } @else if (esCantidadEquipos()) {
                           <input id="n-ctx" class="form-control" type="number" inputmode="numeric" min="1" step="1"
                                  autocomplete="off"

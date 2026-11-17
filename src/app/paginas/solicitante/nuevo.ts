@@ -230,8 +230,16 @@ export class Nuevo {
 
   /* ---------------- bienes bajo resguardo ---------------- */
 
-  /** true cuando el campo adicional del catalogo pide numero de inventario. */
-  readonly esInventario = computed(() => esCampoInventario(this.problema()?.campo_adicional));
+  /**
+   * true cuando el campo adicional del catalogo pide numero de inventario,
+   * o cuando es el modelo de impresora de IMP (impresoras propias): mismo
+   * catalogo de bienes en SIASAF que equipo de computo (ver esCmp), asi que
+   * en vez de capturar el modelo a mano se elige el bien del resguardo —
+   * reemplaza al campo libre de esModeloImpresoraLibre.
+   */
+  readonly esInventario = computed(
+    () => esCampoInventario(this.problema()?.campo_adicional) || this.esModeloImpresoraLibre(),
+  );
   /** true cuando el campo adicional pide cuantos equipos afecta la falla (servicio INTERNET): solo numeros. */
   readonly esCantidadEquipos = computed(() =>
     esCampoCantidadEquipos(this.problema()?.campo_adicional),
@@ -246,8 +254,12 @@ export class Nuevo {
     this.contextoV.set(valor === null || valor === undefined ? '' : String(valor));
   }
 
-  /** Equipo de computo: un solo equipo por ticket, sacado de una API distinta. */
-  readonly esCmp = computed(() => this.problema()?.servicio_clave === 'CMP');
+  /**
+   * Equipo de computo o impresoras propias: un solo bien por ticket, sacado
+   * de la API de bienes tipo CMP (mismo catalogo en SIASAF para los dos
+   * servicios) en vez de la generica.
+   */
+  readonly esCmp = computed(() => ['CMP', 'IMP'].includes(this.problema()?.servicio_clave ?? ''));
 
   /* ---------------- hora de atencion (servicio CNA, Cartas de no adeudo) ---------------- */
 
@@ -296,10 +308,20 @@ export class Nuevo {
   readonly seleccion = signal<string[]>([]);
   /** Se consulta una sola vez por sesion de pantalla, no en cada problema. */
   private bienesPedidos = false;
+  /** El bien que buscan no aparece en la lista (SIASAF desactualizado, prestado, etc.): se captura a mano. */
+  readonly capturaManualBien = signal(false);
+
+  alternarCapturaManual() {
+    this.capturaManualBien.update((v) => !v);
+    this.seleccion.set([]);
+    this.contextoV.set('');
+  }
 
   /** Lo que se manda como contexto: los inventarios elegidos, la cuenta armada, el modelo elegido, o el texto capturado. */
   readonly contextoFinal = computed(() => {
-    if (this.esInventario() && this.bienes().length) return this.seleccion().join(', ');
+    if (this.esInventario() && this.bienes().length && !this.capturaManualBien()) {
+      return this.seleccion().join(', ');
+    }
     if (this.esCorreo()) return this.correoParaEnviar();
     if (this.esModeloImpresoraCatalogo() && this.modelosImpresora().length) return this.modeloElegido();
     return this.contextoV().trim();
@@ -449,6 +471,7 @@ export class Nuevo {
   cambiaProblema(clave: string) {
     this.claveProblema.set(clave);
     this.seleccion.set([]);
+    this.capturaManualBien.set(false);
     if (this.esInventario() && !this.bienesPedidos) this.cargaBienes();
     if ((this.esModeloImpresoraCatalogo() || this.esTrasladoImpa()) && !this.modelosPedidos) {
       this.cargaModelosImpresora();
@@ -502,6 +525,7 @@ export class Nuevo {
   limpiar() {
     this.contextoV.set('');
     this.seleccion.set([]);
+    this.capturaManualBien.set(false);
     this.texto = '';
     this.correoLibre.set(false);
     this.modeloElegido.set('');
@@ -554,7 +578,7 @@ export class Nuevo {
     }
     if (p.campo_adicional && !this.contextoFinal()) {
       this.error.set(
-        this.esInventario() && this.bienes().length
+        this.esInventario() && this.bienes().length && !this.capturaManualBien()
           ? 'Elige al menos un bien de tu resguardo.'
           : this.esModeloImpresoraCatalogo() && this.modelosImpresora().length
             ? 'Elige el modelo de impresora.'

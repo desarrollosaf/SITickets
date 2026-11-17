@@ -37,4 +37,14 @@ export class AtenderCmpDto {
   @MinLength(10, { message: 'Describe el dictamen de baja' })
   @MaxLength(2000)
   observaciones?: string;
+
+  /**
+   * Solo si el ticket no tenia numero de inventario capturado (el problema
+   * elegido no lo pedia, o nunca se paso por "Retirar equipo"): se captura
+   * hasta este momento, al dar de baja.
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  inventario?: string;
 }
